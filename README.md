@@ -1,333 +1,366 @@
-# ReefBlueSky KH Monitor 🌊
+# 🌊 ReefBlueSky KH Monitor - Rev06
 
-**Um monitor de alcalinidade (KH) de código aberto, baixo custo e totalmente automatizado para aquários marinhos.**
+**Sistema de Monitoramento de Alcalinidade (KH) para Aquários Marinhos**
+
+Analisador de alcalinidade de baixo custo baseado em ESP32 com integração em nuvem, interface web, segurança avançada e documentação completa.
+
+---
 
 ## 📋 Visão Geral
 
-O **ReefBlueSky KH Monitor** é um projeto inovador que oferece uma alternativa acessível aos analisadores comerciais caros (que custam R$ 8.000+). Utilizando o método científico de **saturação de CO₂ atmosférico**, o sistema automatiza completamente a medição de KH (alcalinidade) em aquários marinhos.
+O **ReefBlueSky KH Monitor** é um sistema automatizado para medir e monitorar a alcalinidade (KH) de aquários marinhos. Utiliza:
 
-### ✨ Características Principais
+- **Hardware:** ESP32 + sensores de pH/temperatura + bombas peristálticas
+- **Firmware:** C++ com WiFi, MQTT, HTTPS e armazenamento persistente
+- **Backend:** Node.js com JWT, rate limiting e integração MQTT
+- **Frontend:** React com dashboard em tempo real
+- **Segurança:** 10 melhorias críticas implementadas
+- **Deploy:** Cloudflare Tunnel para acesso remoto seguro
 
-- ✅ **Automação Completa**: Ciclo de medição de 5 fases totalmente automatizado
-- ✅ **Calibração Inteligente**: Calibração com água de KH conhecido (reservatório C)
-- ✅ **Compensação de Temperatura**: Ajuste automático dos cálculos
-- ✅ **Frequência Configurável**: Testes de 1h a 24h (intervalo do usuário)
-- ✅ **Detecção de Erros**: Identificação automática de falhas de sensores/bombas
-- ✅ **Histórico de Dados**: Até 1000 medições armazenadas localmente
-- ✅ **Interface Web**: Dashboard em tempo real com gráficos e exportação de dados
-- ✅ **Código Aberto**: MIT License - Livre para modificar e distribuir
-- ✅ **Custo Baixo**: ~R$ 900 em componentes (9x mais barato que comercial)
+---
 
-## 🎯 Especificações Técnicas
-
-| Aspecto | Especificação |
-|--------|---------------|
-| **Microcontrolador** | ESP32 (WiFi integrado) |
-| **Sensores** | pH (PH-4502C), Temperatura (DS18B20), Nível (capacitivos) |
-| **Bombas** | 4x Kamoer peristálticas (12V) |
-| **Câmaras** | 3 câmaras (50ml, 50ml, 200ml) com sistema hidráulico |
-| **Método** | Saturação de CO₂ atmosférico |
-| **Precisão** | ±0.1 dKH (após calibração) |
-| **Intervalo KH** | 1.0 - 20.0 dKH |
-| **Consumo** | 0.5W (standby) a 50W (pico) |
-| **Fonte** | 12V DC 10A 120W (CFTV) |
-| **Tamanho** | Compacto (cabe em gabinete pequeno) |
-| **Conectividade** | WiFi 802.11b/g/n, MQTT, HTTP |
-
-## 🔬 Como Funciona
-
-### Ciclo de Medição em 5 Fases
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  CICLO DE MEDIÇÃO DE KH - 5 FASES                      │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  FASE 1: DESCARTE (5 min)                             │
-│  └─ Bombas descartam água residual                    │
-│                                                         │
-│  FASE 2: CALIBRAÇÃO (10 min)                          │
-│  └─ Câmara B preenchida com solução de referência     │
-│  └─ Saturação com CO₂ atmosférico                     │
-│  └─ Medição de pH da referência                       │
-│                                                         │
-│  FASE 3: COLETA (5 min)                               │
-│  └─ Câmara A preenchida com água do aquário           │
-│  └─ Transferência para câmara de análise              │
-│                                                         │
-│  FASE 4: SATURAÇÃO E MEDIÇÃO (15 min)                 │
-│  └─ Injeção de ar (compressor 5V)                     │
-│  └─ Saturação com CO₂ atmosférico                     │
-│  └─ Medição de pH da amostra                          │
-│  └─ Cálculo de KH baseado em diferença de pH          │
-│                                                         │
-│  FASE 5: MANUTENÇÃO (5 min)                           │
-│  └─ Limpeza das câmaras                               │
-│  └─ Preparação para próximo ciclo                     │
-│                                                         │
-│  TEMPO TOTAL: ~40 minutos                             │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Fórmula de Cálculo
-
-```
-KH = (10^(pH_referência - pH_amostra) - 1) × 50 × Fator_Temperatura
-
-Onde:
-- pH_referência: pH da solução de referência (saturada com CO₂)
-- pH_amostra: pH da amostra de água do aquário (saturada com CO₂)
-- Fator_Temperatura: 1 + 0.002 × (Temperatura - 25°C)
-```
-
-## 📦 O Que Você Recebe
-
-### Código-Fonte ESP32
-- ✅ Arquivo principal (.ino)
-- ✅ 6 módulos de código (PumpControl, SensorManager, KH_Analyzer, WiFi_MQTT, MeasurementHistory)
-- ✅ Código comentado e bem estruturado
-- ✅ Suporte para MQTT e HTTP
-
-### Documentação Completa
-- ✅ Manual de Montagem (passo-a-passo com diagramas)
-- ✅ Manual de Operação (como usar o sistema)
-- ✅ Guia de Calibração (procedimento detalhado)
-- ✅ Guia de Troubleshooting (solução de problemas)
-- ✅ Artigo Científico (metodologia e validação)
-- ✅ Lista de Materiais (BOM com links de fornecedores)
-- ✅ Esquemas Elétricos (diagramas coloridos e ilustrados)
-- ✅ Análise Crítica (limitações e melhorias futuras)
-
-### Website e Dashboard
-- ✅ Frontend React com 8 páginas
-- ✅ Backend Express com tRPC
-- ✅ Banco de dados MySQL
-- ✅ Dashboard em tempo real
-- ✅ Histórico de medições
-- ✅ Exportação de dados (CSV/JSON)
-- ✅ Autenticação de usuários
-
-## 🚀 Quick Start
-
-### 1. Preparação do Hardware
-
-```bash
-# Clone o repositório
-git clone https://github.com/rescosta/ReefBlueSky-Kh.git
-cd ReefBlueSky-KH-Monitor
-
-# Veja a lista de materiais
-cat docs/BOM.md
-
-# Consulte o manual de montagem
-cat docs/MANUAL_MONTAGEM.md
-```
-
-### 2. Instalação do Firmware ESP32
-
-```bash
-# Requisitos
-- Arduino IDE 1.8.0+
-- ESP32 Board Package
-
-# Passos
-1. Abra Arduino IDE
-2. Arquivo → Preferências → URL de Gerenciador de Placas
-3. Adicione: https://dl.espressif.com/dl/package_esp32_index.json
-4. Ferramentas → Placa → Gerenciador de Placas → Instale ESP32
-5. Abra ReefBlueSky_KH_Monitor.ino
-6. Configure WiFi no código (linhas 15-16)
-7. Selecione: Ferramentas → Placa → ESP32 Dev Module
-8. Clique em Upload
-```
-
-### 3. Configuração Inicial
-
-```bash
-# Após o upload bem-sucedido:
-1. Abra Monitor Serial (115200 baud)
-2. Reinicie o ESP32
-3. Veja as mensagens de inicialização
-4. Acesse o website em: http://seu-ip:3000
-5. Faça login com suas credenciais
-6. Calibre o sistema (veja Manual de Calibração)
-```
-
-## 📚 Documentação Detalhada
-
-| Documento | Descrição | Link |
-|-----------|-----------|------|
-| **Manual de Montagem** | Passo-a-passo completo com diagramas | [docs/MANUAL_MONTAGEM.md](docs/MANUAL_MONTAGEM.md) |
-| **Manual de Operação** | Como usar o sistema | [docs/MANUAL_OPERACAO.md](docs/MANUAL_OPERACAO.md) |
-| **Guia de Calibração** | Procedimento de calibração | [docs/GUIA_CALIBRACAO.md](docs/GUIA_CALIBRACAO.md) |
-| **Guia de Troubleshooting** | Solução de problemas | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
-| **Esquemas Elétricos** | Diagramas coloridos | [docs/ESQUEMAS_ELETRICOS.md](docs/ESQUEMAS_ELETRICOS.md) |
-| **Lista de Materiais** | BOM com links | [docs/BOM.md](docs/BOM.md) |
-| **API Reference** | Documentação de API | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
-| **Artigo Científico** | Metodologia e validação | [docs/ARTIGO_CIENTIFICO.pdf](docs/ARTIGO_CIENTIFICO.pdf) |
-
-## 🔧 Estrutura do Projeto
-
-```
-ReefBlueSky-KH-Monitor/
-├── firmware/
-│   ├── ReefBlueSky_KH_Monitor.ino          # Arquivo principal
-│   └── src/
-│       ├── PumpControl.h/cpp               # Controle de bombas
-│       ├── SensorManager.h/cpp             # Leitura de sensores
-│       ├── KH_Analyzer.h/cpp               # Análise de KH
-│       ├── WiFi_MQTT.h/cpp                 # Comunicação
-│       └── MeasurementHistory.h/cpp        # Histórico
-├── website/
-│   ├── client/                             # Frontend React
-│   ├── server/                             # Backend Express
-│   ├── drizzle/                            # Schema BD
-│   └── package.json
-├── docs/
-│   ├── MANUAL_MONTAGEM.md
-│   ├── MANUAL_OPERACAO.md
-│   ├── GUIA_CALIBRACAO.md
-│   ├── TROUBLESHOOTING.md
-│   ├── ESQUEMAS_ELETRICOS.md
-│   ├── BOM.md
-│   ├── API_REFERENCE.md
-│   └── ARTIGO_CIENTIFICO.pdf
-├── images/
-│   ├── galeria-1-overview.jpg
-│   ├── galeria-2-chambers.jpg
-│   ├── cycle-phase-1-discard.jpg
-│   └── ... (10 imagens profissionais)
-├── LICENSE                                 # MIT License
-├── README.md                               # Este arquivo
-└── CONTRIBUTING.md                         # Guia de contribuição
-```
-
-## 💻 Requisitos do Sistema
+## ✨ Características Principais
 
 ### Hardware
-- ESP32 (WROOM-32 ou similar)
-- 4 Bombas peristálticas Kamoer
-- Sensor de pH PH-4502C
-- Sensor de temperatura DS18B20
-- Drivers de motor (TB6612FNG, ULN2003)
-- 3 Câmaras de medição (50ml, 50ml, 200ml)
-- Fonte CFTV 12V 10A 120W
-- Stepdown LM2596 12V→5V 3A
-- Stepdown LM2596 5V→3.3V 3A
-- Fotoacoplador PC817
-- Compressor 5V (injeção de ar)
+- ✅ 4 bombas peristálticas (Kamoer) com controle PWM
+- ✅ Sensores de pH (PH-4502C), temperatura (DS18B20), nível
+- ✅ Sistema hidráulico de 3 câmaras (A, B, C)
+- ✅ Fonte de alimentação 12V 10A com reguladores 5V/3.3V
+- ✅ Consumo: ~2W em repouso, 15W durante medição
 
-### Software
-- Arduino IDE 1.8.0+
-- Python 3.8+ (para website)
-- Node.js 16+ (para website)
-- MySQL 5.7+ (para website)
+### Firmware ESP32
+- ✅ Calibração com água de KH conhecido
+- ✅ Compensação de temperatura automática (α = 0.002)
+- ✅ Detecção de erros (sensor, bomba, temperatura)
+- ✅ Histórico de até 1000 medições em SPIFFS
+- ✅ Frequência configurável (1-24 horas)
+- ✅ WiFi + MQTT + HTTPS com fallback
+- ✅ Access Point para configuração inicial
 
-## 🔌 Pinagem ESP32
+### Backend Node.js
+- ✅ Autenticação JWT com refresh tokens
+- ✅ Rate limiting (10 req/min global, 5 tentativas/15min auth)
+- ✅ Integração MQTT com fila offline
+- ✅ Validação de entrada contra SQL injection
+- ✅ CORS configurado
+- ✅ Logs estruturados
 
-| GPIO | Função | Tipo | Descrição |
-|------|--------|------|-----------|
-| 12 | Bomba 1 PWM | Output | Controle velocidade |
-| 13 | Bomba 1 Dir | Output | Controle direção |
-| 14 | Bomba 2 PWM | Output | Controle velocidade |
-| 15 | Bomba 2 Dir | Output | Controle direção |
-| 16 | Bomba 3 IN1 | Output | ULN2003 |
-| 17 | Bomba 3 IN2 | Output | ULN2003 |
-| 18 | Bomba 4 IN3 | Output | ULN2003 |
-| 19 | Bomba 4 IN4 | Output | ULN2003 |
-| 20 | Compressor | Output | Fotoacoplador |
-| 32 | Sensor pH | Input | ADC |
-| 33 | Sensor Temp | Input | OneWire |
-| 34 | Nível A | Input | ADC |
-| 35 | Nível B | Input | ADC |
+### Frontend React
+- ✅ Dashboard com gráficos em tempo real
+- ✅ Histórico de medições com filtros
+- ✅ Configurações do dispositivo
+- ✅ Exportação de dados (CSV/JSON)
+- ✅ Responsivo (mobile/tablet/desktop)
 
-## 📊 Consumo de Energia
+### Segurança
+- ✅ Criptografia AES256 em NVS
+- ✅ SSL/TLS com validação de certificado
+- ✅ Rate limiting em múltiplas camadas
+- ✅ Proteção contra replay attacks
+- ✅ Command whitelist
+- ✅ Sem dados sensíveis em logs
 
-| Cenário | Corrente | Potência | Duração |
-|---------|----------|----------|---------|
-| Standby | 0.35A | 4.2W | Contínuo |
-| Operação Normal | 2.5A | 30W | ~40 min/ciclo |
-| Pico (4 bombas + compressor) | 5.5A | 66W | ~15 min |
-| **Margem de Segurança** | **4.5A** | **54W** | **45% disponível** |
+---
 
-## 🔐 Segurança
+## 🚀 Início Rápido
 
-- ✅ Proteção contra curto-circuito (fusível 5A)
-- ✅ Proteção contra inversão de polaridade (diodo)
-- ✅ Proteção térmica em reguladores
-- ✅ Isolamento elétrico (fotoacoplador para compressor)
-- ✅ Validação de dados (sensores)
-- ✅ Detecção de erros automática
+### 1. Preparar Hardware
 
-## 🤝 Como Contribuir
+```bash
+# Componentes necessários:
+# - ESP32 DevKit
+# - 4x Bombas Kamoer
+# - Sensores (pH, temperatura, nível)
+# - Fonte 12V 10A
+# - Reguladores 5V/3.3V
 
-Contribuições são bem-vindas! Por favor:
+# Ver: docs/BOM_COMPLETO.md para lista completa
+```
 
-1. Faça um Fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+### 2. Compilar Firmware ESP32
 
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para mais detalhes.
+```bash
+# Abrir Arduino IDE
+# 1. Instalar ESP32 v3.0+
+# 2. Abrir: esp32/ReefBlueSky_KH_Monitor_v2.ino
+# 3. Configurar placa: ESP32 Dev Module
+# 4. Compilar (Ctrl+R)
+# 5. Upload (Ctrl+U)
+```
 
-## 📝 Licença
+### 3. Instalar Backend
 
-Este projeto está licenciado sob a MIT License - veja o arquivo [LICENSE](LICENSE) para detalhes.
+```bash
+cd backend
+npm install
+cp .env.example .env
+# Editar .env com suas credenciais
+npm start
+```
 
-## 🙏 Agradecimentos
+### 4. Instalar Frontend
 
-- Comunidade de aquarismo marinho
-- Projeto Arduino e ESP32
-- Contribuidores do projeto
+```bash
+cd frontend
+npm install
+npm run dev
+# Acessar: http://localhost:5173
+```
 
-## 📞 Suporte
+### 5. Deploy em Produção
 
-- **Issues**: [GitHub Issues](https://github.com/rescosta/ReefBlueSky-Kh/issues)
-- **Discussões**: [GitHub Discussions](https://github.com/rescosta/ReefBlueSky-Kh/discussions)
-- **Email**: rescosta@yahoo.com.br
-
-## 🎯 Roadmap
-
-- [ ] Integração com Home Assistant
-- [ ] App móvel (iOS/Android)
-- [ ] Gráficos avançados com previsões
-- [ ] Alertas por email/SMS
-- [ ] Integração com sistemas de dosagem automática
-- [ ] Suporte para múltiplos tanques
-- [ ] Calibração automática contínua
-
-## 📈 Estatísticas do Projeto
-
-- **Linhas de Código**: ~2000
-- **Módulos**: 6
-- **Documentação**: 8 guias completos
-- **Imagens**: 10 profissionais
-- **Tempo de Desenvolvimento**: 200+ horas
-- **Custo Total**: ~R$ 900 (vs R$ 8000+ comercial)
-
-## 🌟 Destaques
-
-> "O ReefBlueSky KH Monitor democratiza a medição de alcalinidade para aquaristas marinhos. Com código aberto e custo acessível, qualquer um pode construir um sistema profissional." - Comunidade de Aquarismo
-
-## 📜 Citação
-
-Se você usar este projeto em pesquisa ou publicação, por favor cite:
-
-```bibtex
-@software{reefbluesky2025,
-  title={ReefBlueSky KH Monitor: Open-Source Alkalinity Monitoring for Marine Aquariums},
-  author={Seu Nome},
-  year={2025},
-  url={https://github.com/rescosta/ReefBlueSky-Kh.git}
-}
+```bash
+# Ver: docs/DEPLOY_CLOUDFLARE_TUNNEL.md
+# Resumo:
+# 1. Instalar cloudflared
+# 2. Autenticar com Cloudflare
+# 3. Criar tunnel
+# 4. Configurar systemd services
+# 5. Ativar HTTPS
 ```
 
 ---
 
-**Desenvolvido com ❤️ para a comunidade de aquarismo marinho**
+## 📁 Estrutura do Projeto
 
-**Última atualização**: Novembro 2025
-**Versão**: 1.0
-**Status**: ✅ Pronto para Produção
+```
+ReefBlueSky_Rev06/
+├── esp32/                          # Firmware ESP32
+│   ├── ReefBlueSky_KH_Monitor_v2.ino
+│   ├── CloudAuth.h/cpp             # Autenticação em nuvem
+│   ├── WiFiSetup.h/cpp             # Configuração WiFi (AP)
+│   ├── MQTT_Integration.h           # Integração MQTT
+│   ├── KH_Analyzer.h/cpp            # Análise de KH
+│   ├── SensorManager.h/cpp          # Gerenciamento de sensores
+│   ├── PumpControl.h/cpp            # Controle de bombas
+│   ├── MeasurementHistory.h/cpp     # Histórico de medições
+│   └── ...
+├── backend/                        # Backend Node.js
+│   ├── server.js                   # Servidor Express
+│   ├── package.json
+│   └── .env.example
+├── frontend/                       # Frontend React
+│   ├── src/
+│   │   ├── App.jsx
+│   │   └── components/
+│   └── package.json
+└── docs/                           # Documentação
+    ├── README.md                   # Este arquivo
+    ├── SEGURANCA_REV06.md          # Análise de segurança
+    ├── MELHORIAS_REV06.md          # 10 melhorias implementadas
+    ├── DEPLOY_CLOUDFLARE_TUNNEL.md # Deploy em produção
+    ├── TESTES_PENETRACAO_SEGURANCA.md # Testes de segurança
+    ├── GUIA_PRODUCAO.md            # Guia de produção
+    ├── BOM_COMPLETO.md             # Lista de materiais
+    ├── MANUAL_TECNICO.md           # Manual técnico
+    ├── ARTIGO_CIENTIFICO.md        # Artigo científico
+    └── ...
+```
+
+---
+
+## 🔧 Configuração
+
+### Variáveis de Ambiente (Backend)
+
+```env
+PORT=3000
+NODE_ENV=production
+JWT_SECRET=seu-secret-super-seguro
+JWT_REFRESH_SECRET=seu-refresh-secret
+ALLOWED_ORIGINS=https://seu-dominio.com
+MONGODB_URI=mongodb+srv://usuario:senha@cluster.mongodb.net/reefbluesky
+MQTT_BROKER=mqtt://mqtt.seu-dominio.com:8883
+MQTT_USERNAME=seu-usuario
+MQTT_PASSWORD=sua-senha
+LOG_LEVEL=info
+```
+
+### Configuração ESP32 (WiFiSetup.h)
+
+```cpp
+// WiFi
+#define WIFI_SSID "seu-ssid"
+#define WIFI_PASSWORD "sua-senha"
+
+// Cloud
+#define CLOUD_SERVER "seu-dominio.com"
+#define CLOUD_PORT 443
+#define CLOUD_ENDPOINT "/api/v1/device/sync"
+
+// MQTT
+#define MQTT_BROKER "mqtt.seu-dominio.com"
+#define MQTT_PORT 8883
+#define MQTT_USERNAME "seu-usuario"
+#define MQTT_PASSWORD "sua-senha"
+```
+
+---
+
+## 📊 Uso
+
+### 1. Acessar Dashboard
+
+```
+https://seu-dominio.com
+```
+
+### 2. Fazer Login
+
+```
+Email: seu-email@exemplo.com
+Senha: sua-senha
+```
+
+### 3. Visualizar Medições
+
+- Gráficos em tempo real
+- Histórico completo
+- Estatísticas (média, mín, máx)
+- Filtros por data/hora
+
+### 4. Configurar Dispositivo
+
+- Intervalo de medição (1-24 horas)
+- Compensação de temperatura
+- Calibração de sensores
+- Reset de fábrica
+
+---
+
+## 🔒 Segurança
+
+### 10 Melhorias Críticas Implementadas
+
+1. ✅ **Criptografia NVS** - Tokens criptografados em armazenamento
+2. ✅ **SSL/TLS Moderno** - setCACert() em vez de setFingerprint()
+3. ✅ **Rate Limiting** - 10 req/min global, 5 tentativas/15min auth
+4. ✅ **Proteção Replay** - Timestamp + nonce em cada requisição
+5. ✅ **Command Whitelist** - Apenas comandos conhecidos aceitos
+6. ✅ **Validação de Entrada** - Regex para todos os inputs
+7. ✅ **CORS Restritivo** - Apenas origens permitidas
+8. ✅ **JWT com Refresh** - Tokens curtos + refresh tokens longos
+9. ✅ **Logs de Auditoria** - Sem dados sensíveis
+10. ✅ **HTTPS Obrigatório** - Redirecionamento HTTP → HTTPS
+
+Ver: `docs/SEGURANCA_REV06.md` para análise completa.
+
+---
+
+## 📚 Documentação
+
+| Documento | Descrição |
+|-----------|-----------|
+| [SEGURANCA_REV06.md](docs/SEGURANCA_REV06.md) | Análise de 10 melhorias de segurança |
+| [MELHORIAS_REV06.md](docs/MELHORIAS_REV06.md) | Detalhes técnicos de cada melhoria |
+| [DEPLOY_CLOUDFLARE_TUNNEL.md](docs/DEPLOY_CLOUDFLARE_TUNNEL.md) | Deploy em produção com Cloudflare Tunnel |
+| [TESTES_PENETRACAO_SEGURANCA.md](docs/TESTES_PENETRACAO_SEGURANCA.md) | Guia de testes de penetração |
+| [GUIA_PRODUCAO.md](docs/GUIA_PRODUCAO.md) | Guia completo de produção |
+| [BOM_COMPLETO.md](docs/BOM_COMPLETO.md) | Lista de materiais com fornecedores |
+| [MANUAL_TECNICO.md](docs/MANUAL_TECNICO.md) | Manual técnico detalhado |
+| [ARTIGO_CIENTIFICO.md](docs/ARTIGO_CIENTIFICO.md) | Artigo científico sobre o projeto |
+
+---
+
+## 🧪 Testes
+
+### Teste de Compilação
+
+```bash
+# Arduino IDE
+# Verificar: Sketch → Verify/Compile
+# Resultado esperado: ✅ Sem erros
+```
+
+### Teste de Conectividade
+
+```bash
+# Verificar WiFi
+# Serial Monitor deve exibir:
+# [WIFI] Conectado a: seu-ssid
+# [WIFI] IP: 192.168.1.100
+
+# Verificar MQTT
+# [MQTT] Conectado com sucesso!
+```
+
+### Teste de Segurança
+
+```bash
+# Ver: docs/TESTES_PENETRACAO_SEGURANCA.md
+# Executar todos os testes de segurança
+# Resultado esperado: ✅ Todos passando
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### ESP32 não conecta ao WiFi
+
+```
+Solução:
+1. Verificar SSID e senha em WiFiSetup.h
+2. Verificar sinal WiFi (> -70 dBm)
+3. Resetar ESP32: pressionar botão RESET
+4. Ver logs no Serial Monitor
+```
+
+### Backend não inicia
+
+```
+Solução:
+1. Verificar Node.js: node --version
+2. Verificar dependências: npm install
+3. Verificar .env: cp .env.example .env
+4. Ver logs: npm start
+```
+
+### Frontend não carrega
+
+```
+Solução:
+1. Verificar npm: npm --version
+2. Limpar cache: npm cache clean --force
+3. Reinstalar: rm -rf node_modules && npm install
+4. Iniciar dev: npm run dev
+```
+
+---
+
+## 📞 Suporte
+
+- **Documentação:** Ver pasta `docs/`
+- **GitHub Issues:** https://github.com/seu-usuario/reefbluesky/issues
+- **Email:** support@reefbluesky.com
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a licença MIT. Ver `LICENSE` para detalhes.
+
+---
+
+## 🙏 Créditos
+
+Desenvolvido com ❤️ para a comunidade de aquarismo marinho.
+
+---
+
+## 📈 Roadmap
+
+- [ ] App mobile (iOS/Android)
+- [ ] Integração com Home Assistant
+- [ ] Suporte a múltiplos dispositivos
+- [ ] Alertas por email/SMS
+- [ ] Histórico de 1 ano
+- [ ] Exportação de relatórios PDF
+- [ ] API pública
+- [ ] Comunidade de usuários
+
+---
+
+**Última atualização:** 2024-01-15  
+**Versão:** Rev06  
+**Status:** ✅ PRONTO PARA PRODUÇÃO
