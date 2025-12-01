@@ -20,6 +20,15 @@ const mqtt = require('mqtt');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
+const mariadb = require('mariadb');
+const pool = mariadb.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'reefapp',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'reefbluesky'
+});
+
+
 // Carregar variáveis de ambiente
 dotenv.config();
 
@@ -317,26 +326,12 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
  * GET /api/v1/device/ping
  * [SEGURANÇA] Heartbeat do dispositivo
  */
-app.get('/api/v1/device/ping', verifyToken, (req, res) => {
-    console.log('[API] GET /api/v1/device/ping - Device:', req.user.deviceId);
-    
-    res.json({
-        success: true,
-        message: 'Pong',
-        timestamp: Date.now(),
-        serverTime: new Date().toISOString()
-    });
-});
-
-/**
- * POST /api/v1/device/sync
- * [SEGURANÇA] Sincronizar medições (incremental)
- */
-app.post('/api/v1/device/sync', verifyToken, syncLimiter, (req, res) => {
+app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     console.log('[API] POST /api/v1/device/sync - Device:', req.user.deviceId);
     
     const { measurements, lastSyncTimestamp } = req.body;
     
+    // Validar input
     if (!Array.isArray(measurements)) {
         return res.status(400).json({
             success: false,
@@ -344,29 +339,97 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, (req, res) => {
         });
     }
     
-    // [SEGURANÇA] Validar cada medição
+    if (measurements.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Array de medições vazio'
+        });
+    }
+    
+    // Validar cada medição
     for (const m of measurements) {
         if (!m.timestamp || typeof m.kh !== 'number') {
             return res.status(400).json({
                 success: false,
-                message: 'Medição inválida'
+                message: 'Medição inválida: faltam timestamp ou kh'
             });
         }
     }
     
-    console.log(`[API] Sincronizando ${measurements.length} medições`);
+    console.log(`[API] Sincronizando ${measurements.length} medições do deviceId: ${req.user.deviceId}`);
     
-    // TODO: Salvar medições em banco de dados
-    
-    res.json({
-        success: true,
-        message: 'Medições sincronizadas com sucesso',
-        data: {
-            synced: measurements.length,
-            nextSyncTime: Date.now() + 300000  // Próxima sync em 5 minutos
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        let insertedCount = 0;
+        
+        // ✅ CORRETO: Array dentro de colchetes
+        for (const m of measurements) {
+            try {
+                await conn.execute(
+                    'INSERT INTO measurements (deviceId, kh, phref, phsample, temperature, timestamp, status, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [
+                        req.user.deviceId,
+                        m.kh,
+                        m.phref || null,
+                        m.phsample || null,
+                        m.temperature || null,
+                        m.timestamp,
+                        m.status || null,
+                        m.confidence || null
+                    ]
+                );
+                insertedCount++;
+            } catch (insertErr) {
+                console.error(`[DB] Erro ao inserir medição ${m.timestamp}:`, insertErr.message);
+            }
         }
-    });
+        
+        console.log(`[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`);
+        
+        res.json({
+            success: true,
+            message: `${insertedCount} medições sincronizadas com sucesso`,
+            data: {
+                synced: insertedCount,
+                failed: measurements.length - insertedCount,
+                nextSyncTime: Date.now() + 300000
+            }
+        });
+        
+    } catch (err) {
+        console.error('[DB] Erro crítico ao sincronizar:', err.message, err.code);
+        
+        let statusCode = 503;
+        let errorMsg = 'Erro ao conectar ao banco de dados';
+        
+        if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+            errorMsg = 'Credenciais do banco incorretas';
+        } else if (err.code === 'ER_BAD_DB_ERROR') {
+            errorMsg = 'Banco de dados não existe';
+        } else if (err.message.includes('timeout')) {
+            errorMsg = 'Timeout ao conectar (MariaDB pode estar DOWN)';
+        }
+        
+        return res.status(statusCode).json({
+            success: false,
+            message: errorMsg,
+            error: err.message
+        });
+        
+    } finally {
+        if (conn) {
+            try {
+                conn.release();
+                console.log('[DB] Conexão liberada');
+            } catch (releaseErr) {
+                console.error('[DB] Erro ao liberar conexão:', releaseErr.message);
+            }
+        }
+    }
 });
+
+
 
 /**
  * POST /api/v1/device/health
