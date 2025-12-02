@@ -344,7 +344,7 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
       [email, passwordHash, now, now]
     );
 
-    const newUserId = result.insertId;
+    const newUserId = Number(result.insertId);
 
     const token = generateToken(newUserId, null);
     const refreshToken = generateRefreshToken(newUserId, null);
