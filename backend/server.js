@@ -43,6 +43,23 @@ const JWT_SECRET = process.env.JWT_SECRET || 'seu-secret-super-seguro-aqui-mude-
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu-refresh-secret-aqui';
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ===== SERVIR ARQUIVOS ESTÁTICOS ===== ← ADICIONAR AQUI
+app.use(express.static('public'));
+
+// ===== PÁGINA DE LOGIN (Rota raiz) ===== ← ADICIONAR AQUI
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/login.html');
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(__dirname + '/public/login.html');
+});
+
+
+
 // ============================================================================
 // [SEGURANÇA] Middlewares de Proteção
 // ============================================================================
