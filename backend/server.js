@@ -253,6 +253,85 @@ function handleMQTTHealth(data) {
 // [API] Endpoints de Autenticação (v1)
 // ============================================================================
 
+// ===== API Endpoints de Autenticação de Usuário v1 =====
+
+// Login de usuário (para painel web)
+app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
+  console.log('API POST /api/v1/auth/login');
+
+  const { email, password } = req.body;
+
+  // Validação básica
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email e senha são obrigatórios'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Buscar usuário pelo email
+    const rows = await conn.query(
+      'SELECT id, email, passwordHash FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Credenciais inválidas'
+      });
+    }
+
+    const user = rows[0];
+
+    // Comparar senha com bcrypt
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Credenciais inválidas'
+      });
+    }
+
+    // Gerar tokens JWT (reaproveitando as funções existentes)
+    const token = generateToken(user.id, null);          // deviceId = null para login web
+    const refreshToken = generateRefreshToken(user.id, null);
+
+    console.log('API /auth/login - Login OK para usuário', user.email);
+
+    return res.json({
+      success: true,
+      message: 'Login bem-sucedido',
+      data: {
+        token,
+        refreshToken,
+        userId: user.id,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error('AUTH ERROR /auth/login:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao fazer login',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }
+});
+
+
 /**
  * POST /api/v1/device/register
  * [SEGURANÇA] Registrar novo dispositivo
