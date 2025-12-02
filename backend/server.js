@@ -55,7 +55,10 @@ app.get('/login', (req, res) => {
   res.sendFile(__dirname + '/public/login.html');
 });
 
-
+// Dashboard (proteção via JWT no frontend)
+app.get('/dashboard', (req, res) => {
+  res.sendFile(__dirname + '/public/dashboard.html');
+});
 
 // ============================================================================
 // [SEGURANÇA] Middlewares de Proteção
@@ -176,6 +179,43 @@ function generateRefreshToken(userId, deviceId) {
     );
 }
 
+// ===== Middleware de autenticação de usuário (JWT - web) =====
+function authUserMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token não fornecido'
+    });
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token inválido para usuário'
+      });
+    }
+
+    req.user = {
+      userId: decoded.userId,
+      deviceId: decoded.deviceId || null
+    };
+
+    next();
+  } catch (err) {
+    console.error('authUserMiddleware error:', err.message);
+    return res.status(401).json({
+      success: false,
+      message: 'Token inválido ou expirado'
+    });
+  }
+}
+
+
 // ============================================================================
 // [MQTT] Integração com MQTT Broker
 // ============================================================================
@@ -253,7 +293,92 @@ function handleMQTTHealth(data) {
 // [API] Endpoints de Autenticação (v1)
 // ============================================================================
 
-// ===== API Endpoints de Autenticação de Usuário v1 =====
+// Registro de novo usuário (para painel web)
+app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
+  console.log('API POST /api/v1/auth/register');
+
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email e senha são obrigatórios'
+    });
+  }
+
+  if (typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email inválido'
+    });
+  }
+
+  if (typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: 'Senha deve ter pelo menos 6 caracteres'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const existing = await conn.query(
+      'SELECT id FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    if (existing && existing.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Já existe um usuário com este email'
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const now = new Date();
+
+    const result = await conn.query(
+      'INSERT INTO users (email, passwordHash, createdAt, updatedAt) VALUES (?, ?, ?, ?)',
+      [email, passwordHash, now, now]
+    );
+
+    const newUserId = result.insertId;
+
+    const token = generateToken(newUserId, null);
+    const refreshToken = generateRefreshToken(newUserId, null);
+
+    console.log('API /auth/register - Novo usuário criado', email);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Usuário criado com sucesso',
+      data: {
+        userId: newUserId,
+        email,
+        token,
+        refreshToken
+      }
+    });
+  } catch (err) {
+    console.error('AUTH ERROR /auth/register:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao registrar usuário',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }
+});
+
 
 // Login de usuário (para painel web)
 app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
@@ -331,6 +456,56 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+// Dados do usuário autenticado
+app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
+  console.log('API GET /api/v1/auth/me');
+
+  const userId = req.user.userId;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      'SELECT id, email, createdAt, updatedAt FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
+    const user = rows[0];
+
+    return res.json({
+      success: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (err) {
+    console.error('AUTH ERROR /auth/me:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao buscar dados do usuário',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }
+});
 
 /**
  * POST /api/v1/device/register
@@ -606,6 +781,20 @@ app.post('/api/v1/device/command-result', verifyToken, (req, res) => {
         message: 'Resultado do comando recebido'
     });
 });
+
+
+// Endpoint protegido para teste do token de usuário (dashboard web)
+app.get('/api/v1/dashboard/example', authUserMiddleware, (req, res) => {
+  return res.json({
+    success: true,
+    message: 'Acesso autorizado ao dashboard (usuário)',
+    data: {
+      userId: req.user.userId,
+      deviceId: req.user.deviceId
+    }
+  });
+});
+
 
 // ============================================================================
 // [API] Endpoints de Status (v1)
