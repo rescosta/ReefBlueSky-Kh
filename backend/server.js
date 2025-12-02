@@ -339,28 +339,36 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const now = new Date();
 
+    // Gera código de 6 dígitos
+    const verificationCode = String(
+      Math.floor(100000 + Math.random() * 900000)
+    );
+
+    // Expira em 10 minutos
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+
     const result = await conn.query(
-      'INSERT INTO users (email, passwordHash, createdAt, updatedAt) VALUES (?, ?, ?, ?)',
-      [email, passwordHash, now, now]
+      'INSERT INTO users (email, passwordHash, createdAt, updatedAt, verificationCode, verificationExpiresAt, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [email, passwordHash, now, now, verificationCode, expiresAt, 0]
     );
 
     const newUserId = Number(result.insertId);
 
-    const token = generateToken(newUserId, null);
-    const refreshToken = generateRefreshToken(newUserId, null);
+    console.log('API /auth/register - Novo usuário criado (aguardando verificação)', email, 'code:', verificationCode);
 
-    console.log('API /auth/register - Novo usuário criado', email);
+    // TODO: enviar email real com verificationCode para o usuário.
+    // Ex: await sendVerificationEmail(email, verificationCode);
 
     return res.status(201).json({
       success: true,
-      message: 'Usuário criado com sucesso',
+      message: 'Usuário criado. Enviamos um código de verificação para seu email.',
       data: {
         userId: newUserId,
-        email,
-        token,
-        refreshToken
+        email: email,
+        requiresVerification: true
       }
     });
+
   } catch (err) {
     console.error('AUTH ERROR /auth/register:', err.message);
     return res.status(500).json({
@@ -379,6 +387,107 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
   }
 });
 
+// Verificar código de 6 dígitos
+app.post('/api/v1/auth/verify-code', authLimiter, async (req, res) => {
+  console.log('API POST /api/v1/auth/verify-code');
+
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email e código são obrigatórios'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      'SELECT id, email, verificationCode, verificationExpiresAt, isVerified FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
+    const user = rows[0];
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Usuário já está verificado'
+      });
+    }
+
+    if (!user.verificationCode || !user.verificationExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nenhum código de verificação ativo para este usuário'
+      });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(user.verificationExpiresAt);
+
+    if (now > expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código expirado, solicite um novo registro'
+      });
+    }
+
+    if (String(code).trim() !== String(user.verificationCode).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código inválido'
+      });
+    }
+
+    // Marca como verificado e limpa o código
+    await conn.query(
+      'UPDATE users SET isVerified = 1, verificationCode = NULL, verificationExpiresAt = NULL, updatedAt = ? WHERE id = ?',
+      [now, user.id]
+    );
+
+    const userIdNumber = Number(user.id);
+    const token = generateToken(userIdNumber, null);
+    const refreshToken = generateRefreshToken(userIdNumber, null);
+
+    console.log('API /auth/verify-code - Usuário verificado', user.email);
+
+    return res.json({
+      success: true,
+      message: 'Código verificado com sucesso',
+      data: {
+        userId: userIdNumber,
+        email: user.email,
+        token,
+        refreshToken
+      }
+    });
+  } catch (err) {
+    console.error('AUTH ERROR /auth/verify-code:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao verificar código',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }
+});
 
 // Login de usuário (para painel web)
 app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
