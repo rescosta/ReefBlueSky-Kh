@@ -250,12 +250,27 @@
         <!-- Step 1: email/senha + botões (aqui você já tem o form com os botões, então NÃO precisa repetir nada) -->
 
         <!-- Step 2: campo de código + botão -->
+
         <div id="step-2" style="display:none; margin-top: 20px;">
           <div class="form-group">
-            <label for="verificationCode">Código de verificação (6 dígitos):</label>
+            <label for="verificationCode">Código recebido por email (6 dígitos):</label>
             <input id="verificationCode" type="text" maxlength="6" />
           </div>
-          <button type="button" onclick="confirmCode()">Confirmar código</button>
+          <div class="form-group">
+            <label for="newPassword">Nova senha:</label>
+            <input id="newPassword" type="password" />
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirmar nova senha:</label>
+            <input id="confirmPassword" type="password" />
+          </div>
+          <div style="margin-bottom:10px;">
+            <label style="font-size: 12px;">
+              <input type="checkbox" onchange="toggleResetPasswordVisibility(this)">
+              Mostrar senhas
+            </label>
+          </div>
+          <button type="button" onclick="confirmResetPassword()">Definir nova senha</button>
         </div>
 
         <p id="info-text" style="margin-top: 15px; font-size: 13px; color: #555;">
@@ -310,7 +325,7 @@
           infoText.textContent = 'Use seu email e senha para entrar ou registrar uma nova conta.';
         } else {
           if (step2) step2.style.display = 'block';
-          infoText.textContent = 'Digite o código de 6 dígitos enviado para o seu email.';
+          infoText.textContent = 'Digite o código recebido e escolha uma nova senha.';
         }
       }
 
@@ -452,7 +467,56 @@
         }
       }
 
+      function toggleResetPasswordVisibility(checkbox) {
+        const newPwd = document.getElementById('newPassword');
+        const confirmPwd = document.getElementById('confirmPassword');
+        const type = checkbox.checked ? 'text' : 'password';
+        if (newPwd) newPwd.type = type;
+        if (confirmPwd) confirmPwd.type = type;
+      }
 
+      async function confirmResetPassword() {
+        const email = lastRegisteredEmail || emailInput.value.trim();
+        const code = document.getElementById('verificationCode').value.trim();
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        if (!email || !code || !newPassword || !confirmPassword) {
+          showError('Preencha todos os campos.');
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          showError('As senhas não conferem.');
+          return;
+        }
+
+        if (newPassword.length < 6) {
+          showError('A nova senha deve ter pelo menos 6 caracteres.');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/v1/auth/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code, newPassword })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            showError(result.message || 'Código inválido ou erro ao redefinir a senha.');
+            return;
+          }
+
+          showSuccess('Senha redefinida com sucesso! Você já pode entrar com a nova senha.');
+          showStep(1);
+        } catch (err) {
+          console.error('Erro em reset-password:', err);
+          showError('Erro ao conectar com o servidor.');
+        }
+      }
 
 
       async function confirmCode() {
