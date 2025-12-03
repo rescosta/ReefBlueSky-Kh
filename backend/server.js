@@ -20,7 +20,9 @@ const mqtt = require('mqtt');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
+
 const mariadb = require('mariadb');
+const nodemailer = require('nodemailer');
 
 const pool = mariadb.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
@@ -36,6 +38,63 @@ const pool = mariadb.createPool({
 
 // Carregar variáveis de ambiente
 dotenv.config();
+
+const mailTransporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: Number(process.env.EMAIL_PORT),
+  secure: false, // use true se mudar para porta 465
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// (opcional) testar conexão SMTP ao subir o servidor
+mailTransporter.verify((error, success) => {
+  if (error) {
+    console.error('Erro ao conectar no SMTP:', error);
+  } else {
+    console.log('SMTP pronto para enviar emails');
+  }
+});
+
+async function sendVerificationEmail(email, code) {
+  try {
+    await mailTransporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: 'ReefBlueSky - Código de Verificação',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #8B00FF;">ReefBlueSky</h2>
+          <p>Seu código de verificação de 6 dígitos é:</p>
+          <div style="
+            background: #8B00FF;
+            color: #ffffff;
+            padding: 16px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 8px;
+            letter-spacing: 6px;
+          ">
+            ${code}
+          </div>
+          <p style="color: #666;">Ele expira em 10 minutos.</p>
+          <p style="font-size: 12px; color: #999;">
+            Se você não solicitou este código, pode ignorar este email.
+          </p>
+        </div>
+      `,
+    });
+
+    console.log('Código de verificação enviado para', email);
+  } catch (err) {
+    console.error('Erro ao enviar email de verificação:', err.message);
+    // Não lança erro para não quebrar o /auth/register
+  }
+}
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -356,8 +415,9 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
 
     console.log('API /auth/register - Novo usuário criado (aguardando verificação)', email, 'code:', verificationCode);
 
-    // TODO: enviar email real com verificationCode para o usuário.
-    // Ex: await sendVerificationEmail(email, verificationCode);
+    // enviar email real com verificationCode para o usuário.
+    
+    await sendVerificationEmail(email, verificationCode);
 
     return res.status(201).json({
       success: true,
