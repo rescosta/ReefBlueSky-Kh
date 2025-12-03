@@ -447,6 +447,80 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
   }
 });
 
+// Esqueci minha senha - enviar código de recuperação
+app.post('/api/v1/auth/forgot-password', authLimiter, async (req, res) => {
+  console.log('API POST /api/v1/auth/forgot-password');
+
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email é obrigatório'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Verifica se usuário existe
+    const rows = await conn.query(
+      'SELECT id, email FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    if (!rows || rows.length === 0) {
+      // Resposta genérica para não vazar se email existe
+      return res.json({
+        success: true,
+        message: 'Se o email existir, um código de recuperação foi enviado.'
+      });
+    }
+
+    const user = rows[0];
+
+    // Gera novo código de 6 dígitos
+    const verificationCode = String(
+      Math.floor(100000 + Math.random() * 900000)
+    );
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 min
+
+    // Atualiza código e expiração no banco
+    await conn.query(
+      'UPDATE users SET verificationCode = ?, verificationExpiresAt = ?, updatedAt = ? WHERE id = ?',
+      [verificationCode, expiresAt, now, user.id]
+    );
+
+    console.log('API /auth/forgot-password - Código gerado para', user.email, 'code:', verificationCode);
+
+    // Envia email com o código (mesma função de verificação)
+    await sendVerificationEmail(user.email, verificationCode);
+
+    return res.json({
+      success: true,
+      message: 'Se o email existir, um código de recuperação foi enviado.'
+    });
+  } catch (err) {
+    console.error('AUTH ERROR /auth/forgot-password:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao solicitar recuperação de senha',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }
+});
+
+
 // Verificar código de 6 dígitos
 app.post('/api/v1/auth/verify-code', authLimiter, async (req, res) => {
   console.log('API POST /api/v1/auth/verify-code');
