@@ -1,458 +1,553 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReefBlueSky - Login em Desenvolvimento</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReefBlueSky - Login em Desenvolvimento</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-                sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 400px;
-        }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      max-width: 400px;
+    }
 
-        .logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
 
-        .logo h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 5px;
-        }
+    .logo h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 5px;
+    }
 
-        .logo p {
-            color: #999;
-            font-size: 14px;
-            font-style: italic;
-        }
+    .logo p {
+      color: #999;
+      font-size: 14px;
+      font-style: italic;
+    }
 
-        .status-badge {
-            display: inline-block;
-            background: #fff3cd;
-            color: #856404;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 10px;
-            border: 1px solid #ffeaa7;
-        }
+    .status-badge {
+      display: inline-block;
+      background: #fff3cd;
+      color: #856404;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 10px;
+      border: 1px solid #ffeaa7;
+    }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
+    .form-group {
+      margin-bottom: 20px;
+    }
 
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+      font-size: 14px;
+    }
 
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
 
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
 
-        .buttons-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
+    .buttons-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
 
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-            margin-top: 0;
-        }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      margin-top: 0;
+    }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
 
-        button:active {
-            transform: translateY(0);
-        }
+    button:active {
+      transform: translateY(0);
+    }
 
-        button:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-        }
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
 
-        .btn-secondary {
-            background: #ffffff;
-            color: #667eea;
-            border: 1px solid #667eea;
-        }
+    .btn-secondary {
+      background: #ffffff;
+      color: #667eea;
+      border: 1px solid #667eea;
+    }
 
-        .btn-secondary:hover {
-            background: #f5f7ff;
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.25);
-        }
+    .btn-secondary:hover {
+      background: #f5f7ff;
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.25);
+    }
 
-        .error-message {
-            color: #d32f2f;
-            font-size: 14px;
-            margin-top: 10px;
-            padding: 10px;
-            background: #ffebee;
-            border-radius: 6px;
-            border-left: 4px solid #d32f2f;
-            display: none;
-        }
+    .link-button {
+      background: transparent;
+      border: none;
+      color: #667eea;
+      font-size: 12px;
+      padding: 0;
+      width: auto;
+      font-weight: 500;
+    }
 
-        .success-message {
-            color: #388e3c;
-            font-size: 14px;
-            margin-top: 10px;
-            padding: 10px;
-            background: #e8f5e9;
-            border-radius: 6px;
-            border-left: 4px solid #388e3c;
-            display: none;
-        }
+    .link-button:hover {
+      background: transparent;
+      box-shadow: none;
+      transform: none;
+      text-decoration: underline;
+    }
 
-        .info-box {
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            border-radius: 6px;
-            font-size: 13px;
-            color: #1976d2;
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
+    .error-message {
+      color: #d32f2f;
+      font-size: 14px;
+      margin-top: 10px;
+      padding: 10px;
+      background: #ffebee;
+      border-radius: 6px;
+      border-left: 4px solid #d32f2f;
+      display: none;
+    }
 
-        .spinner {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
+    .success-message {
+      color: #388e3c;
+      font-size: 14px;
+      margin-top: 10px;
+      padding: 10px;
+      background: #e8f5e9;
+      border-radius: 6px;
+      border-left: 4px solid #388e3c;
+      display: none;
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+    .info-box {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #1976d2;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">
-            <h1>🐠 ReefBlueSky</h1>
-            <p>Monitor de KH para Aquários</p>
-            <div class="status-badge">⚠️ EM DESENVOLVIMENTO</div>
+  <div class="container">
+    <div class="logo">
+      <h1>🐠 ReefBlueSky</h1>
+      <p>Monitor de KH para Aquários</p>
+      <div class="status-badge">⚠️ EM DESENVOLVIMENTO</div>
+    </div>
+
+    <div class="info-box">
+      <strong>Bem-vindo!</strong><br>
+      Este sistema está em fase de desenvolvimento. Use as credenciais de teste para acessar:<br>
+      <strong></strong>
+    </div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">📧 Email:</label>
+        <input 
+          type="email" 
+          id="email" 
+          name="email" 
+          placeholder="seu@email.com"
+          required
+          autocomplete="email"
+          value=""
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password">🔐 Senha:</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          placeholder="Sua senha"
+          required
+          autocomplete="current-password"
+        >
+        <div style="text-align:right; margin-top: 5px;">
+          <button type="button" class="link-button" onclick="startForgotPassword()">
+            Esqueci minha senha
+          </button>
         </div>
+      </div>
 
-        <div class="info-box">
-            <strong>Bem-vindo!</strong><br>
-            Este sistema está em fase de desenvolvimento. Use as credenciais de teste para acessar:<br>
-            <strong></strong>
-        </div>
+      <div class="buttons-row">
+        <button type="button" id="loginBtn">
+          Entrar no Painel
+        </button>
+        <button type="button" id="registerBtn" class="btn-secondary">
+          Registrar e entrar
+        </button>
+      </div>
 
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="email">📧 Email:</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
-                    placeholder="seu@email.com"
-                    required
-                    autocomplete="email"
-                    value=""
-                >
-            </div>
+      <div class="error-message" id="errorMessage"></div>
+      <div class="success-message" id="successMessage"></div>
+    </form>
 
-            <div class="form-group">
-                <label for="password">🔐 Senha:</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="Sua senha"
-                    required
-                    autocomplete=""
-                >
-            </div>
+    <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
 
-            <div class="buttons-row">
-                <button type="button" id="loginBtn">
-                    Entrar no Painel
-                </button>
-                <button type="button" id="registerBtn" class="btn-secondary">
-                    Registrar e entrar
-                </button>
-            </div>
+    <!-- Step 2: recuperação de senha -->
+    <div id="step-2" style="display:none; margin-top: 20px;">
+      <div class="form-group">
+        <label for="verificationCode">Código recebido por email:</label>
+        <input id="verificationCode" type="text" maxlength="6" />
+      </div>
+      <div class="form-group">
+        <label for="newPassword">Nova senha:</label>
+        <input id="newPassword" type="password" />
+      </div>
+      <div class="form-group">
+        <label for="confirmPassword">Confirmar nova senha:</label>
+        <input id="confirmPassword" type="password" />
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size: 12px;">
+          <input type="checkbox" onchange="toggleResetPasswordVisibility(this)">
+          Mostrar senhas
+        </label>
+      </div>
+      <button type="button" onclick="confirmResetPassword()">Definir nova senha</button>
+    </div>
 
-            <div class="error-message" id="errorMessage"></div>
-            <div class="success-message" id="successMessage"></div>
-        </form>
+    <p id="info-text" style="margin-top: 15px; font-size: 13px; color: #555;">
+      Use seu email e senha para entrar ou registrar uma nova conta.
+    </p>
+  </div> <!-- fim .container -->
 
-        <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
+  <script>
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
 
-        <!-- Step 1: email/senha + botões (aqui você já tem o form com os botões, então NÃO precisa repetir nada) -->
+    let currentStep = 1;
+    let lastRegisteredEmail = '';
 
-        <!-- Step 2: campo de código + botão -->
-        <div id="step-2" style="display:none; margin-top: 20px;">
-          <div class="form-group">
-            <label for="verificationCode">Código de verificação (6 dígitos):</label>
-            <input id="verificationCode" type="text" maxlength="6" />
-          </div>
-          <button type="button" onclick="confirmCode()">Confirmar código</button>
-        </div>
+    function showError(message) {
+      errorMessage.textContent = '❌ ' + message;
+      errorMessage.style.display = 'block';
+      successMessage.style.display = 'none';
+    }
 
-        <p id="info-text" style="margin-top: 15px; font-size: 13px; color: #555;">
-          Use seu email e senha para entrar ou registrar uma nova conta.
-        </p>
-    </div> <!-- fim .container -->
+    function showSuccess(message) {
+      successMessage.textContent = '✓ ' + message;
+      successMessage.style.display = 'block';
+      errorMessage.style.display = 'none';
+    }
 
-    <script>
-      const loginBtn = document.getElementById('loginBtn');
-      const registerBtn = document.getElementById('registerBtn');
-      const errorMessage = document.getElementById('errorMessage');
-      const successMessage = document.getElementById('successMessage');
-      const emailInput = document.getElementById('email');
-      const passwordInput = document.getElementById('password');
-
-      let currentStep = 1;
-      let lastRegisteredEmail = '';
-
-      function showError(message) {
-        errorMessage.textContent = '❌ ' + message;
-        errorMessage.style.display = 'block';
-        successMessage.style.display = 'none';
-      }
-
-      function showSuccess(message) {
-        successMessage.textContent = '✓ ' + message;
-        successMessage.style.display = 'block';
-        errorMessage.style.display = 'none';
-      }
-
-      function setLoading(button, loading) {
-        if (loading) {
-          button.disabled = true;
-          button.innerHTML = '<span class="spinner"></span> Processando...';
+    function setLoading(button, loading) {
+      if (loading) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner"></span> Processando...';
+      } else {
+        button.disabled = false;
+        if (button.id === 'loginBtn') {
+          button.innerHTML = 'Entrar no Painel';
         } else {
-          button.disabled = false;
-          if (button.id === 'loginBtn') {
-            button.innerHTML = 'Entrar no Painel';
-          } else {
-            button.innerHTML = 'Registrar e entrar';
-          }
+          button.innerHTML = 'Registrar e entrar';
         }
       }
+    }
 
-      function showStep(step) {
-        currentStep = step;
-        const step2 = document.getElementById('step-2');
-        const infoText = document.getElementById('info-text');
+    function showStep(step) {
+      currentStep = step;
+      const step2 = document.getElementById('step-2');
+      const infoText = document.getElementById('info-text');
 
-        if (step === 1) {
-          if (step2) step2.style.display = 'none';
-          infoText.textContent = 'Use seu email e senha para entrar ou registrar uma nova conta.';
+      if (step === 1) {
+        if (step2) step2.style.display = 'none';
+        infoText.textContent = 'Use seu email e senha para entrar ou registrar uma nova conta.';
+      } else {
+        if (step2) step2.style.display = 'block';
+        infoText.textContent = 'Digite o código recebido e escolha uma nova senha.';
+      }
+    }
+
+    function saveTokensAndRedirect(data) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('refreshToken', data.refreshToken || '');
+      localStorage.setItem('userId', data.userId);
+      localStorage.setItem('email', data.email || emailInput.value.trim());
+      showSuccess('Login realizado com sucesso! Redirecionando...');
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1200);
+    }
+
+    async function loginUser() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      errorMessage.style.display = 'none';
+      successMessage.style.display = 'none';
+
+      if (!email || !password) {
+        showError('Por favor, preencha todos os campos');
+        return;
+      }
+
+      if (!email.includes('@')) {
+        showError('Email inválido');
+        return;
+      }
+
+      setLoading(loginBtn, true);
+
+      try {
+        const response = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          saveTokensAndRedirect(data.data);
         } else {
-          if (step2) step2.style.display = 'block';
-          infoText.textContent = 'Digite o código de 6 dígitos enviado para o seu email.';
+          showError(data.message || 'Erro ao processar requisição');
         }
+      } catch (error) {
+        console.error('Erro:', error);
+        showError('Erro ao conectar com o servidor. Verifique sua conexão.');
+      } finally {
+        setLoading(loginBtn, false);
+      }
+    }
+
+    async function registerAndAskCode() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      errorMessage.style.display = 'none';
+      successMessage.style.display = 'none';
+
+      if (!email || !password) {
+        showError('Por favor, preencha todos os campos');
+        return;
       }
 
-      function saveTokensAndRedirect(data) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('refreshToken', data.refreshToken || '');
-        localStorage.setItem('userId', data.userId);
-        localStorage.setItem('email', data.email || emailInput.value.trim());
-        showSuccess('Login realizado com sucesso! Redirecionando...');
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1200);
+      if (!email.includes('@')) {
+        showError('Email inválido');
+        return;
       }
 
-      async function loginUser() {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
+      setLoading(registerBtn, true);
 
-        errorMessage.style.display = 'none';
-        successMessage.style.display = 'none';
+      try {
+        const response = await fetch('/api/v1/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-        if (!email || !password) {
-          showError('Por favor, preencha todos os campos');
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          lastRegisteredEmail = email;
+          showSuccess('Registrado! Enviamos um código para ' + email);
+          // aqui continua sendo fluxo de verificação para novo usuário
+          // se quiser separar fluxos, pode usar outro step; por enquanto mantém
+        } else {
+          showError(data.message || 'Erro ao registrar');
+        }
+      } catch (error) {
+        console.error('Erro no registro:', error);
+        showError('Erro ao conectar com o servidor.');
+      } finally {
+        setLoading(registerBtn, false);
+      }
+    }
+
+    async function startForgotPassword() {
+      const email = emailInput.value.trim();
+
+      if (!email) {
+        showError('Informe seu email para recuperar a senha.');
+        return;
+      }
+
+      if (!email.includes('@')) {
+        showError('Email inválido.');
+        return;
+      }
+
+      errorMessage.style.display = 'none';
+      successMessage.style.display = 'none';
+
+      setLoading(registerBtn, true); // reaproveita botão secundário como “loading”
+
+      try {
+        const response = await fetch('/api/v1/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          lastRegisteredEmail = email;
+          showSuccess('Se o email existir, um código de recuperação foi enviado.');
+          showStep(2);
+        } else {
+          showError('Erro ao solicitar recuperação de senha.');
+        }
+      } catch (err) {
+        console.error('Erro em forgot-password:', err);
+        showError('Erro ao conectar com o servidor.');
+      } finally {
+        setLoading(registerBtn, false);
+      }
+    }
+
+    function toggleResetPasswordVisibility(checkbox) {
+      const newPwd = document.getElementById('newPassword');
+      const confirmPwd = document.getElementById('confirmPassword');
+      const type = checkbox.checked ? 'text' : 'password';
+      if (newPwd) newPwd.type = type;
+      if (confirmPwd) confirmPwd.type = type;
+    }
+
+    async function confirmResetPassword() {
+      const email = lastRegisteredEmail || emailInput.value.trim();
+      const code = document.getElementById('verificationCode').value.trim();
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (!email || !code || !newPassword || !confirmPassword) {
+        showError('Preencha todos os campos.');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        showError('As senhas não conferem.');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        showError('A nova senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/v1/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code, newPassword })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          showError(result.message || 'Código inválido ou erro ao redefinir a senha.');
           return;
         }
 
-        if (!email.includes('@')) {
-          showError('Email inválido');
-          return;
-        }
-
-        setLoading(loginBtn, true);
-
-        try {
-          const response = await fetch('/api/v1/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data.success) {
-            saveTokensAndRedirect(data.data);
-          } else {
-            showError(data.message || 'Erro ao processar requisição');
-          }
-        } catch (error) {
-          console.error('Erro:', error);
-          showError('Erro ao conectar com o servidor. Verifique sua conexão.');
-        } finally {
-          setLoading(loginBtn, false);
-        }
-      }
-
-      async function registerAndAskCode() {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-
-        errorMessage.style.display = 'none';
-        successMessage.style.display = 'none';
-
-        if (!email || !password) {
-          showError('Por favor, preencha todos os campos');
-          return;
-        }
-
-        if (!email.includes('@')) {
-          showError('Email inválido');
-          return;
-        }
-
-        setLoading(registerBtn, true);
-
-        try {
-          const response = await fetch('/api/v1/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data.success) {
-            lastRegisteredEmail = email;
-            showSuccess('Registrado! Enviamos um código para ' + email);
-            showStep(2);
-          } else {
-            showError(data.message || 'Erro ao registrar');
-          }
-        } catch (error) {
-          console.error('Erro no registro:', error);
-          showError('Erro ao conectar com o servidor.');
-        } finally {
-          setLoading(registerBtn, false);
-        }
-      }
-
-      async function confirmCode() {
-        const code = document.getElementById('verificationCode').value.trim();
-        const email = lastRegisteredEmail || emailInput.value.trim();
-
-        if (!email || !code) {
-          showError('Informe o código de verificação.');
-          return;
-        }
-
-        try {
-          const response = await fetch('/api/v1/auth/verify-code', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, code })
-          });
-
-          const result = await response.json();
-
-          if (!response.ok || !result.success) {
-            showError(result.message || 'Código inválido ou expirado.');
-            return;
-          }
-
-          saveTokensAndRedirect(result.data);
-        } catch (err) {
-          console.error('Erro ao verificar código:', err);
-          showError('Erro ao conectar com o servidor.');
-        }
-      }
-
-      loginBtn.addEventListener('click', () => {
-        loginUser();
-      });
-
-      registerBtn.addEventListener('click', () => {
-        registerAndAskCode();
-      });
-
-      passwordInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          loginBtn.click();
-        }
-      });
-
-      document.addEventListener('DOMContentLoaded', () => {
-        console.log('Dica: use admin@test.com / teste123 para testar.');
+        showSuccess('Senha redefinida com sucesso! Você já pode entrar com a nova senha.');
         showStep(1);
-      });
-    </script>
-  </body>
+      } catch (err) {
+        console.error('Erro em reset-password:', err);
+        showError('Erro ao conectar com o servidor.');
+      }
+    }
+
+    loginBtn.addEventListener('click', () => {
+      loginUser();
+    });
+
+    registerBtn.addEventListener('click', () => {
+      registerAndAskCode();
+    });
+
+    passwordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        loginBtn.click();
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      showStep(1);
+    });
+  </script>
+</body>
 </html>
-
-
