@@ -582,6 +582,13 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
 
     const user = rows[0];
 
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Conta ainda não verificada. Verifique o código enviado para seu email.'
+      });
+    }
+
     // Comparar senha com bcrypt
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
