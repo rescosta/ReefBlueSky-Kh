@@ -569,7 +569,7 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
 
     // Buscar usuário pelo email
     const rows = await conn.query(
-      'SELECT id, email, passwordHash FROM users WHERE email = ? LIMIT 1',
+      'SELECT id, email, passwordHash, isVerified FROM users WHERE email = ? LIMIT 1',
       [email]
     );
 
