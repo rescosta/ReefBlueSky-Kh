@@ -247,14 +247,22 @@
 
         <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
 
-        <!-- Step 1: email/senha + botões (aqui você já tem o form com os botões, então NÃO precisa repetir nada) -->
 
-        <!-- Step 2: campo de código + botão -->
-
+       
+        <!-- Step 2: verificação de conta (apenas código) -->
         <div id="step-2" style="display:none; margin-top: 20px;">
           <div class="form-group">
-            <label for="verificationCode">Código recebido por email (6 dígitos):</label>
-            <input id="verificationCode" type="text" maxlength="6" />
+            <label for="verificationCodeStep2">Código de verificação (6 dígitos):</label>
+            <input id="verificationCodeStep2" type="text" maxlength="6" />
+          </div>
+          <button type="button" onclick="confirmCode()">Confirmar código</button>
+        </div>
+
+        <!-- Step 3: recuperação de senha (código + nova senha) -->
+        <div id="step-3" style="display:none; margin-top: 20px;">
+          <div class="form-group">
+            <label for="verificationCodeStep3">Código recebido por email (6 dígitos):</label>
+            <input id="verificationCodeStep3" type="text" maxlength="6" />
           </div>
           <div class="form-group">
             <label for="newPassword">Nova senha:</label>
@@ -272,6 +280,7 @@
           </div>
           <button type="button" onclick="confirmResetPassword()">Definir nova senha</button>
         </div>
+
 
         <p id="info-text" style="margin-top: 15px; font-size: 13px; color: #555;">
           Use seu email e senha para entrar ou registrar uma nova conta.
@@ -318,16 +327,23 @@
       function showStep(step) {
         currentStep = step;
         const step2 = document.getElementById('step-2');
+        const step3 = document.getElementById('step-3');
         const infoText = document.getElementById('info-text');
 
+        if (step2) step2.style.display = 'none';
+        if (step3) step3.style.display = 'none';
+
         if (step === 1) {
-          if (step2) step2.style.display = 'none';
           infoText.textContent = 'Use seu email e senha para entrar ou registrar uma nova conta.';
-        } else {
+        } else if (step === 2) {
           if (step2) step2.style.display = 'block';
+          infoText.textContent = 'Digite o código de verificação enviado para seu email para ativar a conta.';
+        } else if (step === 3) {
+          if (step3) step3.style.display = 'block';
           infoText.textContent = 'Digite o código recebido e escolha uma nova senha.';
         }
       }
+
 
       function saveTokensAndRedirect(data) {
         localStorage.setItem('token', data.token);
@@ -455,7 +471,7 @@
           if (response.ok) {
             lastRegisteredEmail = email;
             showSuccess('Se o email existir, um código de recuperação foi enviado.');
-            showStep(2);
+            showStep(3);
           } else {
             showError('Erro ao solicitar recuperação de senha.');
           }
@@ -477,7 +493,7 @@
 
       async function confirmResetPassword() {
         const email = lastRegisteredEmail || emailInput.value.trim();
-        const code = document.getElementById('verificationCode').value.trim();
+        const code = document.getElementById('verificationCodeStep3').value.trim();
         const newPassword = document.getElementById('newPassword').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
 
@@ -520,7 +536,7 @@
 
 
       async function confirmCode() {
-        const code = document.getElementById('verificationCode').value.trim();
+        const code = document.getElementById('verificationCodeStep2').value.trim();
         const email = lastRegisteredEmail || emailInput.value.trim();
 
         if (!email || !code) {
