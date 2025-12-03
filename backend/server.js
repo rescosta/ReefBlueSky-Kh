@@ -623,6 +623,101 @@ app.post('/api/v1/auth/verify-code', authLimiter, async (req, res) => {
   }
 });
 
+// Redefinir senha com código (para fluxo "Esqueci minha senha")
+app.post('/api/v1/auth/reset-password', authLimiter, async (req, res) => {
+  console.log('API POST /api/v1/auth/reset-password');
+
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email, código e nova senha são obrigatórios'
+    });
+  }
+
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: 'Nova senha deve ter pelo menos 6 caracteres'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      'SELECT id, email, verificationCode, verificationExpiresAt FROM users WHERE email = ? LIMIT 1',
+      [email]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
+    const user = rows[0];
+
+    if (!user.verificationCode || !user.verificationExpiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nenhum código de recuperação ativo para este usuário'
+      });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(user.verificationExpiresAt);
+
+    if (now > expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código expirado, solicite uma nova recuperação de senha'
+      });
+    }
+
+    if (String(code).trim() !== String(user.verificationCode).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código inválido'
+      });
+    }
+
+    // Atualiza a senha e limpa o código
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await conn.query(
+      'UPDATE users SET passwordHash = ?, verificationCode = NULL, verificationExpiresAt = NULL, updatedAt = ? WHERE id = ?',
+      [passwordHash, now, user.id]
+    );
+
+    console.log('API /auth/reset-password - Senha redefinida para', user.email);
+
+    return res.json({
+      success: true,
+      message: 'Senha redefinida com sucesso. Você já pode entrar com a nova senha.'
+    });
+  } catch (err) {
+    console.error('AUTH ERROR /auth/reset-password:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao redefinir senha',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }
+});
+
+
 // Login de usuário (para painel web)
 app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
   console.log('API POST /api/v1/auth/login');
