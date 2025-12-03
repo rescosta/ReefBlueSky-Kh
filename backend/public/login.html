@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReefBlueSky - Login em Desenvolvimento</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .logo p {
+            color: #999;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #fff3cd;
+            color: #856404;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+            border: 1px solid #ffeaa7;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .buttons-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            margin-top: 0;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #f5f7ff;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.25);
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 6px;
+            border-left: 4px solid #d32f2f;
+            display: none;
+        }
+
+        .success-message {
+            color: #388e3c;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 6px;
+            border-left: 4px solid #388e3c;
+            display: none;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #1976d2;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🐠 ReefBlueSky</h1>
+            <p>Monitor de KH para Aquários</p>
+            <div class="status-badge">⚠️ EM DESENVOLVIMENTO</div>
+        </div>
+
+        <div class="info-box">
+            <strong>Bem-vindo!</strong><br>
+            Este sistema está em fase de desenvolvimento. Use as credenciais de teste para acessar:<br>
+            <strong>xxxxxxxxxxxxxx</strong>
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">📧 Email:</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    placeholder="seu@email.com"
+                    required
+                    autocomplete="email"
+                    value="admin@test.com"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">🔐 Senha:</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="Sua senha"
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
+
+            <div class="buttons-row">
+                <button type="button" id="loginBtn">
+                    Entrar no Painel
+                </button>
+                <button type="button" id="registerBtn" class="btn-secondary">
+                    Registrar e entrar
+                </button>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+        </form>
+
+        <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
+
+    </div>
+
+    <script>
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+
+        function showError(message) {
+            errorMessage.textContent = '❌ ' + message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = '✓ ' + message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+
+        function setLoading(button, loading) {
+            if (loading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner"></span> Processando...';
+            } else {
+                button.disabled = false;
+                if (button.id === 'loginBtn') {
+                    button.innerHTML = 'Entrar no Painel';
+                } else {
+                    button.innerHTML = 'Registrar e entrar';
+                }
+            }
+        }
+
+        function saveTokensAndRedirect(data) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('refreshToken', data.refreshToken || '');
+            localStorage.setItem('userId', data.userId);
+            showSuccess('Login realizado com sucesso! Redirecionando...');
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 1200);
+        }
+
+        async function doAuth(path, button) {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+
+            if (!email || !password) {
+                showError('Por favor, preencha todos os campos');
+                return;
+            }
+
+            if (!email.includes('@')) {
+                showError('Email inválido');
+                return;
+            }
+
+            setLoading(button, true);
+
+            try {
+                const response = await fetch(path, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    saveTokensAndRedirect(data.data);
+                } else {
+                    showError(data.message || 'Erro ao processar requisição');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showError('Erro ao conectar com o servidor. Verifique sua conexão.');
+            } finally {
+                setLoading(button, false);
+            }
+        }
+
+        loginBtn.addEventListener('click', () => {
+            doAuth('/api/v1/auth/login', loginBtn);
+        });
+
+        registerBtn.addEventListener('click', () => {
+            doAuth('/api/v1/auth/register', registerBtn);
+        });
+
+        // Enter no campo senha = clicar em "Entrar no Painel"
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loginBtn.click();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('💡 Dica: use admin@test.com / teste123 para testar.');
+        });
+    </script>
+</body>
+</html>
