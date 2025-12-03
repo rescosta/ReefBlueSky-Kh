@@ -384,14 +384,46 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
     conn = await pool.getConnection();
 
     const existing = await conn.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
+      'SELECT id, isVerified FROM users WHERE email = ? LIMIT 1',
       [email]
     );
 
     if (existing && existing.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'Já existe um usuário com este email'
+      const existingUser = existing[0];
+
+      // Se já está verificado, bloqueia novo cadastro
+      if (existingUser.isVerified) {
+        return res.status(409).json({
+          success: false,
+          message: 'Já existe um usuário verificado com este email'
+        });
+      }
+
+      // Usuário existe mas ainda NÃO foi verificado:
+      // apenas gera novo código e nova expiração (reenviar código)
+      const now = new Date();
+      const verificationCode = String(
+        Math.floor(100000 + Math.random() * 900000)
+      );
+      const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+
+      await conn.query(
+        'UPDATE users SET verificationCode = ?, verificationExpiresAt = ?, updatedAt = ? WHERE id = ?',
+        [verificationCode, expiresAt, now, existingUser.id]
+      );
+
+      console.log('API /auth/register - Reenviando código para usuário não verificado', email, 'code:', verificationCode);
+
+      await sendVerificationEmail(email, verificationCode);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Já existe um cadastro pendente para este email. Reenviamos um novo código de verificação.',
+        data: {
+          userId: existingUser.id,
+          email: email,
+          requiresVerification: true
+        }
       });
     }
 
