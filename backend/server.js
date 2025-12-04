@@ -980,9 +980,11 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
  * [SEGURANÇA] Heartbeat do dispositivo
  */
 app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
-  console.log('[API] POST /api/v1/device/sync - Device:', req.user.deviceId);
-
+  console.log('SYNC BODY =>', JSON.stringify(req.body));
   const { measurements, lastSyncTimestamp, local_ip } = req.body;
+  console.log('local_ip extraído =>', local_ip);
+
+  console.log('[API] POST /api/v1/device/sync - Device:', req.user.deviceId);
 
   // Validar input
   if (!Array.isArray(measurements)) {
