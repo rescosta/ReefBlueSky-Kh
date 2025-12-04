@@ -980,125 +980,122 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
  * [SEGURANÇA] Heartbeat do dispositivo
  */
 app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
-    console.log('[API] POST /api/v1/device/sync - Device:', req.user.deviceId);
-    
-    const { measurements, lastSyncTimestamp, local_ip } = req.body;
-    
+  console.log('[API] POST /api/v1/device/sync - Device:', req.user.deviceId);
 
-    // atualizar IP local do device
+  const { measurements, lastSyncTimestamp, local_ip } = req.body;
 
+  // Validar input
+  if (!Array.isArray(measurements)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Medições devem ser um array'
+    });
+  }
+
+  if (measurements.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Array de medições vazio'
+    });
+  }
+
+  for (const m of measurements) {
+    if (!m.timestamp || typeof m.kh !== 'number') {
+      return res.status(400).json({
+        success: false,
+        message: 'Medição inválida: faltam timestamp ou kh'
+      });
+    }
+  }
+
+  console.log(`[API] Sincronizando ${measurements.length} medições do deviceId: ${req.user.deviceId}`);
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 1) Auto‑registro do device
+    await conn.query(
+      `INSERT INTO devices (deviceId, name, createdAt, updatedAt)
+       VALUES (?, ?, NOW(), NOW())
+       ON DUPLICATE KEY UPDATE updatedAt = NOW()`,
+      [req.user.deviceId, 'KH Auto-Register']
+    );
+
+    // 2) Atualizar IP local se veio no body
     if (local_ip) {
+      await conn.query(
+        'UPDATE devices SET local_ip = ?, last_seen = NOW() WHERE deviceId = ?',
+        [local_ip, req.user.deviceId]
+      );
+    }
+
+    // 3) Gravar medições
+    let insertedCount = 0;
+    for (const m of measurements) {
       try {
-        let connIp = await pool.getConnection();
-        await connIp.query(
-          'UPDATE devices SET local_ip = ?, last_seen = ? WHERE deviceId = ?',
-          [local_ip, new Date(), req.user.deviceId]
+        await conn.execute(
+          'INSERT INTO measurements (deviceId, kh, phref, phsample, temperature, timestamp, status, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            req.user.deviceId,
+            m.kh,
+            m.phref || null,
+            m.phsample || null,
+            m.temperature || null,
+            m.timestamp,
+            m.status || null,
+            m.confidence || null
+          ]
         );
-        connIp.release();
-      } catch (e) {
-        console.error('[DB] Erro ao atualizar local_ip do device:', e.message);
+        insertedCount++;
+      } catch (insertErr) {
+        console.error(`[DB] Erro ao inserir medição ${m.timestamp}:`, insertErr.message);
       }
     }
 
+    console.log(`[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`);
 
-    // Validar input
-    if (!Array.isArray(measurements)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Medições devem ser um array'
-        });
+    return res.json({
+      success: true,
+      message: `${insertedCount} medições sincronizadas com sucesso`,
+      data: {
+        synced: insertedCount,
+        failed: measurements.length - insertedCount,
+        nextSyncTime: Date.now() + 300000
+      }
+    });
+
+  } catch (err) {
+    console.error('[DB] Erro crítico ao sincronizar:', err.message, err.code);
+
+    let statusCode = 503;
+    let errorMsg = 'Erro ao conectar ao banco de dados';
+
+    if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+      errorMsg = 'Credenciais do banco incorretas';
+    } else if (err.code === 'ER_BAD_DB_ERROR') {
+      errorMsg = 'Banco de dados não existe';
+    } else if (err.message.includes('timeout')) {
+      errorMsg = 'Timeout ao conectar (MariaDB pode estar DOWN)';
     }
-    
-    if (measurements.length === 0) {
-        return res.status(400).json({
-            success: false,
-            message: 'Array de medições vazio'
-        });
+
+    return res.status(statusCode).json({
+      success: false,
+      message: errorMsg,
+      error: err.message
+    });
+
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+        console.log('[DB] Conexão liberada');
+      } catch (releaseErr) {
+        console.error('[DB] Erro ao liberar conexão:', releaseErr.message);
+      }
     }
-    
-    // Validar cada medição
-    for (const m of measurements) {
-        if (!m.timestamp || typeof m.kh !== 'number') {
-            return res.status(400).json({
-                success: false,
-                message: 'Medição inválida: faltam timestamp ou kh'
-            });
-        }
-    }
-    
-    console.log(`[API] Sincronizando ${measurements.length} medições do deviceId: ${req.user.deviceId}`);
-    
-    let conn;
-    try {
-        conn = await pool.getConnection();
-        let insertedCount = 0;
-        
-        // ✅ CORRETO: Array dentro de colchetes
-        for (const m of measurements) {
-            try {
-                await conn.execute(
-                    'INSERT INTO measurements (deviceId, kh, phref, phsample, temperature, timestamp, status, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    [
-                        req.user.deviceId,
-                        m.kh,
-                        m.phref || null,
-                        m.phsample || null,
-                        m.temperature || null,
-                        m.timestamp,
-                        m.status || null,
-                        m.confidence || null
-                    ]
-                );
-                insertedCount++;
-            } catch (insertErr) {
-                console.error(`[DB] Erro ao inserir medição ${m.timestamp}:`, insertErr.message);
-            }
-        }
-        
-        console.log(`[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`);
-        
-        res.json({
-            success: true,
-            message: `${insertedCount} medições sincronizadas com sucesso`,
-            data: {
-                synced: insertedCount,
-                failed: measurements.length - insertedCount,
-                nextSyncTime: Date.now() + 300000
-            }
-        });
-        
-    } catch (err) {
-        console.error('[DB] Erro crítico ao sincronizar:', err.message, err.code);
-        
-        let statusCode = 503;
-        let errorMsg = 'Erro ao conectar ao banco de dados';
-        
-        if (err.code === 'ER_ACCESS_DENIED_ERROR') {
-            errorMsg = 'Credenciais do banco incorretas';
-        } else if (err.code === 'ER_BAD_DB_ERROR') {
-            errorMsg = 'Banco de dados não existe';
-        } else if (err.message.includes('timeout')) {
-            errorMsg = 'Timeout ao conectar (MariaDB pode estar DOWN)';
-        }
-        
-        return res.status(statusCode).json({
-            success: false,
-            message: errorMsg,
-            error: err.message
-        });
-        
-    } finally {
-        if (conn) {
-            try {
-                conn.release();
-                console.log('[DB] Conexão liberada');
-            } catch (releaseErr) {
-                console.error('[DB] Erro ao liberar conexão:', releaseErr.message);
-            }
-        }
-    }
+  }
 });
-
 
 
 /**
