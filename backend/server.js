@@ -23,6 +23,7 @@ const rateLimit = require('express-rate-limit');
 
 const mariadb = require('mariadb');
 const nodemailer = require('nodemailer');
+const displayRoutes = require('./display-endpoints');
 
 const pool = mariadb.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
@@ -163,6 +164,8 @@ app.use(globalLimiter);
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use('/api/display', displayRoutes);
+
 
 // ============================================================================
 // [SEGURANÇA] Autenticação JWT
@@ -979,8 +982,25 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
 app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     console.log('[API] POST /api/v1/device/sync - Device:', req.user.deviceId);
     
-    const { measurements, lastSyncTimestamp } = req.body;
+    const { measurements, lastSyncTimestamp, local_ip } = req.body;
     
+
+    // atualizar IP local do device
+
+    if (local_ip) {
+      try {
+        let connIp = await pool.getConnection();
+        await connIp.query(
+          'UPDATE devices SET local_ip = ?, last_seen = ? WHERE deviceId = ?',
+          [local_ip, new Date(), req.user.deviceId]
+        );
+        connIp.release();
+      } catch (e) {
+        console.error('[DB] Erro ao atualizar local_ip do device:', e.message);
+      }
+    }
+
+
     // Validar input
     if (!Array.isArray(measurements)) {
         return res.status(400).json({
