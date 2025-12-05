@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuração
-REPO_URL="https://raw.githubusercontent.com/rescosta/ReefBlueSky-Kh/main/backend/dashboard.html"
+REPO_URL="https://github.com/rescosta/ReefBlueSky-Kh/blob/main/backend/public/dashboard.html"
 BRANCH="main"
 BACKUP_DIR="backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
