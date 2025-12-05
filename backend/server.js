@@ -959,7 +959,7 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
               phref,
               phsample,
               temperature,
-              timestamp,
+              CAST(timestamp AS UNSIGNED) AS timestamp,
               status,
               confidence,
               createdAt
