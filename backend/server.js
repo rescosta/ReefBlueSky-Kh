@@ -959,7 +959,7 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
               phref,
               phsample,
               temperature,
-              CAST(timestamp AS UNSIGNED) AS timestamp,
+              timestamp,
               status,
               confidence,
               createdAt
@@ -970,10 +970,16 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
       [deviceId]
     );
 
+    const safeRows = rows.map(r => ({
+      ...r,
+      timestamp: Number(r.timestamp)
+    }));
+
     return res.json({
       success: true,
-      data: rows
+      data: safeRows
     });
+
   } catch (err) {
     console.error('API /user/devices/:deviceId/measurements error:', err.message);
     return res.status(500).json({
