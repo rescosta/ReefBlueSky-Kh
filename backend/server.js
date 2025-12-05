@@ -180,6 +180,7 @@ function verifyToken(req, res, next) {
     const token = authHeader && authHeader.split(' ')[1];  // Bearer TOKEN
     
     if (!token) {
+        console.log('[verifyToken] Falhou: header Authorization ausente ou sem Bearer');
         return res.status(401).json({
             success: false,
             message: 'Token não fornecido'
