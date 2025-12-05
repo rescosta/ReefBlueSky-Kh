@@ -888,6 +888,108 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
   }
 });
 
+
+// ===== ENDPOINTS WEB: DISPOSITIVOS DO USUÁRIO =====
+// Lista devices do usuário logado
+app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
+  console.log('API GET /api/v1/user/devices');
+  const userId = req.user.userId;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      `SELECT id,
+              deviceId,
+              name,
+              local_ip AS localIp,
+              last_seen AS lastSeen,
+              createdAt,
+              updatedAt
+         FROM devices
+        WHERE userId = ?
+        ORDER BY createdAt DESC`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      data: rows
+    });
+  } catch (err) {
+    console.error('API /user/devices error:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar dispositivos',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try { conn.release(); } catch (e) {
+        console.error('DB release error /user/devices:', e.message);
+      }
+    }
+  }
+});
+
+// Histórico de medições de um device do usuário
+app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async (req, res) => {
+  console.log('API GET /api/v1/user/devices/:deviceId/measurements');
+  const userId = req.user.userId;
+  const { deviceId } = req.params;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Garante que o device pertence a este usuário
+    const devRows = await conn.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!devRows || devRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device não encontrado para este usuário'
+      });
+    }
+
+    const rows = await conn.query(
+      `SELECT id,
+              kh,
+              phref,
+              phsample,
+              temperature,
+              timestamp,
+              status,
+              confidence,
+              createdAt
+         FROM measurements
+        WHERE deviceId = ?
+        ORDER BY timestamp DESC
+        LIMIT 500`,
+      [deviceId]
+    );
+
+    return res.json({
+      success: true,
+      data: rows
+    });
+  } catch (err) {
+    console.error('API /user/devices/:deviceId/measurements error:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar medições',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try { conn.release(); } catch (e) {
+        console.error('DB release error /user/measurements:', e.message);
+      }
+    }
+  }
+});
+
 /**
  * POST /api/v1/device/register
  * [SEGURANÇA] Registrar novo dispositivo
