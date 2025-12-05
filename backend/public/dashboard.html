@@ -186,6 +186,22 @@
     </div>
   </div>
 
+  <div id="device-list"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Data/hora</th>
+        <th>KH</th>
+        <th>pH ref</th>
+        <th>pH sample</th>
+        <th>Temp</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="measurement-table"></tbody>
+  </table>
+
   <script>
     const userInfoEl = document.getElementById('userInfo');
     const endpointInfoEl = document.getElementById('endpointInfo');
@@ -210,12 +226,12 @@
       window.location.href = '/login';
     }
 
+    const token = localStorage.getItem('token');
+    if (!token) {
+    window.location.href = '/login';
+    }
+
     async function loadDashboard() {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        redirectToLogin();
-        return;
-      }
 
       setBadge(false, 'Verificando token...');
       userInfoEl.textContent = 'Carregando dados do usuário...';
@@ -274,7 +290,59 @@
       redirectToLogin();
     });
 
+
+  async function loadDevices() {
+    const res = await fetch('/api/v1/user/devices', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const json = await res.json();
+    if (!json.success) {
+      console.error(json.message);
+      return;
+    }
+
+    const list = document.getElementById('device-list'); // crie um <div id="device-list"></div> no HTML
+    list.innerHTML = '';
+
+    json.data.forEach(dev => {
+      const btn = document.createElement('button');
+      btn.textContent = dev.deviceId + ' - ' + (dev.name || '');
+      btn.onclick = () => loadMeasurements(dev.deviceId);
+      list.appendChild(btn);
+    });
+  }
+
+  async function loadMeasurements(deviceId) {
+    const res = await fetch(`/api/v1/user/devices/${deviceId}/measurements`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const json = await res.json();
+    if (!json.success) {
+      console.error(json.message);
+      return;
+    }
+
+    const table = document.getElementById('measurement-table'); // crie uma <tbody id="measurement-table"></tbody>
+    table.innerHTML = '';
+
+    json.data.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${new Date(m.timestamp * 1000).toLocaleString()}</td>
+        <td>${m.kh}</td>
+        <td>${m.phref}</td>
+        <td>${m.phsample}</td>
+        <td>${m.temperature}</td>
+        <td>${m.status}</td>
+      `;
+      table.appendChild(tr);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
     loadDashboard();
+    loadDevices();
+  });
   </script>
 </body>
 </html>
