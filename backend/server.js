@@ -891,10 +891,10 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
  * POST /api/v1/device/register
  * [SEGURANÇA] Registrar novo dispositivo
  */
-app.post('/api/v1/device/register', authLimiter, (req, res) => {
+app.post('/api/v1/device/register', authLimiter, async (req, res) => {
     console.log('[API] POST /api/v1/device/register');
     
-    const { deviceId, username, password } = req.body;
+    const { deviceId, username, password, local_ip } = req.body;
     
     // Validar entrada
     if (!deviceId || !username || !password) {
@@ -912,27 +912,105 @@ app.post('/api/v1/device/register', authLimiter, (req, res) => {
         });
     }
     
+    let conn;
+    try {
+      conn = await pool.getConnection();
+
+      // 1) Buscar usuário pelo email (username)
+      const userRows = await conn.query(
+        'SELECT id, email, passwordHash, isVerified FROM users WHERE email = ? LIMIT 1',
+        [username]
+      );
+
+      if (!userRows || userRows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Usuário não encontrado para este username'
+        });
+      }
+
+      const user = userRows[0];
+
+      if (!user.isVerified) {
+        return res.status(403).json({
+          success: false,
+          message: 'Usuário ainda não verificado'
+        });
+      }
+
+      // 2) Validar senha enviada pelo device contra passwordHash do usuário
+      const ok = await bcrypt.compare(password, user.passwordHash);
+      if (!ok) {
+        return res.status(401).json({
+          success: false,
+          message: 'Credenciais inválidas para este usuário'
+        });
+      }
+
+      const now = new Date();
+
+      // 3) Criar/atualizar device já vinculando userId
+      await conn.query(
+        `INSERT INTO devices (deviceId, userId, name, local_ip, last_seen, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           userId = VALUES(userId),
+           name = VALUES(name),
+           local_ip = VALUES(local_ip),
+           last_seen = VALUES(last_seen),
+           updatedAt = VALUES(updatedAt)`,
+        [
+          deviceId,
+          user.id,
+          'KH Auto-Register',
+          local_ip || null,
+          now,
+          now,
+          now
+        ]
+      );
+
+
     // TODO: Verificar se dispositivo já existe
     // TODO: Criar usuário no banco de dados
     // TODO: Hash da senha com bcrypt
     
     // Gerar tokens
-    const token = generateToken('user_123', deviceId);
-    const refreshToken = generateRefreshToken('user_123', deviceId);
+    const token = generateToken(user.id, deviceId);
+    const refreshToken = generateRefreshToken(user.id, deviceId);
     
-    console.log('[API] Dispositivo registrado com sucesso:', deviceId);
+    console.log('[API] Dispositivo registrado com sucesso:', deviceId, 'userId');
     
     res.status(201).json({
         success: true,
         message: 'Dispositivo registrado com sucesso',
         data: {
             deviceId,
+            userId: user.id,
             token,
             refreshToken,
             expiresIn: 3600  // 1 hora em segundos
         }
     });
+  } catch (err) {
+    console.error('DEVICE ERROR /device/register:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao registrar dispositivo',
+      error: err.message
+    });
+  } finally {
+    if (conn) {
+      try {
+        conn.release();
+      } catch (releaseErr) {
+        console.error('DB release error:', releaseErr.message);
+      }
+    }
+  }     
 });
+
+
 
 /**
  * POST /api/v1/device/refresh-token
