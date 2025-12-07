@@ -932,6 +932,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
 });
 
 // Histórico de medições de um device do usuário
+// Histórico de medições de um device do usuário
 app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async (req, res) => {
   console.log('API GET /api/v1/user/devices/:deviceId/measurements');
   const userId = req.user.userId;
@@ -952,23 +953,6 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
         message: 'Device não encontrado para este usuário'
       });
     }
-
-    const rows = await conn.query(
-      `SELECT id,
-              kh,
-              phref,
-              phsample,
-              temperature,
-              timestamp,
-              status,
-              confidence,
-              createdAt
-         FROM measurements
-        WHERE deviceId = ?
-        ORDER BY timestamp DESC
-        LIMIT 500`,
-      [deviceId]
-    );
 
     const { from, to } = req.query;
 
@@ -1025,6 +1009,7 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
     }
   }
 });
+
 
 /**
  * POST /api/v1/device/register
