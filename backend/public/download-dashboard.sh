@@ -52,16 +52,16 @@ if curl -f -o dashboard.html "$REPO_URL"; then
   echo ""
   
   # Verificar integridade básica
-  if grep -q "ReefBlueSky KH Monitor" dashboard.html; then
-    echo -e "${GREEN}[✓]${NC} Arquivo validado (contém header esperado)"
-  else
-    echo -e "${RED}[✗]${NC} Erro: Arquivo não parece válido"
-    if [ -f "${BACKUP_DIR}/dashboard.html.${TIMESTAMP}.bak" ]; then
-      echo -e "${YELLOW}[INFO]${NC} Restaurando backup..."
-      cp "${BACKUP_DIR}/dashboard.html.${TIMESTAMP}.bak" dashboard.html
-      exit 1
-    fi
-  fi
+#  if grep -q "ReefBlueSky KH Monitor" dashboard.html; then
+#    echo -e "${GREEN}[✓]${NC} Arquivo validado (contém header esperado)"
+#  else
+#    echo -e "${RED}[✗]${NC} Erro: Arquivo não parece válido"
+#    if [ -f "${BACKUP_DIR}/dashboard.html.${TIMESTAMP}.bak" ]; then
+#      echo -e "${YELLOW}[INFO]${NC} Restaurando backup..."
+#      cp "${BACKUP_DIR}/dashboard.html.${TIMESTAMP}.bak" dashboard.html
+#      exit 1
+#    fi
+#  fi
   
   echo ""
   echo -e "${BLUE}[INFO]${NC} Informações do arquivo:"

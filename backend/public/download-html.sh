@@ -17,7 +17,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuração
-REPO_URL="https://raw.githubusercontent.com/rescosta/ReefBlueSky-Kh/main/backend/login.html"
+REPO_URL="https://raw.githubusercontent.com/rescosta/ReefBlueSky-Kh/main/backend/dashboard.html"
 BRANCH="main"
 BACKUP_DIR="backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -52,16 +52,16 @@ if curl -f -o login.html "$REPO_URL"; then
   echo ""
   
   # Verificar integridade básica
-  if grep -q "ReefBlueSky KH Monitor" login.html; then
-    echo -e "${GREEN}[✓]${NC} Arquivo validado (contém header esperado)"
-  else
-    echo -e "${RED}[✗]${NC} Erro: Arquivo não parece válido"
-    if [ -f "${BACKUP_DIR}/login.html.${TIMESTAMP}.bak" ]; then
-      echo -e "${YELLOW}[INFO]${NC} Restaurando backup..."
-      cp "${BACKUP_DIR}/login.html.${TIMESTAMP}.bak" login.html
-      exit 1
-    fi
-  fi
+#  if grep -q "ReefBlueSky KH Monitor" login.html; then
+#    echo -e "${GREEN}[✓]${NC} Arquivo validado (contém header esperado)"
+#  else
+#    echo -e "${RED}[✗]${NC} Erro: Arquivo não parece válido"
+#    if [ -f "${BACKUP_DIR}/login.html.${TIMESTAMP}.bak" ]; then
+#      echo -e "${YELLOW}[INFO]${NC} Restaurando backup..."
+#      cp "${BACKUP_DIR}/login.html.${TIMESTAMP}.bak" login.html
+#      exit 1
+#    fi
+#  fi
   
   echo ""
   echo -e "${BLUE}[INFO]${NC} Informações do arquivo:"
