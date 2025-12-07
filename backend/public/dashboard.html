@@ -328,7 +328,12 @@
     json.data.forEach(m => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${new Date(m.timestamp * 1000).toLocaleString()}</td>
+        <td>${
+          new Date(m.timestamp).toLocaleString(undefined, {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          })
+        }</td>
         <td>${m.kh}</td>
         <td>${m.phref}</td>
         <td>${m.phsample}</td>
