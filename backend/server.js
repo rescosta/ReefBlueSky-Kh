@@ -117,8 +117,9 @@ app.get('/login', (req, res) => {
 
 // Dashboard (proteção via JWT no frontend)
 app.get('/dashboard', (req, res) => {
-  res.sendFile(__dirname + '/public/dashboard.html');
+  res.sendFile(__dirname + '/public/dashboard-main.html');
 });
+
 
 // ============================================================================
 // [SEGURANÇA] Middlewares de Proteção
