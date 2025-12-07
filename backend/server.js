@@ -970,6 +970,36 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
       [deviceId]
     );
 
+    const { from, to } = req.query;
+
+    let sql = `
+      SELECT id,
+             kh,
+             phref,
+             phsample,
+             temperature,
+             timestamp,
+             status,
+             confidence,
+             createdAt
+        FROM measurements
+       WHERE deviceId = ?
+    `;
+    const params = [deviceId];
+
+    if (from) {
+      sql += ' AND timestamp >= ?';
+      params.push(Number(from));
+    }
+    if (to) {
+      sql += ' AND timestamp <= ?';
+      params.push(Number(to));
+    }
+
+    sql += ' ORDER BY timestamp DESC LIMIT 500';
+
+    const rows = await conn.query(sql, params);
+
     const safeRows = rows.map(r => ({
       ...r,
       timestamp: Number(r.timestamp)
@@ -1326,10 +1356,12 @@ app.post('/api/v1/device/health', verifyToken, (req, res) => {
  */
 app.get('/api/v1/device/commands', verifyToken, (req, res) => {
     console.log('[API] GET /api/v1/device/commands - Device:', req.user.deviceId);
-    
-    // TODO: Buscar comandos pendentes do banco de dados
-    
-    const commands = [];  // Exemplo vazio
+
+    const deviceId = req.user.deviceId;
+    const commands = deviceCommands.get(deviceId) || [];
+
+    // opcional: limpar fila após envio
+    deviceCommands.set(deviceId, []);
     
     res.json({
         success: true,
@@ -1376,6 +1408,175 @@ app.get('/api/v1/dashboard/example', authUserMiddleware, (req, res) => {
       deviceId: req.user.deviceId
     }
   });
+});
+
+// ===== BLOCO 1: Config do dispositivo (INSERIR DEPOIS DAS ROTAS /api/v1/user/devices EXISTENTES) =====
+
+// armazenamento em memória, depois você troca por DB
+const deviceConfigs = new Map(); // key: deviceId
+
+function getOrCreateDeviceConfig(deviceId) {
+  if (!deviceConfigs.has(deviceId)) {
+    deviceConfigs.set(deviceId, {
+      khReference: 8.0,
+      intervalHours: 1,
+      levels: { A: true, B: true, C: false },
+      pumps: {
+        1: { running: false, direction: 'forward' },
+        2: { running: false, direction: 'forward' },
+        3: { running: false, direction: 'forward' },
+      },
+    });
+  }
+  return deviceConfigs.get(deviceId);
+}
+
+// GET /config - usado por apiLoadDeviceConfig em dashboard-config.js
+app.get('/api/v1/user/devices/:deviceId/config', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+
+    // TODO: validar se o device pertence ao userId
+    const cfg = getOrCreateDeviceConfig(deviceId);
+
+    return res.json({ success: true, data: cfg });
+  } catch (err) {
+    console.error('GET /config error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao carregar config' });
+  }
+});
+
+// POST /config/kh - apiSetReferenceKH
+app.post('/api/v1/user/devices/:deviceId/config/kh', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const { khReference } = req.body;
+
+    if (typeof khReference !== 'number' || Number.isNaN(khReference)) {
+      return res.status(400).json({ success: false, message: 'khReference inválido' });
+    }
+
+    const cfg = getOrCreateDeviceConfig(deviceId);
+    cfg.khReference = khReference;
+
+    // TODO opcional: persistir em DB / notificar device
+    return res.json({ success: true, data: { khReference } });
+  } catch (err) {
+    console.error('POST /config/kh error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao salvar khReference' });
+  }
+});
+
+// POST /config/interval - apiSetMeasurementInterval
+app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const { intervalHours } = req.body;
+
+    if (typeof intervalHours !== 'number' || intervalHours <= 0 || intervalHours > 24) {
+      return res.status(400).json({ success: false, message: 'intervalHours inválido' });
+    }
+
+    const cfg = getOrCreateDeviceConfig(deviceId);
+    cfg.intervalHours = intervalHours;
+
+    // TODO: agendar próxima medição na "hora cheia"
+    return res.json({ success: true, data: { intervalHours } });
+  } catch (err) {
+    console.error('POST /config/interval error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao salvar intervalo' });
+  }
+});
+
+// ===== BLOCO 2: Comandos para o dispositivo (DEPOIS DO BLOCO DE CONFIG) =====
+
+const deviceCommands = new Map(); // key: deviceId, value: array de comandos
+
+function enqueueCommand(deviceId, type, payload = {}) {
+  if (!deviceCommands.has(deviceId)) {
+    deviceCommands.set(deviceId, []);
+  }
+  const queue = deviceCommands.get(deviceId);
+  const cmd = {
+    id: Date.now() + '-' + Math.random().toString(16).slice(2),
+    type,
+    payload,
+    createdAt: Date.now(),
+  };
+  queue.push(cmd);
+  return cmd;
+}
+
+// POST /command/pump - usado em dashboard-config.js (apiManualPump)
+app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const { pumpId, direction, seconds } = req.body;
+
+    if (!pumpId || !seconds || seconds <= 0) {
+      return res.status(400).json({ success: false, message: 'pumpId/seconds inválidos' });
+    }
+    const dir = direction === 'reverse' ? 'reverse' : 'forward';
+
+    const cmd = enqueueCommand(deviceId, 'manual_pump', { pumpId, direction: dir, seconds });
+    console.log('[CMD] manual_pump enfileirado', deviceId, cmd);
+
+    return res.json({ success: true, data: { commandId: cmd.id } });
+  } catch (err) {
+    console.error('POST /command/pump error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao enviar comando de bomba' });
+  }
+});
+
+// POST /command/kh-correction - usado em dashboard-config.js (apiKhCorrection)
+app.post('/api/v1/user/devices/:deviceId/command/kh-correction', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const { volume } = req.body;
+
+    if (typeof volume !== 'number' || volume <= 0) {
+      return res.status(400).json({ success: false, message: 'volume inválido' });
+    }
+
+    const cmd = enqueueCommand(deviceId, 'kh_correction', { volume });
+    console.log('[CMD] kh_correction enfileirado', deviceId, cmd);
+
+    return res.json({ success: true, data: { commandId: cmd.id } });
+  } catch (err) {
+    console.error('POST /command/kh-correction error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao enviar correção de KH' });
+  }
+});
+
+// POST /command - usado em dashboard-sistema.js (restart, reset_kh, factory_reset)
+app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const { type } = req.body;
+
+    if (!type) {
+      return res.status(400).json({ success: false, message: 'type obrigatório' });
+    }
+
+    const allowed = new Set(['restart', 'reset_kh', 'factory_reset']);
+    if (!allowed.has(type)) {
+      return res.status(400).json({ success: false, message: 'type inválido' });
+    }
+
+    const cmd = enqueueCommand(deviceId, type, {});
+    console.log('[CMD] comando enfileirado', deviceId, cmd);
+
+    return res.json({ success: true, data: { commandId: cmd.id } });
+  } catch (err) {
+    console.error('POST /command error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao enviar comando' });
+  }
 });
 
 
