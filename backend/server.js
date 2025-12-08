@@ -1568,8 +1568,9 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
 
 // Atualizar nome (fake ID) do device
 app.put(
-  '/api/v1/user/devices/:deviceId/name', authUserMiddleware, async (req, res) 
-  => {
+  '/api/v1/user/devices/:deviceId/name',
+  authUserMiddleware,
+  async (req, res) => {
     try {
       const userId = req.user.userId;
       const { deviceId } = req.params;
@@ -1604,6 +1605,7 @@ app.put(
     }
   },
 );
+
 
 // ============================================================================
 // [API] Endpoints de Status (v1)
