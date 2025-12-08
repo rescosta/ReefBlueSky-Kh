@@ -1566,6 +1566,44 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
   }
 });
 
+// Atualizar nome (fake ID) do device
+app.put(
+  '/api/v1/user/devices/:deviceId/name', authUserMiddleware, async (req, res) 
+  => {
+    try {
+      const userId = req.user.userId;
+      const { deviceId } = req.params;
+      const { name } = req.body;
+
+      if (!name || !name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nome não pode ser vazio.',
+        });
+      }
+
+      const sql = `
+        UPDATE devices
+        SET name = ?
+        WHERE id = ? AND user_id = ?;
+      `;
+      const params = [name.trim(), deviceId, userId];
+
+      await db.query(sql, params);
+
+      return res.json({
+        success: true,
+        message: 'Nome atualizado.',
+      });
+    } catch (err) {
+      console.error('Erro ao atualizar nome do device:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Erro interno ao atualizar nome do device.',
+      });
+    }
+  },
+);
 
 // ============================================================================
 // [API] Endpoints de Status (v1)
