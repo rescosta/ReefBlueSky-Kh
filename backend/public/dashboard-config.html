@@ -274,6 +274,19 @@
         </div>
 
         <div class="field-row">
+          <label for="deviceNameInput">Nome do dispositivo (fake ID)</label>
+          <div class="inline">
+            <input id="deviceNameInput" type="text" maxlength="64" />
+            <button id="saveDeviceNameBtn" class="btn-primary">
+              Salvar nome
+            </button>
+          </div>
+          <div id="deviceNameStatus" class="hint">
+            Esse nome aparecerá nas telas Principal, Sistema e na seleção de devices.
+          </div>
+        </div>
+
+        <div class="field-row">
           <label for="intervalRange">Intervalo entre medições (horas)</label>
           <input id="intervalRange" type="range" min="1" max="24" value="1" />
           <div class="inline">
