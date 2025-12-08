@@ -16,7 +16,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const mqtt = require('mqtt');
+//const mqtt = require('mqtt');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
@@ -284,64 +284,64 @@ function authUserMiddleware(req, res, next) {
 // [MQTT] Integração com MQTT Broker
 // ============================================================================
 
-let mqttClient = null;
+//let mqttClient = null;
 
-function initMQTT() {
-    console.log('[MQTT] Conectando ao broker:', MQTT_BROKER);
+//function initMQTT() {
+//   console.log('[MQTT] Conectando ao broker:', MQTT_BROKER);
+//  
+//    mqttClient = mqtt.connect(MQTT_BROKER, {
+//        clientId: 'reefbluesky-server',
+//        username: process.env.MQTT_USERNAME,
+//        password: process.env.MQTT_PASSWORD,
+//        reconnectPeriod: 5000,
+//        connectTimeout: 10000
+//    });
+//    
+//    mqttClient.on('connect', () => {
+//        console.log('[MQTT] Conectado ao broker');
+//        
+//        // Subscrever a tópicos de interesse
+//        mqttClient.subscribe('reefbluesky/+/measurement', (err) => {
+//            if (!err) {
+//                console.log('[MQTT] Inscrito em reefbluesky/+/measurement');
+//            }
+//        });
+//        
+//       mqttClient.subscribe('reefbluesky/+/health', (err) => {
+//            if (!err) {
+//                console.log('[MQTT] Inscrito em reefbluesky/+/health');
+//            }
+//        });
+//    });
     
-    mqttClient = mqtt.connect(MQTT_BROKER, {
-        clientId: 'reefbluesky-server',
-        username: process.env.MQTT_USERNAME,
-        password: process.env.MQTT_PASSWORD,
-        reconnectPeriod: 5000,
-        connectTimeout: 10000
-    });
-    
-    mqttClient.on('connect', () => {
-        console.log('[MQTT] Conectado ao broker');
+//    mqttClient.on('message', (topic, message) => {
+//        console.log(`[MQTT] Mensagem recebida em ${topic}:`, message.toString());
         
-        // Subscrever a tópicos de interesse
-        mqttClient.subscribe('reefbluesky/+/measurement', (err) => {
-            if (!err) {
-                console.log('[MQTT] Inscrito em reefbluesky/+/measurement');
-            }
-        });
-        
-        mqttClient.subscribe('reefbluesky/+/health', (err) => {
-            if (!err) {
-                console.log('[MQTT] Inscrito em reefbluesky/+/health');
-            }
-        });
-    });
-    
-    mqttClient.on('message', (topic, message) => {
-        console.log(`[MQTT] Mensagem recebida em ${topic}:`, message.toString());
-        
-        try {
-            const data = JSON.parse(message.toString());
+//        try {
+//            const data = JSON.parse(message.toString());
             
-            // Processar medição
-            if (topic.includes('measurement')) {
-                handleMQTTMeasurement(data);
-            }
-            
-            // Processar health metrics
-            if (topic.includes('health')) {
-                handleMQTTHealth(data);
-            }
-        } catch (error) {
-            console.error('[MQTT] Erro ao processar mensagem:', error.message);
-        }
-    });
+//            // Processar medição
+//            if (topic.includes('measurement')) {
+//                handleMQTTMeasurement(data);
+//            }
+//            
+//            // Processar health metrics
+//            if (topic.includes('health')) {
+//                handleMQTTHealth(data);
+//            }
+//        } catch (error) {
+//            console.error('[MQTT] Erro ao processar mensagem:', error.message);
+//        }
+//   });
+//    
+//    mqttClient.on('error', (error) => {
+//        console.error('[MQTT] Erro:', error.message);
+//    });
     
-    mqttClient.on('error', (error) => {
-        console.error('[MQTT] Erro:', error.message);
-    });
-    
-    mqttClient.on('disconnect', () => {
-        console.log('[MQTT] Desconectado do broker');
-    });
-}
+//    mqttClient.on('disconnect', () => {
+//        console.log('[MQTT] Desconectado do broker');
+//    });
+//}
 
 function handleMQTTMeasurement(data) {
     console.log('[MQTT] Medição recebida:', data);
@@ -1582,8 +1582,9 @@ app.get('/api/v1/status', (req, res) => {
             version: '2.0-rev06',
             timestamp: new Date().toISOString(),
             mqtt: {
-                connected: mqttClient ? mqttClient.connected : false,
-                broker: MQTT_BROKER
+              enabled: false,
+              connected: false,
+              broker: MQTT_BROKER
             },
             uptime: process.uptime()
         }
@@ -1651,7 +1652,7 @@ app.use((err, req, res, next) => {
 
 function startServer() {
     // Inicializar MQTT
-    initMQTT();
+    //initMQTT();
     
     // Iniciar servidor HTTP
     app.listen(PORT, () => {
@@ -1694,8 +1695,6 @@ startServer();
 // Graceful shutdown
 process.on('SIGINT', () => {
     console.log('\n[SERVER] Encerrando servidor...');
-    if (mqttClient) {
-        mqttClient.end();
-    }
+    // MQTT desativado temporariamente
     process.exit(0);
 });
