@@ -189,6 +189,63 @@
       gap: 8px;
       font-size: 14px;
     }
+
+    .kh-metrics-row {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .kh-metrics-row .label {
+      display: block;
+      color: #9ca3af;
+      margin-bottom: 2px;
+    }
+
+    .kh-window {
+      padding: 4px 6px;
+      border-radius: 6px;
+      text-align: center;
+      background: #020617;
+      border: 1px solid #1f2937;
+    }
+
+    .kh-window.ok {
+      background-color: #022c22;
+      border-color: #16a34a;
+      color: #bbf7d0;
+    }
+
+    .kh-window.warn {
+      background-color: #451a03;
+      border-color: #f59e0b;
+      color: #fed7aa;
+    }
+
+    .kh-window.alert {
+      background-color: #450a0a;
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+
+    .kh-window.neutral {
+      background-color: #020617;
+      border-color: #374151;
+      color: #9ca3af;
+    }
+
+    .kh-target-line {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .kh-target-line span.value {
+      color: #e5e7eb;
+      font-weight: 500;
+    }
+
     .kh-side-row {
       display: flex;
       justify-content: space-between;
@@ -311,6 +368,29 @@
             </div>
           </div>
         </div>
+        <div class="kh-target-line">
+          Alvo: <span class="value" id="khTargetSpan">--</span> dKH
+        </div>
+
+        <div class="kh-metrics-row">
+          <div>
+            <span class="label">24h</span>
+            <div class="kh-window neutral" id="kh24hSpan">--</div>
+          </div>
+          <div>
+            <span class="label">3 dias</span>
+            <div class="kh-window neutral" id="kh3dSpan">--</div>
+          </div>
+          <div>
+            <span class="label">7 dias</span>
+            <div class="kh-window neutral" id="kh7dSpan">--</div>
+          </div>
+          <div>
+            <span class="label">15 dias</span>
+            <div class="kh-window neutral" id="kh15dSpan">--</div>
+          </div>
+        </div>
+
       </div>
 
       <div class="card">
