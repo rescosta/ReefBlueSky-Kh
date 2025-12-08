@@ -1589,7 +1589,7 @@ app.put(
       `;
       const params = [name.trim(), deviceId, userId];
 
-      await db.query(sql, params);
+      await pool.query(sql, params);
 
       return res.json({
         success: true,
