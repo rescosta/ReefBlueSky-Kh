@@ -28,6 +28,13 @@ const statusReactorEl = document.getElementById('statusReactor');
 const measurementsBody = document.getElementById('measurementsBody');
 const lastCountInfo = document.getElementById('lastCountInfo');
 
+const khTargetSpan = document.getElementById('khTargetSpan');
+const kh24hSpan = document.getElementById('kh24hSpan');
+const kh3dSpan = document.getElementById('kh3dSpan');
+const kh7dSpan = document.getElementById('kh7dSpan');
+const kh15dSpan = document.getElementById('kh15dSpan');
+
+
 // Utilitário simples de data/hora
 function formatDateTime(ms) {
   if (!ms) return '--';
@@ -93,6 +100,31 @@ function updateKhCard(measures) {
     khMaxEl.textContent = '--';
   }
 }
+
+function formatMetricWindow(labelEl, metric, khTarget) {
+  if (!metric) {
+    labelEl.textContent = '--';
+    labelEl.className = 'kh-window neutral';
+    return;
+  }
+
+  const maxPos = metric.maxPositiveDeviation;
+  const maxNeg = metric.maxNegativeDeviation;
+
+  // maior desvio absoluto
+  const worst = Math.abs(maxPos) >= Math.abs(maxNeg) ? maxPos : maxNeg;
+
+  labelEl.textContent = `${worst >= 0 ? '+' : ''}${worst.toFixed(2)} dKH`;
+
+  if (Math.abs(worst) <= 0.2) {
+    labelEl.className = 'kh-window ok';
+  } else if (Math.abs(worst) <= 0.5) {
+    labelEl.className = 'kh-window warn';
+  } else {
+    labelEl.className = 'kh-window alert';
+  }
+}
+
 
 // Score simples de “saúde do KH” baseado no último valor
 function updateStatusFromKh(kh) {
@@ -189,12 +221,43 @@ async function loadMeasurementsForSelected() {
 
     const measures = json.data || [];
     updateMeasurementsView(measures);
+    await loadKhMetrics(deviceId);
   } catch (err) {
     console.error('loadMeasurementsForSelected error', err);
     lastCountInfo.textContent = 'Erro de comunicação ao carregar medições';
     updateMeasurementsView([]);
   }
 }
+
+async function loadKhMetrics(deviceId) {
+  try {
+    const resp = await fetch(`/api/v1/user/devices/${deviceId}/kh-metrics`, {
+      headers: headersAuth,
+    });
+    if (!resp.ok) {
+      console.error('Erro ao buscar KH metrics', await resp.text());
+      return;
+    }
+    const json = await resp.json();
+    if (!json.success) {
+      console.error('KH metrics falhou', json.message);
+      return;
+    }
+
+    const { khTarget, metrics } = json.data;
+    if (khTargetSpan) {
+      khTargetSpan.textContent = khTarget != null ? khTarget.toFixed(2) : '--';
+    }
+
+    formatMetricWindow(kh24hSpan, metrics['24h'], khTarget);
+    formatMetricWindow(kh3dSpan, metrics['3d'], khTarget);
+    formatMetricWindow(kh7dSpan, metrics['7d'], khTarget);
+    formatMetricWindow(kh15dSpan, metrics['15d'], khTarget);
+  } catch (err) {
+    console.error('loadKhMetrics error', err);
+  }
+}
+
 
 // Inicialização da página principal
 async function initDashboardMain() {

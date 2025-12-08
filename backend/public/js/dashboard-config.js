@@ -70,35 +70,42 @@ function updatePumpStatus(pumpId, running, direction) {
 // Stubs de API (para você ligar no server.js depois)
 
 async function apiLoadDeviceConfig(deviceId) {
-  // Futuro: GET /api/v1/user/devices/:deviceId/config
-  console.log('LOAD config', deviceId);
-  // Mock inicial
-  return {
-    khReference: 8.0,
-    intervalHours: 1,
-    levels: { A: true, B: true, C: false },
-    pumps: {
-      1: { running: false, direction: 'forward' },
-      2: { running: false, direction: 'forward' },
-      3: { running: false, direction: 'forward' },
-    },
-  };
+  try {
+    const res = await fetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+      { headers: headersAuthCfg },
+    );
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      console.error('Erro ao carregar KH config', json.message || json.error);
+      return null;
+    }
+
+    // Adapta para o formato que o restante do código já usa
+    return {
+      khReference: json.khTarget,
+      intervalHours: 1,            // ainda mock
+      levels: { A: true, B: true, C: false }, // ainda mock
+      pumps: {},                   // bombas continuam controladas pelos outros endpoints
+    };
+  } catch (err) {
+    console.error('apiLoadDeviceConfig error', err);
+    return null;
+  }
 }
 
 async function apiSetReferenceKH(deviceId, kh) {
-  // Futuro: POST /api/v1/user/devices/:deviceId/config/kh
-  console.log('SET KH ref', deviceId, kh);
   try {
     const res = await fetch(
-      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/config/kh`,
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: headersAuthCfg,
-        body: JSON.stringify({ khReference: kh }),
+        body: JSON.stringify({ khTarget: kh }),
       },
     );
     const json = await res.json();
-    if (!res.ok || !json.success) {
+    if (!res.ok || json.success === false) {
       console.error(json.message || 'Erro ao salvar KH');
       return false;
     }
@@ -108,6 +115,7 @@ async function apiSetReferenceKH(deviceId, kh) {
     return false;
   }
 }
+
 
 async function apiSetMeasurementInterval(deviceId, hours) {
   // Futuro: POST /api/v1/user/devices/:deviceId/config/interval
