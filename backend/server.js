@@ -1559,6 +1559,7 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
 });
 
 // Atualizar nome (fake ID) do device
+// Atualizar nome (fake ID) do device
 app.put(
   '/api/v1/user/devices/:deviceId/name',
   authUserMiddleware,
@@ -1588,14 +1589,16 @@ app.put(
         success: true,
         message: 'Nome atualizado.',
       });
-  } catch (err) {
-    console.error('Erro ao atualizar nome do device:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao atualizar nome do device.',
-    });
+    } catch (err) {
+      console.error('Erro ao atualizar nome do device:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Erro interno ao atualizar nome do device.',
+      });
+    }
   }
-});
+);
+
 
 
 app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
