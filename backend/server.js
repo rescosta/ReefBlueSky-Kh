@@ -1434,49 +1434,41 @@ app.get('/api/v1/user/devices/:deviceId/config', authUserMiddleware, async (req,
   }
 });
 
-// POST /config/kh - apiSetReferenceKH
-app.post('/api/v1/user/devices/:deviceId/config/kh', authUserMiddleware, async (req, res) => {
-  try {
-    const { deviceId } = req.params;
-    const userId = req.user.userId;
-    const { khReference } = req.body;
-
-    if (typeof khReference !== 'number' || Number.isNaN(khReference)) {
-      return res.status(400).json({ success: false, message: 'khReference inválido' });
-    }
-
-    const cfg = getOrCreateDeviceConfig(deviceId);
-    cfg.khReference = khReference;
-
-    // TODO opcional: persistir em DB / notificar device
-    return res.json({ success: true, data: { khReference } });
-  } catch (err) {
-    console.error('POST /config/kh error', err);
-    return res.status(500).json({ success: false, message: 'Erro ao salvar khReference' });
-  }
-});
-
 // POST /config/interval - apiSetMeasurementInterval
 app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, async (req, res) => {
   try {
-    const { deviceId } = req.params;
     const userId = req.user.userId;
-    const { intervalHours } = req.body;
+    const deviceId = req.params.deviceId;
+    const { intervalHours } = req.body || {};
 
-    if (typeof intervalHours !== 'number' || intervalHours <= 0 || intervalHours > 24) {
+    const n = parseInt(intervalHours, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 24) {
       return res.status(400).json({ success: false, message: 'intervalHours inválido' });
     }
 
-    const cfg = getOrCreateDeviceConfig(deviceId);
-    cfg.intervalHours = intervalHours;
+    const chk = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
 
-    // TODO: agendar próxima medição na "hora cheia"
-    return res.json({ success: true, data: { intervalHours } });
+    const sql = `
+      INSERT INTO device_status
+        (deviceId, userId, interval_hours, updatedAt)
+      VALUES (?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        interval_hours = VALUES(interval_hours),
+        updatedAt = NOW()
+    `;
+    const result = await pool.query(sql, [deviceId, userId, n]);
+
+    return res.json({ success: true, message: 'Intervalo atualizado.' });
   } catch (err) {
-    console.error('POST /config/interval error', err);
-    return res.status(500).json({ success: false, message: 'Erro ao salvar intervalo' });
+    console.error('Error updating interval', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 // ===== BLOCO 2: Comandos para o dispositivo (DEPOIS DO BLOCO DE CONFIG) =====
 
@@ -1586,7 +1578,7 @@ app.put(
       const sql = `
         UPDATE devices
         SET name = ?
-        WHERE id = ? AND user_id = ?;
+        WHERE id = ? AND userId = ?;
       `;
       const params = [name.trim(), deviceId, userId];
 
@@ -1604,21 +1596,26 @@ app.put(
       });
     }
   }
-);
+});
 
 app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;      // igual ao endpoint de name
-    const deviceId = req.params.deviceId; // aqui é o id numérico (igual ao name)
+    const userId = req.user.userId;
+    const deviceId = req.params.deviceId;
 
     const sql = `
-      SELECT kh_target, kh_tolerance_daily, kh_alert_enabled, kh_alert_channel
+      SELECT
+        kh_target,
+        kh_reference,
+        kh_tolerance_daily,
+        kh_alert_enabled,
+        kh_alert_channel
       FROM devices
-      WHERE id = ? AND user_id = ?;
+      WHERE deviceId = ? AND userId = ?
+      LIMIT 1
     `;
-    const params = [deviceId, userId];
+    const rows = await pool.query(sql, [deviceId, userId]);
 
-    const [rows] = await pool.query(sql, params);
 
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Device not found' });
@@ -1629,6 +1626,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
       success: true,
       data: {
         khTarget: cfg.kh_target,
+        khReference: cfg.kh_reference,
         khToleranceDaily: cfg.kh_tolerance_daily,
         khAlertEnabled: cfg.kh_alert_enabled,
         khAlertChannel: cfg.kh_alert_channel,
@@ -1640,6 +1638,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
   }
 });
 
+
 app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -1647,6 +1646,7 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
 
     const {
       khTarget,
+      khReference,
       khToleranceDaily,
       khAlertEnabled,
       khAlertChannel,
@@ -1654,6 +1654,9 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
 
     if (khTarget != null && (isNaN(khTarget) || khTarget < 4 || khTarget > 15)) {
       return res.status(400).json({ success: false, message: 'khTarget inválido' });
+    }
+    if (khReference != null && (isNaN(khReference) || khReference < 3 || khReference > 20)) {
+      return res.status(400).json({ success: false, message: 'khReference inválido' });
     }
     if (khToleranceDaily != null && (isNaN(khToleranceDaily) || khToleranceDaily < 0 || khToleranceDaily > 3)) {
       return res.status(400).json({ success: false, message: 'khToleranceDaily inválido' });
@@ -1663,21 +1666,22 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
       UPDATE devices
       SET
         kh_target = COALESCE(?, kh_target),
+        kh_reference = COALESCE(?, kh_reference),
         kh_tolerance_daily = COALESCE(?, kh_tolerance_daily),
         kh_alert_enabled = COALESCE(?, kh_alert_enabled),
         kh_alert_channel = COALESCE(?, kh_alert_channel)
-      WHERE id = ? AND user_id = ?;
+      WHERE deviceId = ? AND userId = ?
     `;
     const params = [
       khTarget,
+      khReference,
       khToleranceDaily,
       khAlertEnabled,
       khAlertChannel,
       deviceId,
       userId,
     ];
-
-    const [result] = await pool.query(sql, params);
+    const result = await pool.query(sql, params);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Device not found' });
@@ -1690,6 +1694,7 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
   }
 });
 
+
 app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -1697,7 +1702,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
 
     // 1) pegar deviceId (string) + kh_target do banco
     const [devRows] = await pool.query(
-      'SELECT deviceId, kh_target FROM devices WHERE id = ? AND user_id = ?',
+      'SELECT deviceId, kh_target FROM devices WHERE id = ? AND userId = ?',
       [deviceInternalId, userId]
     );
 
@@ -1757,6 +1762,56 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
     });
   } catch (err) {
     console.error('Error fetching KH metrics', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const deviceId = req.params.deviceId;
+
+    const sql = `
+      SELECT
+        interval_hours,
+        level_a,
+        level_b,
+        level_c,
+        pump1_running,
+        pump1_direction,
+        pump2_running,
+        pump2_direction,
+        pump3_running,
+        pump3_direction
+      FROM device_status
+      WHERE deviceId = ? AND userId = ?
+      ORDER BY updatedAt DESC
+      LIMIT 1
+    `;
+    const rows = await pool.query(sql, [deviceId, userId]);
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Status não encontrado' });
+    }
+
+    const s = rows[0];
+    return res.json({
+      success: true,
+      data: {
+        intervalHours: s.interval_hours,
+        levels: {
+          A: !!s.level_a,
+          B: !!s.level_b,
+          C: !!s.level_c,
+        },
+        pumps: {
+          1: { running: !!s.pump1_running, direction: s.pump1_direction || 'forward' },
+          2: { running: !!s.pump2_running, direction: s.pump2_direction || 'forward' },
+          3: { running: !!s.pump3_running, direction: s.pump3_direction || 'forward' },
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching device status', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
