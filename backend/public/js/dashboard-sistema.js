@@ -203,7 +203,7 @@ function renderHealth(health) {
   healthMemEl.className = `health-value ${classifyPercent(mem)}`;
 
   healthStorageEl.textContent =
-    storage != null ? `${storage.toFixed(0)}%` : '--`;
+    storage != null ? `${storage.toFixed(0)}%` : '--';
   healthStorageEl.className = `health-value ${classifyPercent(storage)}`;
 
   healthWifiEl.textContent =
