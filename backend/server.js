@@ -1603,7 +1603,7 @@ app.put(
         message: 'Erro interno ao atualizar nome do device.',
       });
     }
-  },
+  }
 );
 
 
