@@ -29,6 +29,7 @@ const measurementsBody = document.getElementById('measurementsBody');
 const lastCountInfo = document.getElementById('lastCountInfo');
 
 const khTargetSpan = document.getElementById('khTargetSpan');
+const khRefSpan    = document.getElementById('khRefSpan');
 const kh24hSpan = document.getElementById('kh24hSpan');
 const kh3dSpan = document.getElementById('kh3dSpan');
 const kh7dSpan = document.getElementById('kh7dSpan');
@@ -222,6 +223,7 @@ async function loadMeasurementsForSelected() {
     const measures = json.data || [];
     updateMeasurementsView(measures);
     await loadKhMetrics(deviceId);
+    await loadKhInfo(deviceId);
   } catch (err) {
     console.error('loadMeasurementsForSelected error', err);
     lastCountInfo.textContent = 'Erro de comunicação ao carregar medições';
@@ -255,6 +257,32 @@ async function loadKhMetrics(deviceId) {
     formatMetricWindow(kh15dSpan, metrics['15d'], khTarget);
   } catch (err) {
     console.error('loadKhMetrics error', err);
+  }
+}
+
+async function loadKhInfo(deviceId) {
+  try {
+    const resp = await fetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+      { headers: headersAuth }
+    );
+
+    const json = await resp.json();
+    if (!resp.ok || !json.success) {
+      console.error('Erro ao carregar KH config na tela principal', json.message || json.error);
+      return;
+    }
+
+    const { khTarget, khReference } = json.data || {};
+
+    if (khTargetSpan) {
+      khTargetSpan.textContent = khTarget != null ? khTarget.toFixed(2) : '--';
+    }
+    if (khRefSpan) {
+      khRefSpan.textContent = khReference != null ? `ref: ${khReference.toFixed(2)}` : 'ref: --';
+    }
+  } catch (err) {
+    console.error('loadKhInfo error', err);
   }
 }
 

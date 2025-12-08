@@ -14,7 +14,9 @@ const khRefInput = document.getElementById('khRefInput');
 const khRefStatus = document.getElementById('khRefStatus');
 const khTargetInput = document.getElementById('khTargetInput');
 const khTargetStatus = document.getElementById('khTargetStatus');
-const saveKhBtn = document.getElementById('saveKhBtn');
+const saveKhRefBtn    = document.getElementById('saveKhRefBtn');
+const saveKhTargetBtn = document.getElementById('saveKhTargetBtn');
+
 
 const intervalRange = document.getElementById('intervalRange');
 const intervalLabel = document.getElementById('intervalLabel');
@@ -254,23 +256,35 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
 
 
 // Eventos de salvar KH e intervalo
-saveKhBtn.addEventListener('click', async () => {
+// Salvar só alvo
+saveKhTargetBtn.addEventListener('click', async () => {
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (!deviceId) return;
+
+  const khTgt = parseFloat(khTargetInput.value);
+  if (Number.isNaN(khTgt)) return;
+
+  // manda só khTarget (khReference = null)
+  const ok = await apiSetKhConfig(deviceId, null, khTgt);
+  if (ok) {
+    khTargetStatus.textContent = `Alvo atual ${khTgt.toFixed(2)} dKH atualizado`;
+  }
+});
+
+// Salvar só referência (C)
+saveKhRefBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   if (!deviceId) return;
 
   const khRef = parseFloat(khRefInput.value);
-  const khTgt = parseFloat(khTargetInput.value);
+  if (Number.isNaN(khRef)) return;
 
-  if (Number.isNaN(khRef) || Number.isNaN(khTgt)) return;
-
-  const ok = await apiSetKhConfig(deviceId, khRef, khTgt);
+  const ok = await apiSetKhConfig(deviceId, khRef, null);
   if (ok) {
-    khRefStatus.textContent = `Referência atual: ${khRef.toFixed(2)} dKH (atualizado)`;
-    khTargetStatus.textContent = `Alvo atual: ${khTgt.toFixed(2)} dKH (atualizado)`;
-  } else {
-    khTargetStatus.textContent = 'Erro ao salvar configuração de KH.';
+    khRefStatus.textContent = `Referência atual ${khRef.toFixed(2)} dKH atualizado`;
   }
 });
+
 
 
 saveIntervalBtn.addEventListener('click', async () => {
