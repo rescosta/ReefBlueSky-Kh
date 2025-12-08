@@ -1606,6 +1606,161 @@ app.put(
   }
 );
 
+app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;      // igual ao endpoint de name
+    const deviceId = req.params.deviceId; // aqui é o id numérico (igual ao name)
+
+    const sql = `
+      SELECT kh_target, kh_tolerance_daily, kh_alert_enabled, kh_alert_channel
+      FROM devices
+      WHERE id = ? AND user_id = ?;
+    `;
+    const params = [deviceId, userId];
+
+    const [rows] = await pool.query(sql, params);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const cfg = rows[0];
+    return res.json({
+      success: true,
+      data: {
+        khTarget: cfg.kh_target,
+        khToleranceDaily: cfg.kh_tolerance_daily,
+        khAlertEnabled: cfg.kh_alert_enabled,
+        khAlertChannel: cfg.kh_alert_channel,
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching KH config', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const deviceId = req.params.deviceId;
+
+    const {
+      khTarget,
+      khToleranceDaily,
+      khAlertEnabled,
+      khAlertChannel,
+    } = req.body || {};
+
+    if (khTarget != null && (isNaN(khTarget) || khTarget < 4 || khTarget > 15)) {
+      return res.status(400).json({ success: false, message: 'khTarget inválido' });
+    }
+    if (khToleranceDaily != null && (isNaN(khToleranceDaily) || khToleranceDaily < 0 || khToleranceDaily > 3)) {
+      return res.status(400).json({ success: false, message: 'khToleranceDaily inválido' });
+    }
+
+    const sql = `
+      UPDATE devices
+      SET
+        kh_target = COALESCE(?, kh_target),
+        kh_tolerance_daily = COALESCE(?, kh_tolerance_daily),
+        kh_alert_enabled = COALESCE(?, kh_alert_enabled),
+        kh_alert_channel = COALESCE(?, kh_alert_channel)
+      WHERE id = ? AND user_id = ?;
+    `;
+    const params = [
+      khTarget,
+      khToleranceDaily,
+      khAlertEnabled,
+      khAlertChannel,
+      deviceId,
+      userId,
+    ];
+
+    const [result] = await pool.query(sql, params);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    return res.json({ success: true, message: 'KH config atualizada.' });
+  } catch (err) {
+    console.error('Error updating KH config', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const deviceInternalId = req.params.deviceId;
+
+    // 1) pegar deviceId (string) + kh_target do banco
+    const [devRows] = await pool.query(
+      'SELECT deviceId, kh_target FROM devices WHERE id = ? AND user_id = ?',
+      [deviceInternalId, userId]
+    );
+
+    if (devRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const { deviceId, kh_target } = devRows[0];
+    if (kh_target == null) {
+      return res.status(400).json({ success: false, message: 'kh_target não configurado' });
+    }
+
+    const now = Math.floor(Date.now() / 1000); // timestamp em segundos
+    const windows = {
+      '24h': 24 * 3600,
+      '3d': 3 * 24 * 3600,
+      '7d': 7 * 24 * 3600,
+      '15d': 15 * 24 * 3600,
+    };
+
+    const metrics = {};
+
+    for (const [label, seconds] of Object.entries(windows)) {
+      const fromTs = now - seconds;
+
+      const [rows] = await pool.query(
+        `SELECT MIN(kh) AS minKh, MAX(kh) AS maxKh
+         FROM measurements
+         WHERE deviceId = ? AND timestamp >= ?`,
+        [deviceId, fromTs]
+      );
+
+      const r = rows[0] || {};
+      if (r.minKh == null || r.maxKh == null) {
+        metrics[label] = null;
+        continue;
+      }
+
+      const minKh = parseFloat(r.minKh);
+      const maxKh = parseFloat(r.maxKh);
+
+      metrics[label] = {
+        minKh,
+        maxKh,
+        // desvios em relação ao alvo
+        maxPositiveDeviation: maxKh - kh_target,
+        maxNegativeDeviation: minKh - kh_target,
+      };
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        khTarget: kh_target,
+        metrics,
+      },
+    });
+  } catch (err) {
+    console.error('Error fetching KH metrics', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 
 // ============================================================================
 // [API] Endpoints de Status (v1)
