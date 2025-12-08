@@ -193,20 +193,20 @@ async function loadConfigForSelected() {
   if (!cfg) return;
 
   if (typeof cfg.khReference === 'number') {
-  khRefInput.value = cfg.khReference.toFixed(2);
-  khRefStatus.textContent = `Referência atual: ${cfg.khReference.toFixed(2)} dKH`;
-} else {
-  khRefStatus.textContent = 'Referência atual --';
-  khRefInput.value = '';
-}
+    khRefInput.value = cfg.khReference.toFixed(2);
+    khRefStatus.textContent = `Referência atual: ${cfg.khReference.toFixed(2)} dKH`;
+  } else {
+    khRefStatus.textContent = 'Referência atual --';
+    khRefInput.value = '';
+  }
 
-if (typeof cfg.khTarget === 'number') {
-  khTargetInput.value = cfg.khTarget.toFixed(2);
-  khTargetStatus.textContent = `Alvo atual: ${cfg.khTarget.toFixed(2)} dKH`;
-} else {
-  khTargetStatus.textContent = 'Alvo atual --';
-  khTargetInput.value = '';
-}
+  if (typeof cfg.khTarget === 'number') {
+    khTargetInput.value = cfg.khTarget.toFixed(2);
+    khTargetStatus.textContent = `Alvo atual: ${cfg.khTarget.toFixed(2)} dKH`;
+  } else {
+    khTargetStatus.textContent = 'Alvo atual --';
+    khTargetInput.value = '';
+  }
 
   if (typeof cfg.intervalHours === 'number') {
     intervalRange.value = cfg.intervalHours;
@@ -255,33 +255,37 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
 }
 
 
-// Eventos de salvar KH e intervalo
-// Salvar só alvo
-saveKhTargetBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
+saveKhRefBtn.addEventListener('click', async () => {
+  const deviceId = getSelectedDeviceIdOrAlert();
   if (!deviceId) return;
 
-  const khTgt = parseFloat(khTargetInput.value);
-  if (Number.isNaN(khTgt)) return;
+  const val = parseFloat(khRefInput.value.replace(',', '.'));
+  if (Number.isNaN(val)) {
+    alert('Informe um KH de referência válido');
+    return;
+  }
 
-  // manda só khTarget (khReference = null)
-  const ok = await apiSetKhConfig(deviceId, null, khTgt);
+  const ok = await apiSetKhConfig(deviceId, val, null);
   if (ok) {
-    khTargetStatus.textContent = `Alvo atual ${khTgt.toFixed(2)} dKH atualizado`;
+    khRefStatus.textContent = `Referência atual: ${val.toFixed(2)} dKH`;
+    window.dispatchEvent(new CustomEvent('deviceChanged'));
   }
 });
 
-// Salvar só referência (C)
-saveKhRefBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
+saveKhTargetBtn.addEventListener('click', async () => {
+  const deviceId = getSelectedDeviceIdOrAlert();
   if (!deviceId) return;
 
-  const khRef = parseFloat(khRefInput.value);
-  if (Number.isNaN(khRef)) return;
+  const val = parseFloat(khTargetInput.value.replace(',', '.'));
+  if (Number.isNaN(val)) {
+    alert('Informe um KH alvo válido');
+    return;
+  }
 
-  const ok = await apiSetKhConfig(deviceId, khRef, null);
+  const ok = await apiSetKhConfig(deviceId, null, val);
   if (ok) {
-    khRefStatus.textContent = `Referência atual ${khRef.toFixed(2)} dKH atualizado`;
+    khTargetStatus.textContent = `Alvo atual: ${val.toFixed(2)} dKH`;
+    window.dispatchEvent(new CustomEvent('deviceChanged'));
   }
 });
 
