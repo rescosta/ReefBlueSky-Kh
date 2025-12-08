@@ -1588,15 +1588,15 @@ app.put(
         success: true,
         message: 'Nome atualizado.',
       });
-    } catch (err) {
-      console.error('Erro ao atualizar nome do device:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Erro interno ao atualizar nome do device.',
-      });
-    }
+  } catch (err) {
+    console.error('Erro ao atualizar nome do device:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao atualizar nome do device.',
+    });
   }
 });
+
 
 app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
   try {
@@ -1634,7 +1634,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     });
   } catch (err) {
     console.error('Error fetching KH config', err);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
+    return res.status(500).json({ success: false, message: 'Internal server error', });
   }
 });
 
