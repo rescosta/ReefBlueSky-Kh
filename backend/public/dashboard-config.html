@@ -264,14 +264,25 @@
           Ajuste o KH de referência e o intervalo entre medições (1h a 24h), sempre na hora cheia.
         </div>
 
+        <!-- KH de referência (câmara C) -->
         <div class="field-row">
-          <label for="khRefInput">KH de referência (dKH)</label>
+          <label for="khRefInput">KH de referência (câmara C)</label>
           <div class="inline">
             <input id="khRefInput" type="number" step="0.1" min="4" max="16" />
-            <button id="saveKhBtn" class="btn-primary">Salvar KH</button>
           </div>
           <div id="khRefStatus" class="hint">Valor atual --</div>
         </div>
+
+        <!-- KH alvo do aquário -->
+        <div class="field-row">
+          <label for="khTargetInput">KH alvo do aquário</label>
+          <div class="inline">
+            <input id="khTargetInput" type="number" step="0.1" min="4" max="16" />
+            <button id="saveKhBtn" class="btn-primary">Salvar KH</button>
+          </div>
+          <div id="khTargetStatus" class="hint">Alvo atual --</div>
+        </div>
+
 
         <div class="field-row">
           <label for="deviceNameInput">Nome do dispositivo (fake ID)</label>
