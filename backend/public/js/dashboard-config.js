@@ -12,6 +12,8 @@ const headersAuthCfg = {
 
 const khRefInput = document.getElementById('khRefInput');
 const khRefStatus = document.getElementById('khRefStatus');
+const khTargetInput = document.getElementById('khTargetInput');
+const khTargetStatus = document.getElementById('khTargetStatus');
 const saveKhBtn = document.getElementById('saveKhBtn');
 
 const intervalRange = document.getElementById('intervalRange');
@@ -71,48 +73,40 @@ function updatePumpStatus(pumpId, running, direction) {
 
 async function apiLoadDeviceConfig(deviceId) {
   try {
-    const res = await fetch(
-      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-      { headers: headersAuthCfg },
-    );
-    const json = await res.json();
-    if (!res.ok || json.success === false) {
-      console.error('Erro ao carregar KH config', json.message || json.error);
+    const [khRes, statusRes] = await Promise.all([
+      fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`, {
+        headers: headersAuthCfg,
+      }),
+      fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/status`, {
+        headers: headersAuthCfg,
+      }),
+    ]);
+
+    const khJson = await khRes.json();
+    const stJson = await statusRes.json();
+
+    if (!khRes.ok || khJson.success === false) {
+      console.error('Erro ao carregar KH config', khJson.message || khJson.error);
+      return null;
+    }
+    if (!statusRes.ok || stJson.success === false) {
+      console.error('Erro ao carregar status', stJson.message || stJson.error);
       return null;
     }
 
-    // Adapta para o formato que o restante do código já usa
+    const d = khJson.data || {};
+    const s = stJson.data || {};
+
     return {
-      khReference: json.khTarget,
-      intervalHours: 1,            // ainda mock
-      levels: { A: true, B: true, C: false }, // ainda mock
-      pumps: {},                   // bombas continuam controladas pelos outros endpoints
+      khReference: d.khReference,
+      khTarget: d.khTarget,
+      intervalHours: s.intervalHours,
+      levels: s.levels || {},
+      pumps: s.pumps || {},
     };
   } catch (err) {
     console.error('apiLoadDeviceConfig error', err);
     return null;
-  }
-}
-
-async function apiSetReferenceKH(deviceId, kh) {
-  try {
-    const res = await fetch(
-      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-      {
-        method: 'PUT',
-        headers: headersAuthCfg,
-        body: JSON.stringify({ khTarget: kh }),
-      },
-    );
-    const json = await res.json();
-    if (!res.ok || json.success === false) {
-      console.error(json.message || 'Erro ao salvar KH');
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('apiSetReferenceKH error', err);
-    return false;
   }
 }
 
@@ -197,11 +191,20 @@ async function loadConfigForSelected() {
   if (!cfg) return;
 
   if (typeof cfg.khReference === 'number') {
-    khRefInput.value = cfg.khReference.toFixed(2);
-    khRefStatus.textContent = `Valor atual: ${cfg.khReference.toFixed(2)} dKH`;
-  } else {
-    khRefStatus.textContent = 'Valor atual --';
-  }
+  khRefInput.value = cfg.khReference.toFixed(2);
+  khRefStatus.textContent = `Referência atual: ${cfg.khReference.toFixed(2)} dKH`;
+} else {
+  khRefStatus.textContent = 'Referência atual --';
+  khRefInput.value = '';
+}
+
+if (typeof cfg.khTarget === 'number') {
+  khTargetInput.value = cfg.khTarget.toFixed(2);
+  khTargetStatus.textContent = `Alvo atual: ${cfg.khTarget.toFixed(2)} dKH`;
+} else {
+  khTargetStatus.textContent = 'Alvo atual --';
+  khTargetInput.value = '';
+}
 
   if (typeof cfg.intervalHours === 'number') {
     intervalRange.value = cfg.intervalHours;
@@ -222,19 +225,53 @@ async function loadConfigForSelected() {
   }
 }
 
+async function apiSetKhConfig(deviceId, khReference, khTarget) {
+  try {
+    const body = {
+      khReference,
+      khTarget,
+    };
+
+    const res = await fetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+      {
+        method: 'PUT',
+        headers: headersAuthCfg,
+        body: JSON.stringify(body),
+      },
+    );
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      console.error(json.message || 'Erro ao salvar config KH');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('apiSetKhConfig error', err);
+    return false;
+  }
+}
+
+
 // Eventos de salvar KH e intervalo
 saveKhBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
-  const kh = parseFloat(khRefInput.value);
-  if (!deviceId || Number.isNaN(kh)) return;
+  if (!deviceId) return;
 
-  const ok = await apiSetReferenceKH(deviceId, kh);
+  const khRef = parseFloat(khRefInput.value);
+  const khTgt = parseFloat(khTargetInput.value);
+
+  if (Number.isNaN(khRef) || Number.isNaN(khTgt)) return;
+
+  const ok = await apiSetKhConfig(deviceId, khRef, khTgt);
   if (ok) {
-    khRefStatus.textContent = `Valor atual: ${kh.toFixed(2)} dKH (atualizado)`;
+    khRefStatus.textContent = `Referência atual: ${khRef.toFixed(2)} dKH (atualizado)`;
+    khTargetStatus.textContent = `Alvo atual: ${khTgt.toFixed(2)} dKH (atualizado)`;
   } else {
-    khRefStatus.textContent = 'Erro ao salvar KH de referência.';
+    khTargetStatus.textContent = 'Erro ao salvar configuração de KH.';
   }
 });
+
 
 saveIntervalBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
