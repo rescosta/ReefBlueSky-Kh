@@ -265,24 +265,24 @@
         </div>
 
         <!-- KH de referência (câmara C) -->
-        <div class="field-row">
+
+        <div class="form-row">
           <label for="khRefInput">KH de referência (câmara C)</label>
-          <div class="inline">
-            <input id="khRefInput" type="number" step="0.1" min="4" max="16" />
+          <div class="input-with-button">
+            <input id="khRefInput" type="number" step="0.01" placeholder="Ex: 7.50" />
+            <button id="saveKhRefBtn" class="btn-primary">Salvar KH ref</button>
           </div>
-          <div id="khRefStatus" class="hint">Valor atual --</div>
+          <div id="khRefStatus" class="hint">Referência atual --</div>
         </div>
 
-        <!-- KH alvo do aquário -->
-        <div class="field-row">
+        <div class="form-row">
           <label for="khTargetInput">KH alvo do aquário</label>
-          <div class="inline">
-            <input id="khTargetInput" type="number" step="0.1" min="4" max="16" />
-            <button id="saveKhBtn" class="btn-primary">Salvar KH</button>
+          <div class="input-with-button">
+            <input id="khTargetInput" type="number" step="0.01" placeholder="Ex: 8.00" />
+            <button id="saveKhTargetBtn" class="btn-primary">Salvar KH</button>
           </div>
           <div id="khTargetStatus" class="hint">Alvo atual --</div>
         </div>
-
 
         <div class="field-row">
           <label for="deviceNameInput">Nome do dispositivo (fake ID)</label>
