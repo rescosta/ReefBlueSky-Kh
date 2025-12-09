@@ -10,6 +10,7 @@ const headersAuthCfg = {
   Authorization: `Bearer ${cfgToken}`,
 };
 
+
 const khRefInput = document.getElementById('khRefInput');
 const khRefStatus = document.getElementById('khRefStatus');
 const khTargetInput = document.getElementById('khTargetInput');
@@ -256,7 +257,7 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
 
 
 saveKhRefBtn.addEventListener('click', async () => {
-  const deviceId = getSelectedDeviceIdOrAlert();
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) return;
 
   const val = parseFloat(khRefInput.value.replace(',', '.'));
@@ -273,7 +274,7 @@ saveKhRefBtn.addEventListener('click', async () => {
 });
 
 saveKhTargetBtn.addEventListener('click', async () => {
-  const deviceId = getSelectedDeviceIdOrAlert();
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) return;
 
   const val = parseFloat(khTargetInput.value.replace(',', '.'));
@@ -364,7 +365,7 @@ khCorrectionBtn.addEventListener('click', async () => {
 });
 
 async function initDashboardConfig() {
-  await DashboardCommon.initTopbar();
+  DashboardCommon.initTopbar();
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {

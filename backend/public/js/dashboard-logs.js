@@ -54,7 +54,7 @@ function renderLogs(measures) {
 }
 
 async function loadLogsForSelected() {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) {
     logsInfo.textContent = 'Nenhum dispositivo associado.';
     logsBody.innerHTML = '';
@@ -93,6 +93,7 @@ async function loadLogsForSelected() {
     logsBody.innerHTML = '';
   }
 }
+
 
 async function initDashboardLogs() {
   await DashboardCommon.initTopbar();

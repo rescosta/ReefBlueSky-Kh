@@ -77,7 +77,7 @@ function renderSeries(measures) {
 }
 
 async function loadSeriesForSelected() {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) {
     chartInfo.textContent = 'Nenhum dispositivo associado.';
     chartPlaceholder.textContent =

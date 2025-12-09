@@ -230,10 +230,21 @@ function getSelectedDeviceId() {
   return select ? select.value : null;
 }
 
+function getSelectedDeviceIdOrAlert() {
+  const deviceId = getSelectedDeviceId();
+  if (!deviceId) {
+    alert('Selecione um dispositivo no topo antes de continuar.');
+    return null;
+  }
+  return deviceId;
+}
+
 window.DashboardCommon = {
   initTopbar,
-  getSelectedDeviceId,
   loadUserCommon,
   loadDevicesCommon,
   updateDeviceStatusBadge,
+  getSelectedDeviceId,
+  getSelectedDeviceIdOrAlert,
 };
+

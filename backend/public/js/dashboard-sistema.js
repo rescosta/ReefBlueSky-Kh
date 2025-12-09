@@ -247,7 +247,7 @@ function renderEvents(events) {
 }
 
 async function loadSystemForSelected() {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) {
     infoDeviceIdEl.textContent = '--';
     infoDeviceNameEl.textContent = '--';
@@ -280,8 +280,8 @@ cmdRestartBtn.addEventListener('click', async () => {
     : 'Erro ao enviar comando de restart.';
 });
 
-cmdResetKhBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
+cmdRestartBtn.addEventListener('click', async () => {
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) return;
   cmdStatusEl.textContent = 'Enviando comando de reset de KH...';
   const ok = await apiSendCommand(deviceId, 'reset_kh');
