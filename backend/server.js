@@ -1704,12 +1704,12 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
     const deviceInternalId = req.params.deviceId;
 
     // 1) pegar deviceId (string) + kh_target do banco
-    const [devRows] = await pool.query(
+    const devRows = await pool.query(
       'SELECT deviceId, kh_target FROM devices WHERE id = ? AND userId = ?',
       [deviceInternalId, userId]
     );
 
-    if (devRows.length === 0) {
+    if (!devRows || devRows.length === 0) {
       return res.status(404).json({ success: false, message: 'Device not found' });
     }
 
