@@ -92,15 +92,14 @@ async function loadUserCommon() {
       return null;
     }
     currentUser = json.data;
+
+    // guardar role globalmente
+    window.DashboardCommon = window.DashboardCommon || {};
+    DashboardCommon.currentUserRole = currentUser.role || 'user';
+
     const userInfoEl = document.getElementById('userInfo');
     if (userInfoEl) {
       userInfoEl.textContent = `Usuário ${currentUser.email} · id ${currentUser.id}`;
-    }
-
-    // Habilitar aba DEV só para role=dev
-    if (currentUser.role === 'dev') {
-      const navDev = document.getElementById('nav-dev'); // link na topbar
-      if (navDev) navDev.style.display = 'inline-block';
     }
 
     return currentUser;
@@ -110,6 +109,7 @@ async function loadUserCommon() {
     return null;
   }
 }
+
 
 // Carregar lista de devices
 async function loadDevicesCommon() {
@@ -185,6 +185,24 @@ function updateDeviceStatusBadge() {
   }
 }
 
+
+function applyRoleMenuVisibility() {
+  const role =
+    (window.DashboardCommon && DashboardCommon.currentUserRole) || 'user';
+
+  const navLogs = document.getElementById('nav-logs');
+  const navDev  = document.getElementById('nav-dev');
+
+  // Logs some sempre
+  if (navLogs) navLogs.style.display = 'none';
+
+  // Dev só aparece para role=dev
+  if (navDev) {
+    navDev.style.display = role === 'dev' ? 'inline-block' : 'none';
+  }
+}
+
+
 // Inicializar topbar em qualquer página
 async function initTopbar() {
   const root = document.getElementById('topbar-root');
@@ -221,6 +239,7 @@ async function initTopbar() {
   }
 
   await loadUserCommon();
+  applyRoleMenuVisibility();
   const devs = await loadDevicesCommon();
   if (devs.length) {
     updateDeviceStatusBadge();
@@ -255,5 +274,8 @@ window.DashboardCommon = {
   updateDeviceStatusBadge,
   getSelectedDeviceId,
   getSelectedDeviceIdOrAlert,
+  applyRoleMenuVisibility,
+  currentUserRole: 'user',
 };
+
 
