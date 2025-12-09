@@ -957,6 +957,8 @@ app.post('/api/v1/auth/refresh-token', async (req, res) => {
 // Dados do usuário autenticado
 app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
   console.log('API GET /api/v1/auth/me');
+  console.log('[DEV-TEST] log de teste do console do servidor');
+
 
   const userId = req.user.userId;
 
