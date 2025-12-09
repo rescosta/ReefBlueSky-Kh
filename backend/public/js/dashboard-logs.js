@@ -5,92 +5,52 @@ if (!logsToken) {
   window.location.href = 'login';
 }
 
-const logsBody = document.getElementById('logsBody');
-const logsInfo = document.getElementById('logsInfo');
-const loadLogsBtn = document.getElementById('loadLogsBtn');
-const fromInput = document.getElementById('fromInput');
-const toInput = document.getElementById('toInput');
-
-function formatDateTime(ms) {
-  if (!ms) return '--';
-  const d = new Date(ms);
-  if (Number.isNaN(d.getTime())) return '--';
-  return d.toLocaleString(undefined, {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
-}
-
-// Converte datetime-local para epoch ms
-function dateTimeLocalToMs(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.getTime();
-}
-
-function renderLogs(measures) {
-  logsBody.innerHTML = '';
-
-  if (!measures || !measures.length) {
-    logsInfo.textContent = 'Nenhum log encontrado para o período.';
-    return;
-  }
-
-  logsInfo.textContent = `${measures.length} registros carregados.`;
-
-  measures.forEach((m) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${formatDateTime(m.timestamp)}</td>
-      <td>${typeof m.kh === 'number' ? m.kh.toFixed(2) : (m.kh ?? '--')}</td>
-      <td>${m.phref ?? '--'}</td>
-      <td>${m.phsample ?? '--'}</td>
-      <td>${m.temperature ?? '--'}</td>
-      <td>${m.status ?? '--'}</td>
-    `;
-    logsBody.appendChild(tr);
-  });
-}
-
-async function loadLogsForSelected() {
-  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-  if (!deviceId) {
-    logsInfo.textContent = 'Nenhum dispositivo associado.';
-    logsBody.innerHTML = '';
-    return;
-  }
-
-  const fromMs = dateTimeLocalToMs(fromInput.value);
-  const toMs = dateTimeLocalToMs(toInput.value);
-
-  const params = new URLSearchParams();
-  if (fromMs) params.append('from', String(fromMs));
-  if (toMs) params.append('to', String(toMs));
-
-  const qs = params.toString();
-  const url = qs
-    ? `/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements?${qs}`
-    : `/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`;
-
+async function loadServerConsole() {
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${logsToken}` },
+    const res = await fetch('/api/v1/dev/server-console', {
+      headers: API_HEADERS(),
     });
     const json = await res.json();
-    if (!json.success) {
-      console.error(json.message || 'Erro ao buscar logs');
-      logsInfo.textContent = 'Erro ao carregar logs.';
-      logsBody.innerHTML = '';
+    const el = document.getElementById('serverConsole');
+    if (!el) return;
+
+    if (!res.ok || !json.success) {
+      el.textContent = 'Erro ao carregar console do servidor.';
       return;
     }
 
-    const measures = json.data || [];
-    renderLogs(measures);
+    el.textContent = (json.data || []).join('\n');
+    el.scrollTop = el.scrollHeight;
   } catch (err) {
-    console.error('loadLogsForSelected error', err);
-    logsInfo.textContent = 'Erro de comunicação ao carregar logs.';
-    logsBody.innerHTML = '';
+    console.error('loadServerConsole error', err);
+    const el = document.getElementById('serverConsole');
+    if (el) el.textContent = 'Erro ao carregar console do servidor.';
+  }
+}
+
+async function loadDeviceConsole() {
+  try {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    const res = await fetch(`/api/v1/dev/device-console/${encodeURIComponent(deviceId)}`, {
+      headers: API_HEADERS(),
+    });
+    const json = await res.json();
+    const el = document.getElementById('deviceConsole');
+    if (!el) return;
+
+    if (!res.ok || !json.success) {
+      el.textContent = 'Erro ao carregar console do dispositivo.';
+      return;
+    }
+
+    el.textContent = (json.data || []).join('\n');
+    el.scrollTop = el.scrollHeight;
+  } catch (err) {
+    console.error('loadDeviceConsole error', err);
+    const el = document.getElementById('deviceConsole');
+    if (el) el.textContent = 'Erro ao carregar console do dispositivo.';
   }
 }
 
@@ -100,12 +60,13 @@ async function initDashboardLogs() {
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
-    logsInfo.textContent = 'Nenhum dispositivo associado.';
-    logsBody.innerHTML = '';
+    const devEl = document.getElementById('deviceConsole');
+    if (devEl) devEl.textContent = 'Nenhum dispositivo associado.';
     return;
   }
 
-  await loadLogsForSelected();
+  await loadServerConsole();
+  await loadDeviceConsole();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -113,13 +74,21 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('initDashboardLogs error', err),
   );
 
-  loadLogsBtn.addEventListener('click', (e) => {
+  const btnDev = document.getElementById('reloadDeviceConsole');
+  if (btnDev) btnDev.addEventListener('click', (e) => {
     e.preventDefault();
-    loadLogsForSelected();
+    loadDeviceConsole();
+  });
+
+  const btnSrv = document.getElementById('reloadServerConsole');
+  if (btnSrv) btnSrv.addEventListener('click', (e) => {
+    e.preventDefault();
+    loadServerConsole();
+  });
+
+  // Reage à troca de device no topo
+  window.addEventListener('deviceChanged', () => {
+    loadDeviceConsole();
   });
 });
 
-// Reage à troca de device no topo
-window.addEventListener('deviceChanged', () => {
-  loadLogsForSelected();
-});
