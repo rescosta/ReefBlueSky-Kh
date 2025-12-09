@@ -19,8 +19,7 @@ const dotenv = require('dotenv');
 //const mqtt = require('mqtt');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const readLastLines = require('read-last-lines');
-
+const fs = require('fs');
 
 
 const mariadb = require('mariadb');
@@ -312,12 +311,26 @@ app.get('/api/v1/dev/logs', authUserMiddleware, requireDev, (req, res) => {
 
 // Console do servidor (DEV)
 app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req, res) => {
+  const logPath = '/home/reef/.pm2/logs/server-out.log'; // caminho do pm2
+
   try {
-    const logPath = '/home/reef/.pm2/logs/server-out.log'; // caminho do pm2 logs
-    const text = await readLastLines.read(logPath, 200);   // últimas 200 linhas
-    const lines = text
-      .split('\n')
-      .filter(l => l.trim().length > 0);
+    // lê no máximo os últimos 200 KB para não explodir memória
+    const stats = await fs.promises.stat(logPath);
+    const maxBytes = 200 * 1024;
+    const start = Math.max(0, stats.size - maxBytes);
+
+    const fd = await fs.promises.open(logPath, 'r');
+    const buffer = Buffer.alloc(stats.size - start);
+    await fd.read(buffer, 0, buffer.length, start);
+    await fd.close();
+
+    const text = buffer.toString('utf8');
+    let lines = text.split('\n').filter(l => l.trim().length > 0);
+
+    // limita a 200 linhas mais recentes
+    if (lines.length > 200) {
+      lines = lines.slice(lines.length - 200);
+    }
 
     return res.json({
       success: true,
@@ -332,6 +345,7 @@ app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req
     });
   }
 });
+
 
 
 // Console do device (DEV)
