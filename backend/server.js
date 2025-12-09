@@ -100,8 +100,17 @@ async function sendVerificationEmail(email, code) {
 const app = express();
 app.set('trust proxy', 1); 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'seu-secret-super-seguro-aqui-mude-em-producao';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'seu-refresh-secret-aqui';
+const JWT_SECRET = process.env.JWT_SECRET || '...';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...';
+
+function buildTokenPayload(userRow) {
+  return {
+    userId: userRow.id,
+    email: userRow.email,
+    role: userRow.role || 'user',
+  };
+}
+
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
 
 // ===== SERVIR ARQUIVOS ESTÁTICOS ===== ← ADICIONAR AQUI
@@ -267,7 +276,8 @@ function authUserMiddleware(req, res, next) {
 
     req.user = {
       userId: decoded.userId,
-      deviceId: decoded.deviceId || null
+      deviceId: decoded.deviceId || null,
+      role: decoded.role || 'user'
     };
 
     next();
@@ -279,6 +289,25 @@ function authUserMiddleware(req, res, next) {
     });
   }
 }
+
+function requireDev(req, res, next) {
+  if (req.user.role !== 'dev') {
+    return res.status(403).json({ success: false, message: 'Acesso apenas para dev' });
+  }
+  next();
+}
+
+// ===== ENDPOINTS DEV (apenas para role=dev) =====
+app.get('/api/v1/dev/logs', authUserMiddleware, requireDev, (req, res) => {
+  // por enquanto, só um stub
+  return res.json({
+    success: true,
+    data: {
+      logs: []
+    }
+  });
+});
+
 
 
 // ============================================================================
@@ -776,7 +805,7 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
 
     // Buscar usuário pelo email
     const rows = await conn.query(
-      'SELECT id, email, passwordHash, isVerified FROM users WHERE email = ? LIMIT 1',
+      'SELECT id, email, passwordHash, isVerified, role FROM users WHERE email = ? LIMIT 1',
       [email]
     );
 
@@ -805,9 +834,9 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
       });
     }
 
-    // Gerar tokens JWT (reaproveitando as funções existentes)
-    const token = generateToken(user.id, null);          // deviceId = null para login web
-    const refreshToken = generateRefreshToken(user.id, null);
+    const payload = buildTokenPayload(user);
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+    const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
     console.log('API /auth/login - Login OK para usuário', user.email);
 
@@ -819,6 +848,7 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
         refreshToken,
         userId: user.id,
         email: user.email
+        role: payload.role
       }
     });
   } catch (err) {
@@ -839,6 +869,36 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+app.post('/api/v1/auth/refresh-token', async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(400).json({ success: false, message: 'Refresh token não fornecido' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+
+    const payload = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role || 'user',
+    };
+
+    const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+
+    return res.json({
+      success: true,
+      data: { token: newAccessToken },
+    });
+  } catch (err) {
+    return res.status(403).json({
+      success: false,
+      message: 'Refresh token inválido ou expirado',
+    });
+  }
+});
+
+
 // Dados do usuário autenticado
 app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
   console.log('API GET /api/v1/auth/me');
@@ -850,7 +910,7 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
     conn = await pool.getConnection();
 
     const rows = await conn.query(
-      'SELECT id, email, createdAt, updatedAt FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, email, createdAt, updatedAt, role FROM users WHERE id = ? LIMIT 1',
       [userId]
     );
 
@@ -868,6 +928,7 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
       data: {
         id: user.id,
         email: user.email,
+        role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
@@ -1161,6 +1222,7 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
             });
         }
         
+
         // Gerar novo token
         const newToken = generateToken(decoded.userId, decoded.deviceId);
         
