@@ -44,6 +44,7 @@ function getTopbarHtml() {
           <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
           <a href="dashboard-config.html" id="nav-config">Configurações</a>
           <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
+          <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
         </nav>
       </div>
       <div class="topbar-right">
@@ -68,6 +69,7 @@ function highlightActiveNav() {
     { id: 'nav-graficos', match: 'dashboard-graficos.html' },
     { id: 'nav-config', match: 'dashboard-config.html' },
     { id: 'nav-sistema', match: 'dashboard-sistema.html' },
+    { id: 'nav-dev', match: 'dashboard-logs.html' },
   ];
 
   map.forEach(({ id, match }) => {
@@ -94,6 +96,13 @@ async function loadUserCommon() {
     if (userInfoEl) {
       userInfoEl.textContent = `Usuário ${currentUser.email} · id ${currentUser.id}`;
     }
+
+    // Habilitar aba DEV só para role=dev
+    if (currentUser.role === 'dev') {
+      const navDev = document.getElementById('nav-dev'); // link na topbar
+      if (navDev) navDev.style.display = 'inline-block';
+    }
+
     return currentUser;
   } catch (err) {
     console.error('loadUserCommon error', err);
