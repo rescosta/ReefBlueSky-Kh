@@ -847,7 +847,7 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
         token,
         refreshToken,
         userId: user.id,
-        email: user.email
+        email: user.email,
         role: payload.role
       }
     });
