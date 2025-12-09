@@ -19,6 +19,8 @@ const dotenv = require('dotenv');
 //const mqtt = require('mqtt');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const readLastLines = require('read-last-lines');
+
 
 
 const mariadb = require('mariadb');
@@ -310,15 +312,27 @@ app.get('/api/v1/dev/logs', authUserMiddleware, requireDev, (req, res) => {
 
 // Console do servidor (DEV)
 app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req, res) => {
-  // TODO: ler últimos N logs reais do servidor
-  const lines = [
-    '[server] exemplo de linha de log do backend...',
-  ];
-  return res.json({
-    success: true,
-    data: lines
-  });
+  try {
+    const logPath = '/home/reef/.pm2/logs/server-out.log'; // caminho do pm2 logs
+    const text = await readLastLines.read(logPath, 200);   // últimas 200 linhas
+    const lines = text
+      .split('\n')
+      .filter(l => l.trim().length > 0);
+
+    return res.json({
+      success: true,
+      data: lines
+    });
+  } catch (err) {
+    console.error('DEV /server-console error:', err);
+    return res.json({
+      success: false,
+      message: 'Erro ao ler logs do servidor',
+      data: []
+    });
+  }
 });
+
 
 // Console do device (DEV)
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
