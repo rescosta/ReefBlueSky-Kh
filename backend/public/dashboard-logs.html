@@ -128,6 +128,7 @@
       align-items: center;
       margin-bottom: 8px;
     }
+
     .card-title {
       font-size: 13px;
       text-transform: uppercase;
@@ -139,71 +140,33 @@
       color: #6b7280;
     }
 
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 13px;
-    }
-    .filters label {
-      font-size: 13px;
-      color: #e5e7eb;
-    }
-    .filters input {
-      background: #020617;
-      color: #e5e7eb;
-      border-radius: 6px;
-      border: 1px solid #374151;
-      padding: 4px 8px;
-      font-size: 13px;
-    }
-    .filters button {
+    .btn-primary {
       border: none;
       border-radius: 6px;
-      padding: 6px 10px;
+      padding: 6px 12px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #ffffff;
+      color: white;
     }
-    .filters button:hover {
+    .btn-primary:hover {
       filter: brightness(1.05);
     }
 
-    .table-logs {
-      width: 100%;
-      border-collapse: collapse;
+    .console-box {
+      background: #020617;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+      padding: 8px;
+      font-family: monospace;
       font-size: 12px;
-      margin-top: 4px;
-    }
-    .table-logs th,
-    .table-logs td {
-      padding: 4px 6px;
-      border-bottom: 1px solid #1f2937;
-    }
-    .table-logs th {
-      text-align: left;
-      color: #9ca3af;
-      font-weight: 500;
-    }
-    .table-logs tbody tr:hover {
-      background: #030712;
+      max-height: 320px;
+      overflow-y: auto;
+      white-space: pre-wrap;
     }
 
-    .muted {
-      color: #6b7280;
-      font-size: 12px;
-    }
 
-    .footer {
-      font-size: 11px;
-      color: #6b7280;
-      padding: 6px 24px 10px;
-      display: flex;
-      justify-content: space-between;
-    }
   </style>
 </head>
 <body>
@@ -213,43 +176,38 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">Logs de medições</div>
-          <div class="card-subtitle" id="logsSubtitle">Últimos registros do dispositivo selecionado</div>
-        </div>
-        <div class="device-selector">
-          <span>Dispositivo</span>
-          <select id="deviceSelect"></select>
+          <div class="card-title">Console do dispositivo</div>
+          <div class="card-subtitle">
+            Logs recentes do dispositivo selecionado no topo.
+          </div>
         </div>
       </div>
 
-      <div class="filters">
+      <pre id="deviceConsole" class="console-box">Carregando...</pre>
+
+      <button id="reloadDeviceConsole" class="btn-primary" style="margin-top:8px;">
+        Recarregar device
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
         <div>
-          <label for="fromInput">De:</label>
-          <input id="fromInput" type="datetime-local" />
+          <div class="card-title">Console do servidor</div>
+          <div class="card-subtitle">
+            Logs recentes do backend Node.
+          </div>
         </div>
-        <div>
-          <label for="toInput">Até:</label>
-          <input id="toInput" type="datetime-local" />
-        </div>
-        <button id="loadLogsBtn">Carregar</button>
-        <span id="logsInfo" class="muted">Nenhum dado carregado ainda.</span>
       </div>
 
-      <table class="table-logs">
-        <thead>
-          <tr>
-            <th>Data/hora</th>
-            <th>KH</th>
-            <th>pH ref</th>
-            <th>pH amostra</th>
-            <th>Temp (°C)</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="logsBody"></tbody>
-      </table>
+      <pre id="serverConsole" class="console-box">Carregando...</pre>
+
+      <button id="reloadServerConsole" class="btn-primary" style="margin-top:8px;">
+        Recarregar servidor
+      </button>
     </div>
   </div>
+
 
   <div class="footer">
     <div id="userInfo">Usuário --</div>
