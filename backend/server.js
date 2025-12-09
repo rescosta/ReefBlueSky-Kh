@@ -1307,34 +1307,54 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
  * POST /api/v1/device/health
  * [SEGURANÇA] Enviar métricas de saúde
  */
-app.post('/api/v1/device/health', verifyToken, (req, res) => {
-    console.log('[API] POST /api/v1/device/health - Device:', req.user.deviceId);
-    
-    const health = req.body;
-    
-    // [SEGURANÇA] Validar métricas
-    if (typeof health.cpu_usage !== 'number' || 
+app.post('/api/v1/device/health', verifyToken, async (req, res) => {
+  try {
+    const deviceId = req.user.deviceId;
+    const userId = req.user.userId; // assumindo que o token já carrega userId
+    console.log('[API] POST /api/v1/device/health - Device:', deviceId);
+
+    const health = req.body || {};
+
+    if (typeof health.cpu_usage !== 'number' ||
         typeof health.memory_usage !== 'number' ||
         typeof health.uptime !== 'number') {
-        return res.status(400).json({
-            success: false,
-            message: 'Métricas de saúde inválidas'
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Métricas de saúde inválidas',
+      });
     }
-    
+
     console.log('[API] Health metrics:', {
-        cpu: health.cpu_usage + '%',
-        memory: health.memory_usage + '%',
-        uptime: health.uptime + 's'
+      cpu: health.cpu_usage + '%',
+      memory: health.memory_usage + '%',
+      uptime: health.uptime + 's',
     });
-    
-    // TODO: Salvar métricas em banco de dados
-    
-    res.json({
-        success: true,
-        message: 'Métricas de saúde recebidas'
+
+    await pool.query(
+      `INSERT INTO device_health
+         (userId, deviceId, cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        deviceId,
+        health.cpu_usage,
+        health.memory_usage,
+        health.storage_usage ?? null,
+        health.wifi_rssi ?? null,
+        health.uptime,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Métricas de saúde recebidas',
     });
+  } catch (err) {
+    console.error('Error saving device health', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
+
 
 /**
  * GET /api/v1/device/commands
