@@ -934,7 +934,6 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
 });
 
 // Histórico de medições de um device do usuário
-// Histórico de medições de um device do usuário
 app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async (req, res) => {
   console.log('API GET /api/v1/user/devices/:deviceId/measurements');
   const userId = req.user.userId;
@@ -1701,12 +1700,12 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
 app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const deviceInternalId = req.params.deviceId;
+    const deviceIdFromUrl = req.params.deviceId; // nome consistente
 
     // 1) pegar deviceId (string) + kh_target do banco
     const devRows = await pool.query(
-      'SELECT deviceId, kh_target FROM devices WHERE id = ? AND userId = ?',
-      [deviceInternalId, userId]
+      'SELECT deviceId, kh_target FROM devices WHERE deviceId = ? AND userId = ?',
+      [deviceIdFromUrl, userId]
     );
 
     if (!devRows || devRows.length === 0) {
@@ -1750,7 +1749,6 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
       metrics[label] = {
         minKh,
         maxKh,
-        // desvios em relação ao alvo
         maxPositiveDeviation: maxKh - kh_target,
         maxNegativeDeviation: minKh - kh_target,
       };
@@ -1768,6 +1766,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req, res) => {
   try {
