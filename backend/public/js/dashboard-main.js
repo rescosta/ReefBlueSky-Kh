@@ -246,7 +246,14 @@ async function loadKhMetrics(deviceId) {
       return;
     }
 
-    const { khTarget, metrics } = json.data;
+    let { khTarget, metrics } = json.data || {};
+
+    // garante número
+    if (khTarget != null) {
+      khTarget = typeof khTarget === 'number' ? khTarget : parseFloat(khTarget);
+      if (Number.isNaN(khTarget)) khTarget = null;
+    }
+
     if (khTargetSpan) {
       khTargetSpan.textContent = khTarget != null ? khTarget.toFixed(2) : '--';
     }
@@ -259,6 +266,7 @@ async function loadKhMetrics(deviceId) {
     console.error('loadKhMetrics error', err);
   }
 }
+
 
 async function loadKhInfo(deviceId) {
   try {
