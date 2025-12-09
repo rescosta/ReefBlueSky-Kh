@@ -1792,7 +1792,19 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
     `;
     const rows = await pool.query(sql, [deviceId, userId]);
     if (!rows.length) {
-      return res.status(404).json({ success: false, message: 'Status não encontrado' });
+      // Sem status ainda: devolve valores padrão em vez de 404
+      return res.json({
+        success: true,
+        data: {
+          intervalHours: null,
+          levels: { A: false, B: false, C: false },
+          pumps: {
+            1: { running: false, direction: 'forward' },
+            2: { running: false, direction: 'forward' },
+            3: { running: false, direction: 'forward' },
+          },
+        },
+      });
     }
 
     const s = rows[0];
@@ -1812,6 +1824,7 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
         },
       },
     });
+
   } catch (err) {
     console.error('Error fetching device status', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
