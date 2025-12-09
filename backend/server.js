@@ -299,7 +299,7 @@ function requireDev(req, res, next) {
 
 // ===== ENDPOINTS DEV (apenas para role=dev) =====
 app.get('/api/v1/dev/logs', authUserMiddleware, requireDev, (req, res) => {
-  // por enquanto, só um stub
+  // stub antigo (pode até remover depois)
   return res.json({
     success: true,
     data: {
@@ -307,6 +307,33 @@ app.get('/api/v1/dev/logs', authUserMiddleware, requireDev, (req, res) => {
     }
   });
 });
+
+// Console do servidor (DEV)
+app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req, res) => {
+  // TODO: ler últimos N logs reais do servidor
+  const lines = [
+    '[server] exemplo de linha de log do backend...',
+  ];
+  return res.json({
+    success: true,
+    data: lines
+  });
+});
+
+// Console do device (DEV)
+app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
+  const { deviceId } = req.params;
+
+  // TODO: validar se o device pertence ao usuário e ler logs reais
+  const lines = [
+    `[device ${deviceId}] exemplo de log do device...`,
+  ];
+  return res.json({
+    success: true,
+    data: lines
+  });
+});
+
 
 
 
