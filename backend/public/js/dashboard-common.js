@@ -169,7 +169,7 @@ function updateDeviceStatusBadge() {
     badge.textContent = 'Online';
   } else if (diffMin <= 60) {
     badge.className = 'badge badge-off';
-    badge.textContent = 'Ausente';
+    badge.textContent = 'Offline';
   } else {
     badge.className = 'badge badge-off';
     badge.textContent = 'Offline';
