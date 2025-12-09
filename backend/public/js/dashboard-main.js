@@ -273,18 +273,31 @@ async function loadKhInfo(deviceId) {
       return;
     }
 
-    const { khTarget, khReference } = json.data || {};
+    const data = json.data || {};
+    const khTarget = typeof data.khTarget === 'number'
+      ? data.khTarget
+      : (data.khTarget != null ? parseFloat(data.khTarget) : null);
+    const khReference = typeof data.khReference === 'number'
+      ? data.khReference
+      : (data.khReference != null ? parseFloat(data.khReference) : null);
 
     if (khTargetSpan) {
-      khTargetSpan.textContent = khTarget != null ? khTarget.toFixed(2) : '--';
+      khTargetSpan.textContent =
+        khTarget != null && !Number.isNaN(khTarget)
+          ? khTarget.toFixed(2)
+          : '--';
     }
     if (khRefSpan) {
-      khRefSpan.textContent = khReference != null ? `ref: ${khReference.toFixed(2)}` : 'ref: --';
+      khRefSpan.textContent =
+        khReference != null && !Number.isNaN(khReference)
+          ? `ref: ${khReference.toFixed(2)}`
+          : 'ref: --';
     }
   } catch (err) {
     console.error('loadKhInfo error', err);
   }
 }
+
 
 
 // Inicialização da página principal
