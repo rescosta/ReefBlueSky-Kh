@@ -25,6 +25,8 @@ const fs = require('fs');
 const mariadb = require('mariadb');
 const nodemailer = require('nodemailer');
 const displayRoutes = require('./display-endpoints');
+const axios = require('axios');
+
 
 const pool = mariadb.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
@@ -1212,17 +1214,12 @@ app.post('/api/v1/device/register', authLimiter, async (req, res) => {
           now
         ]
       );
-
-
-    // TODO: Verificar se dispositivo já existe
-    // TODO: Criar usuário no banco de dados
-    // TODO: Hash da senha com bcrypt
     
     // Gerar tokens
     const token = generateToken(user.id, deviceId);
     const refreshToken = generateRefreshToken(user.id, deviceId);
     
-    console.log('[API] Dispositivo registrado com sucesso:', deviceId, 'userId');
+    console.log('[API] Dispositivo registrado com sucesso:', deviceId, user.id);
     
     res.status(201).json({
         success: true,
@@ -1479,48 +1476,6 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
  * GET /api/v1/device/commands
  * [SEGURANÇA] Obter comandos pendentes
  */
-app.get('/api/v1/device/commands', verifyToken, (req, res) => {
-    console.log('[API] GET /api/v1/device/commands - Device:', req.user.deviceId);
-
-    const deviceId = req.user.deviceId;
-    const commands = deviceCommands.get(deviceId) || [];
-
-    // opcional: limpar fila após envio
-    deviceCommands.set(deviceId, []);
-    
-    res.json({
-        success: true,
-        data: {
-            commands
-        }
-    });
-});
-
-/**
- * POST /api/v1/device/command-result
- * [SEGURANÇA] Confirmar execução de comando
- */
-app.post('/api/v1/device/command-result', verifyToken, (req, res) => {
-    console.log('[API] POST /api/v1/device/command-result - Device:', req.user.deviceId);
-    
-    const { commandId, status, result } = req.body;
-    
-    if (!commandId || !status) {
-        return res.status(400).json({
-            success: false,
-            message: 'Campos obrigatórios: commandId, status'
-        });
-    }
-    
-    console.log(`[API] Comando ${commandId} executado com status: ${status}`);
-    
-    // TODO: Salvar resultado em banco de dados
-    
-    res.json({
-        success: true,
-        message: 'Resultado do comando recebido'
-    });
-});
 
 
 // Endpoint protegido para teste do token de usuário (dashboard web)
@@ -1607,27 +1562,28 @@ app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, a
   }
 });
 
+// Enfileirar comando genérico usando device_commands (substitui o Map em memória)
+async function enqueueDbCommand(deviceId, type, payload = null) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const now = new Date();
+    const jsonPayload = payload ? JSON.stringify(payload) : null;
 
-// ===== BLOCO 2: Comandos para o dispositivo (DEPOIS DO BLOCO DE CONFIG) =====
+    const result = await conn.query(
+      `INSERT INTO device_commands (deviceId, type, payload, status, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'pending', ?, ?)`,
+      [deviceId, type, jsonPayload, now, now]
+    );
 
-const deviceCommands = new Map(); // key: deviceId, value: array de comandos
-
-function enqueueCommand(deviceId, type, payload = {}) {
-  if (!deviceCommands.has(deviceId)) {
-    deviceCommands.set(deviceId, []);
+    return { id: Number(result.insertId), type };
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
   }
-  const queue = deviceCommands.get(deviceId);
-  const cmd = {
-    id: Date.now() + '-' + Math.random().toString(16).slice(2),
-    type,
-    payload,
-    createdAt: Date.now(),
-  };
-  queue.push(cmd);
-  return cmd;
 }
 
-// POST /command/pump - usado em dashboard-config.js (apiManualPump)
+
+// POST /command/pump
 app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -1637,9 +1593,15 @@ app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, asyn
     if (!pumpId || !seconds || seconds <= 0) {
       return res.status(400).json({ success: false, message: 'pumpId/seconds inválidos' });
     }
-    const dir = direction === 'reverse' ? 'reverse' : 'forward';
 
-    const cmd = enqueueCommand(deviceId, 'manual_pump', { pumpId, direction: dir, seconds });
+    const chk = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+
+    const dir = direction === 'reverse' ? 'reverse' : 'forward';
+    const cmd = await enqueueDbCommand(deviceId, 'manual_pump', { pumpId, direction: dir, seconds });
     console.log('[CMD] manual_pump enfileirado', deviceId, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id } });
@@ -1649,7 +1611,7 @@ app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, asyn
   }
 });
 
-// POST /command/kh-correction - usado em dashboard-config.js (apiKhCorrection)
+// POST /command/kh-correction
 app.post('/api/v1/user/devices/:deviceId/command/kh-correction', authUserMiddleware, async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -1660,7 +1622,13 @@ app.post('/api/v1/user/devices/:deviceId/command/kh-correction', authUserMiddlew
       return res.status(400).json({ success: false, message: 'volume inválido' });
     }
 
-    const cmd = enqueueCommand(deviceId, 'kh_correction', { volume });
+    const chk = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+
+    const cmd = await enqueueDbCommand(deviceId, 'kh_correction', { volume });
     console.log('[CMD] kh_correction enfileirado', deviceId, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id } });
@@ -1670,7 +1638,7 @@ app.post('/api/v1/user/devices/:deviceId/command/kh-correction', authUserMiddlew
   }
 });
 
-// POST /command - usado em dashboard-sistema.js (restart, reset_kh, factory_reset)
+// POST /command (restart, reset_kh, factory_reset + futuros)
 app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -1681,23 +1649,69 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       return res.status(400).json({ success: false, message: 'type obrigatório' });
     }
 
-    const allowed = new Set(['restart', 'reset_kh', 'factory_reset']);
+    const allowed = new Set([
+      'restart',
+      'reset_kh',
+      'factory_reset',
+      'test_now',
+      'set_kh_reference',
+      'set_kh_target',
+      'set_interval_minutes',
+      'esp_console',
+      'custom_1',
+      'custom_2',
+      'custom_3',
+    ]);
     if (!allowed.has(type)) {
       return res.status(400).json({ success: false, message: 'type inválido' });
     }
 
-    const cmd = enqueueCommand(deviceId, type, {});
+    const chk = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+
+    const cmd = await enqueueDbCommand(deviceId, type, {}); // payload opcional
     console.log('[CMD] comando enfileirado', deviceId, cmd);
 
-    return res.json({ success: true, data: { commandId: cmd.id } });
+    return res.json({ success: true, data: { commandId: cmd.id, type } });
   } catch (err) {
     console.error('POST /command error', err);
     return res.status(500).json({ success: false, message: 'Erro ao enviar comando' });
   }
 });
 
+// endpoint genérico opcional para front mandar qualquer comando
+app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { deviceId } = req.params;
+  const { type, payload } = req.body || {};
+
+  if (!type) {
+    return res.status(400).json({ success: false, message: 'type obrigatório' });
+  }
+
+  try {
+    const chk = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+
+    const cmd = await enqueueDbCommand(deviceId, type, payload || null);
+    console.log('[CMD] genérico enfileirado', deviceId, cmd);
+
+    return res.json({ success: true, data: { commandId: cmd.id, type } });
+  } catch (err) {
+    console.error('POST /user/devices/:deviceId/commands error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao enfileirar comando' });
+  }
+});
+
+
 // Atualizar nome (fake ID) do device
-// Atualizar nome (fake ID) do device
+
 app.put(
   '/api/v1/user/devices/:deviceId/name',
   authUserMiddleware,
@@ -1717,7 +1731,7 @@ app.put(
       const sql = `
         UPDATE devices
         SET name = ?
-        WHERE id = ? AND userId = ?;
+        WHERE deviceId = ? AND userId = ?;
       `;
       const params = [name.trim(), deviceId, userId];
 
@@ -1737,6 +1751,81 @@ app.put(
   }
 );
 
+
+// ESP busca comandos pendentes
+app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
+  const deviceId = req.user.deviceId;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      `SELECT id, type, payload
+         FROM device_commands
+        WHERE deviceId = ?
+          AND status = 'pending'
+        ORDER BY createdAt ASC
+        LIMIT 5`,
+      [deviceId]
+    );
+
+    const ids = rows.map(r => r.id);
+    if (ids.length > 0) {
+      await conn.query(
+        `UPDATE device_commands
+            SET status = 'in_progress', updatedAt = NOW()
+          WHERE id IN (${ids.map(() => '?').join(',')})`,
+        ids
+      );
+    }
+
+    const commands = rows.map(r => ({
+      id:      r.id,
+      type:    r.type,
+      payload: r.payload ? JSON.parse(r.payload) : null,
+    }));
+
+    return res.json({ success: true, data: commands });
+  } catch (err) {
+    console.error('POST /device/commands/poll error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao buscar comandos' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
+
+// ESP confirma execução
+app.post('/api/v1/device/commands/complete', verifyToken, async (req, res) => {
+  const deviceId = req.user.deviceId;
+  const { commandId, status, errorMessage } = req.body || {};
+
+  if (!commandId || !status) {
+    return res.status(400).json({ success: false, message: 'commandId e status são obrigatórios' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const result = await conn.query(
+      `UPDATE device_commands
+          SET status = ?, errorMessage = ?, updatedAt = NOW()
+        WHERE id = ? AND deviceId = ?`,
+      [status, errorMessage || null, commandId, deviceId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Comando não encontrado para este device' });
+    }
+
+    return res.json({ success: true, message: 'Comando atualizado' });
+  } catch (err) {
+    console.error('POST /device/commands/complete error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao atualizar comando' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
 
 
 app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
@@ -1778,6 +1867,85 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     return res.status(500).json({ success: false, message: 'Internal server error', });
   }
 });
+
+
+
+// Helper para descobrir a URL local do device.
+async function getDeviceBaseUrl(deviceId) {
+  const conn = await pool.getConnection();
+  try {
+    const rows = await conn.query(
+      'SELECT local_ip FROM devices WHERE deviceId = ? LIMIT 1',
+      [deviceId]
+    );
+    if (!rows.length || !rows[0].local_ip) {
+      throw new Error('Device sem local_ip configurado');
+    }
+    const ip = rows[0].local_ip.replace(/\/+$/, '');
+    return `http://${ip}`;
+  } finally {
+    conn.release();
+  }
+}
+
+
+// Test mode ON/OFF
+app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
+  const { deviceId } = req.params;
+  const { enabled } = req.body;
+  const userId = req.user.userId;
+
+  try {
+    // garante que o device pertence ao usuário
+    const devRows = await pool.query(
+      'SELECT deviceId FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!devRows.length) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const baseUrl = await getDeviceBaseUrl(deviceId);
+    await axios.post(`${baseUrl}/test_mode`, null, {
+      params: { enabled: enabled ? '1' : '0' },
+      timeout: 5000,
+    });
+
+    return res.json({ success: true, data: { testModeEnabled: !!enabled } });
+  } catch (err) {
+    console.error('Erro em /test-mode', err.message);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Falha ao acionar test_mode no device' });
+  }
+});
+
+app.post('/api/v1/user/devices/:deviceId/test-now', authUserMiddleware, async (req, res) => {
+  const { deviceId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const devRows = await pool.query(
+      'SELECT deviceId FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!devRows.length) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const baseUrl = await getDeviceBaseUrl(deviceId);
+    await axios.post(`${baseUrl}/test_now`, null, { timeout: 5000 });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Erro em /test-now', err.message);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Falha ao acionar test_now no device' });
+  }
+});
+
+
 
 
 app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
@@ -1869,7 +2037,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
     for (const [label, seconds] of Object.entries(windows)) {
       const fromTs = now - seconds;
 
-      const [rows] = await pool.query(
+      const rows = await pool.query(
         `SELECT MIN(kh) AS minKh, MAX(kh) AS maxKh
          FROM measurements
          WHERE deviceId = ? AND timestamp >= ?`,
