@@ -1699,6 +1699,29 @@ app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (r
     );
     if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
 
+    // normalizar para o formato que o ESP entende
+    let dbType = type;
+    switch (type) {
+      case 'factory_reset':
+        dbType = 'factoryreset';
+        break;
+      case 'reset_kh':
+        dbType = 'resetkh';
+        break;
+      case 'test_now':
+        dbType = 'testnow';
+        break;
+      case 'manual_pump':
+        dbType = 'manualpump';
+        break;
+      case 'kh_correction':
+        dbType = 'khcorrection';
+        break;
+      default:
+        // 'restart' etc. já batem
+        break;
+    }
+
     const cmd = await enqueueDbCommand(deviceId, type, payload || null);
     console.log('[CMD] genérico enfileirado', deviceId, cmd);
 
