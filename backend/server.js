@@ -1601,8 +1601,8 @@ app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, asyn
     if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
 
     const dir = direction === 'reverse' ? 'reverse' : 'forward';
-    const cmd = await enqueueDbCommand(deviceId, 'manual_pump', { pumpId, direction: dir, seconds });
-    console.log('[CMD] manual_pump enfileirado', deviceId, cmd);
+    const cmd = await enqueueDbCommand(deviceId, 'manualpump', { pumpId, direction: dir, seconds });
+    console.log('[CMD] manualpump enfileirado', deviceId, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id } });
   } catch (err) {
