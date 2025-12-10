@@ -1,5 +1,15 @@
 #include "CloudAuth.h"
 #include <ESP32-targz.h>
+#include "MultiDeviceAuth.h"
+#include "TimeProvider.h"
+
+extern String deviceToken;
+
+const char* CLOUD_BASE_URL = "http://iot.reefbluesky.com.br/api/v1";
+
+
+CloudAuth cloudAuth(CLOUD_BASE_URL, deviceId.c_str());
+
 
 // ============================================================================
 // [SEGURANÇA] Construtor e Inicialização
@@ -26,20 +36,30 @@ bool CloudAuth::init() {
         Serial.println("[CloudAuth::init] Token carregado do armazenamento seguro");
         
         // Verificar se token ainda é válido
-        if (millis() / 1000 < tokenExpiry) {
+        unsigned long nowSec = getCurrentEpochMs() / 1000ULL;
+        if (nowSec < tokenExpiry) {
             Serial.println("[CloudAuth::init] Token ainda válido");
+
+            extern void sendHealthToCloud();   // declaração da função na .ino
+            sendHealthToCloud();               // envia health imediatamente
+
             return true;
         }
         
         // Token expirado, tentar renovar
         if (refreshTokenIfNeeded()) {
             Serial.println("[CloudAuth::init] Token renovado com sucesso");
+            
+            extern void sendHealthToCloud();
+            sendHealthToCloud();
+
             return true;
         }
     }
     
     Serial.println("[CloudAuth::init] Nenhum token válido encontrado");
     Serial.println("[CloudAuth::init] Aguardando registro do dispositivo...");
+    
     
     return false;
 }
@@ -178,7 +198,7 @@ String CloudAuth::decryptToken(const String& encryptedToken) {
 // ============================================================================
 
 bool CloudAuth::refreshTokenIfNeeded() {
-    unsigned long now = millis() / 1000;
+    unsigned long now = getCurrentEpochMs() / 1000ULL;
     
     // Renovar se vai expirar em menos de 1 hora
     if (tokenExpiry - now > 3600) {
@@ -192,16 +212,17 @@ bool CloudAuth::refreshTokenIfNeeded() {
         return false;
     }
     
-    if (!validateSSLCertificate()) {
-        Serial.println("[CloudAuth::refreshTokenIfNeeded] Validação SSL falhou");
-        return false;
-    }
+    //if (!validateSSLCertificate()) {
+    //    Serial.println("[CloudAuth::refreshTokenIfNeeded] Validação SSL falhou");
+    //    return false;
+   // }
     
-    WiFiClientSecure client;
-    if (ca_cert != nullptr) client.setCACert(ca_cert);
+    //WiFiClientSecure client;
+    WiFiClient client;
+    //if (ca_cert != nullptr) client.setCACert(ca_cert);
     
     HTTPClient http;
-    String url = serverUrl + "/api/device/refresh-token";
+    String url = serverUrl + "/device/refresh-token";
     
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
@@ -220,22 +241,25 @@ bool CloudAuth::refreshTokenIfNeeded() {
     if (httpCode == 200) {
         String response = http.getString();
         DynamicJsonDocument responseDoc(512);
-        deserializeJson(responseDoc, response);
-        
-        if (responseDoc.containsKey("deviceToken")) {
-            String newToken = responseDoc["deviceToken"].as<String>();
-            unsigned long newExpiry = responseDoc["expiresIn"].as<unsigned long>();
-            
-            deviceToken = newToken;
-            tokenExpiry = now + newExpiry;
-            
-            storeTokenSecurely(deviceToken, refreshToken, tokenExpiry);
-            
-            Serial.println("[CloudAuth::refreshTokenIfNeeded] Token renovado com sucesso");
-            http.end();
-            return true;
+        DeserializationError err = deserializeJson(responseDoc, response);
+        if (!err && responseDoc["success"]) {
+            JsonObject data = responseDoc["data"];
+            if (data.containsKey("token")) {
+                String newToken = data["token"].as<String>();
+                unsigned long newExpiry = data["expiresIn"].as<unsigned long>();
+
+                deviceToken = newToken;
+                tokenExpiry = now + newExpiry;
+
+                storeTokenSecurely(deviceToken, refreshToken, tokenExpiry);
+
+                Serial.println("[CloudAuth::refreshTokenIfNeeded] Token renovado com sucesso");
+                http.end();
+                return true;
+            }
         }
     }
+
     
     Serial.printf("[CloudAuth::refreshTokenIfNeeded] Erro ao renovar token: %d\n", httpCode);
     http.end();
@@ -286,7 +310,7 @@ void CloudAuth::queueMeasurement(const Measurement& m) {
 }
 
 // ============================================================================
-// [FUNCIONALIDADE] Sincronização Incremental com Compressão
+// [FUNCIONALIDADE] Sincronização Incremental (sem wrapper/compressão)
 // ============================================================================
 
 bool CloudAuth::syncOfflineMeasurements() {
@@ -294,88 +318,101 @@ bool CloudAuth::syncOfflineMeasurements() {
         Serial.println("[CloudAuth::syncOfflineMeasurements] Nenhuma medição para sincronizar");
         return true;
     }
-    
+
     if (!rateLimiter.canMakeRequest()) {
         Serial.println("[CloudAuth::syncOfflineMeasurements] Rate limit atingido");
         return false;
     }
-    
+
     Serial.printf("[CloudAuth::syncOfflineMeasurements] Sincronizando %d medições...\n", offlineMeasurementQueue.size());
+
+//    if (!validateSSLCertificate()) {
+//        Serial.println("[CloudAuth::syncOfflineMeasurements] Validação SSL falhou");
+//        return false;
+//    }
+
+//    WiFiClientSecure client;
+      WiFiClient client;  
+//    if (ca_cert != nullptr) client.setCACert(ca_cert);
+      HTTPClient http;
+      String url = String(serverUrl) + "/device/sync";
+      http.begin(client, url);
+
     
-    if (!validateSSLCertificate()) {
-        Serial.println("[CloudAuth::syncOfflineMeasurements] Validação SSL falhou");
-        return false;
-    }
-    
-    WiFiClientSecure client;
-    if (ca_cert != nullptr) client.setCACert(ca_cert);
-    
-    HTTPClient http;
-    String url = serverUrl + "/api/device/sync";
-    
-    http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", "Bearer " + deviceToken);
-    
-    // [FUNCIONALIDADE] Extrair medições da fila em chunks
+
+    // Extrair medições da fila em chunks
     std::vector<Measurement> chunk;
     int chunkSize = incrementalSync.getChunkSize();
-    
-    while (!offlineMeasurementQueue.empty() && chunk.size() < chunkSize) {
+
+    while (!offlineMeasurementQueue.empty() && (int)chunk.size() < chunkSize) {
         chunk.push_back(offlineMeasurementQueue.front());
         offlineMeasurementQueue.pop();
     }
-    
-    // [FUNCIONALIDADE] Comprimir medições
-    String compressedData = compressMeasurements(chunk);
-    
-    // Montar payload
+
+    // Montar payload exatamente como o Postman
     DynamicJsonDocument doc(4096);
-    doc["deviceId"] = deviceId;
-    doc["timestamp"] = millis() / 1000;
-    doc["measurementCount"] = chunk.size();
-    doc["compressed"] = true;
-    doc["data"] = compressedData;
-    
+    JsonArray measurementsArray = doc.createNestedArray("measurements");
+
+    for (const auto& m : chunk) {
+        JsonObject obj = measurementsArray.createNestedObject();
+        obj["timestamp"]   = m.timestamp;          // mesmo campo do Postman
+        obj["kh"]          = m.kh;
+        obj["phref"]       = m.ph_reference;
+        obj["phsample"]    = m.ph_sample;
+        obj["temperature"] = m.temperature;
+        obj["status"]      = m.is_valid ? "ok" : "invalid";
+        obj["confidence"]  = m.confidence;
+    }
+
     String payload;
     serializeJson(doc, payload);
-    
+    Serial.println("[SYNC] Payload:");
+    Serial.println(payload);
+
     int httpCode = http.POST(payload);
-    
+    Serial.printf("[SYNC] httpCode = %d\n", httpCode);
+    if (httpCode <= 0) {
+        Serial.printf("[SYNC] Erro HTTP: %s\n", http.errorToString(httpCode).c_str());
+    }
+
     if (httpCode == 200) {
         String response = http.getString();
         DynamicJsonDocument responseDoc(512);
-        deserializeJson(responseDoc, response);
-        
-        if (responseDoc["success"]) {
-            // [FUNCIONALIDADE] Atualizar checkpoint de sincronização
-            if (chunk.size() > 0) {
+        DeserializationError err = deserializeJson(responseDoc, response);
+        if (!err && responseDoc["success"]) {
+            // Atualizar checkpoint de sincronização
+            if (!chunk.empty()) {
                 incrementalSync.updateLastSyncedTimestamp(chunk.back().timestamp);
             }
-            
+
             Serial.printf("[CloudAuth::syncOfflineMeasurements] %d medições sincronizadas com sucesso\n", chunk.size());
             http.end();
-            
+
             // Continuar sincronizando se ainda há medições
             if (!offlineMeasurementQueue.empty()) {
                 delay(1000);  // Aguardar antes de próxima sincronização
                 return syncOfflineMeasurements();
             }
-            
+
             return true;
+        } else {
+            Serial.println("[CloudAuth::syncOfflineMeasurements] Resposta 200 mas JSON inválido ou success=false");
         }
     }
-    
+
     Serial.printf("[CloudAuth::syncOfflineMeasurements] Erro ao sincronizar: %d\n", httpCode);
-    
+
     // Recolocar medições na fila se falhar
     for (const auto& m : chunk) {
         queueMeasurement(m);
     }
-    
+
     http.end();
     return false;
 }
+
 
 // ============================================================================
 // [SEGURANÇA] Enviar Heartbeat com Validação
@@ -386,17 +423,20 @@ bool CloudAuth::sendHeartbeat(const DeviceStatus& status) {
         return false;
     }
     
-    if (!validateSSLCertificate()) {
-        return false;
-    }
+    //if (!validateSSLCertificate()) {
+    //    return false;
+   // }
     
-    WiFiClientSecure client;
-    if (ca_cert != nullptr) client.setCACert(ca_cert);
+    //WiFiClientSecure client;
+    WiFiClient client;
+    //if (ca_cert != nullptr) client.setCACert(ca_cert);
     
     HTTPClient http;
-    String url = serverUrl + "/api/device/ping?deviceId=" + deviceId;
+    String url = serverUrl + "/device/ping?deviceId=" + deviceId;
     
     http.begin(client, url);
+
+    
     http.addHeader("Authorization", "Bearer " + deviceToken);
     
     int httpCode = http.GET();
@@ -435,11 +475,12 @@ bool CloudAuth::sendHealthMetrics(const SystemHealth& health) {
         return false;
     }
     
-    WiFiClientSecure client;
-    if (ca_cert != nullptr) client.setCACert(ca_cert);
+    //WiFiClientSecure client;
+    WiFiClient client;
+    //if (ca_cert != nullptr) client.setCACert(ca_cert);
     
     HTTPClient http;
-    String url = serverUrl + "/api/device/health";
+    String url = serverUrl + "/device/health";
     
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
@@ -447,7 +488,7 @@ bool CloudAuth::sendHealthMetrics(const SystemHealth& health) {
     
     DynamicJsonDocument doc(512);
     doc["deviceId"] = deviceId;
-    doc["timestamp"] = millis() / 1000;
+    doc["timestamp"] = getCurrentEpochMs() / 1000ULL; 
     doc["cpuUsage"] = health.cpu_usage;
     doc["memoryUsage"] = health.memory_usage;
     doc["spiffsUsage"] = health.spiffs_usage;
@@ -480,96 +521,108 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
     if (!rateLimiter.canMakeRequest()) {
         return false;
     }
-    
-    WiFiClientSecure client;
-    if (ca_cert != nullptr) client.setCACert(ca_cert);
-    
+
+    WiFiClient client;
     HTTPClient http;
-    String url = serverUrl + "/api/device/commands?deviceId=" + deviceId;
-    
+    String url = String(serverUrl) + "/device/commands/poll";
+
     http.begin(client, url);
     http.addHeader("Authorization", "Bearer " + deviceToken);
-    
-    int httpCode = http.GET();
-    
+    http.addHeader("Content-Type", "application/json");
+
+    // corpo vazio ou {} – backend ignora o body
+    int httpCode = http.POST("{}");
+
     if (httpCode == 200) {
         String response = http.getString();
         DynamicJsonDocument responseDoc(2048);
-        deserializeJson(responseDoc, response);
-        
-        if (responseDoc.containsKey("commands") && responseDoc["commands"].size() > 0) {
-            JsonObject cmdObj = responseDoc["commands"][0];
-            
-            // [SEGURANÇA] Validar comando
-            if (!commandValidator.validatePayload(cmdObj)) {
-                Serial.println("[CloudAuth::pullCommandFromServer] Comando inválido rejeitado");
-                http.end();
-                return false;
-            }
-            
-            // [SEGURANÇA] Verificar se comando é permitido
-            String action = cmdObj["action"];
-            if (!commandValidator.isCommandAllowed(action)) {
-                Serial.println("[CloudAuth::pullCommandFromServer] Comando não permitido");
-                http.end();
-                return false;
-            }
-            
-            command.command_id = cmdObj["commandId"].as<String>();
-            command.action = action;
-            command.params = cmdObj["params"].as<JsonObject>();
-            
-            Serial.printf("[CloudAuth::pullCommandFromServer] Comando recebido: %s\n", action.c_str());
+        DeserializationError err = deserializeJson(responseDoc, response);
+        if (err) {
+            Serial.printf("[CloudAuth::pullCommandFromServer] JSON inválido: %s\n", err.c_str());
             http.end();
-            return true;
+            return false;
         }
+
+        if (!responseDoc["success"]) {
+            http.end();
+            return false;
+        }
+
+        JsonArray arr = responseDoc["data"].as<JsonArray>();
+        if (!arr || arr.size() == 0) {
+            http.end();
+            return false; // sem comandos pendentes
+        }
+
+        JsonObject cmdObj = arr[0];
+
+        // tipo e payload do backend
+        String type = cmdObj["type"].as<String>();
+
+        // opcional: validar tipo permitido
+        if (!commandValidator.isCommandAllowed(type)) {
+            Serial.println("[CloudAuth::pullCommandFromServer] Comando não permitido");
+            http.end();
+            return false;
+        }
+
+        command.command_id = String(cmdObj["id"].as<int>());
+        command.action = type;
+        command.params = cmdObj["payload"].as<JsonObject>(); // pode ser null
+
+        Serial.printf("[CloudAuth::pullCommandFromServer] Comando recebido: %s\n", type.c_str());
+        http.end();
+        return true;
     }
-    
+
+    Serial.printf("[CloudAuth::pullCommandFromServer] Erro HTTP: %d\n", httpCode);
     http.end();
     return false;
 }
+
 
 // ============================================================================
 // [SEGURANÇA] Confirmar Execução de Comando
 // ============================================================================
 
-bool CloudAuth::confirmCommandExecution(const String& commandId, const String& status, const String& result) {
+bool CloudAuth::confirmCommandExecution(const String& commandId,
+                                        const String& status,
+                                        const String& result) {
     if (!rateLimiter.canMakeRequest()) {
         return false;
     }
-    
-    WiFiClientSecure client;
-    if (ca_cert != nullptr) client.setCACert(ca_cert);
-    
+
+    WiFiClient client;
     HTTPClient http;
-    String url = serverUrl + "/api/device/command-result";
-    
+    String url = String(serverUrl) + "/device/commands/complete";
+
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", "Bearer " + deviceToken);
-    
+
     DynamicJsonDocument doc(512);
-    doc["deviceId"] = deviceId;
-    doc["commandId"] = commandId;
-    doc["status"] = status;
-    doc["result"] = result;
-    doc["timestamp"] = millis() / 1000;
-    
+    doc["commandId"] = commandId.toInt();   // backend espera número
+    doc["status"] = status;                // ex.: "done" ou "error"
+    if (result.length() > 0) {
+        doc["errorMessage"] = result;      // só envia se tiver erro
+    }
+
     String payload;
     serializeJson(doc, payload);
-    
+
     int httpCode = http.POST(payload);
-    
+
     if (httpCode == 200) {
         Serial.printf("[CloudAuth::confirmCommandExecution] Execução confirmada: %s\n", commandId.c_str());
         http.end();
         return true;
     }
-    
+
     Serial.printf("[CloudAuth::confirmCommandExecution] Erro ao confirmar: %d\n", httpCode);
     http.end();
     return false;
 }
+
 
 // ============================================================================
 // [FUNCIONALIDADE] Compressão de Dados com GZIP

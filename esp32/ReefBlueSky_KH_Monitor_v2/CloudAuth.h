@@ -13,6 +13,9 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
 
+extern const char* CLOUD_BASE_URL;
+
+
 // ============================================================================
 // [SEGURANÇA] Estruturas de Dados para Autenticação e Comunicação
 // ============================================================================
@@ -232,7 +235,6 @@ class CloudAuth {
 private:
     String serverUrl;
     String deviceId;
-    String deviceToken;
     unsigned long tokenExpiry = 0;
     String refreshToken;
     

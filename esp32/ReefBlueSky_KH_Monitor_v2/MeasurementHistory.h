@@ -151,6 +151,13 @@ public:
      */
     size_t getHistoryFileSize();
 
+
+/**
+     * Normalizar timestamps antigos em segundos para milissegundos
+     * [MIGRAÇÃO] Usa heurística simples (timestamp pequeno => segundos)
+     */
+    void normalizeTimestampsIfNeeded();
+
 private:
     // Histórico
     std::vector<Measurement> _measurements;

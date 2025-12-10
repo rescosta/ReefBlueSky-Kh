@@ -6,6 +6,8 @@
 #include <WebServer.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
+#include <DNSServer.h>
+
 
 // ============================================================================
 // [ONBOARDING] Sistema de Configuração Inicial via Access Point (AP) WiFi
@@ -30,9 +32,12 @@
 class WiFiSetup {
 private:
     WebServer server;
+    DNSServer dnsServer;
+    static constexpr byte DNS_PORT = 53;
+    
     String ssid;
     String password;
-    String serverUrl;
+    static constexpr const char* FIXED_SERVER_URL = "https://iot.reefbluesky.com.br/api/v1"; 
     String serverUsername;
     String serverPassword;
     bool configured = false;
@@ -40,11 +45,12 @@ private:
     // [SEGURANÇA] Arquivo de configuração criptografado
     static constexpr const char* CONFIG_FILE = "/spiffs/wifi_config.json";
     static constexpr const char* AP_SSID = "ReefBlueSky-Setup";
-    static constexpr const char* AP_PASSWORD = "setup123456";
+    static constexpr const char* AP_PASSWORD = "12345678";
     
     // [ONBOARDING] Página HTML do formulário de configuração
     String getConfigHTML() {
         return R"(
+        
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -220,6 +226,8 @@ private:
             <div class="section-title">📡 WiFi da Casa</div>
             
             <div class="form-group">
+                <label for="ssidSelect">Redes WiFi disponíveis</label>
+                <select id="ssidSelect"></select>
                 <label for="ssid">Nome da Rede WiFi (SSID)</label>
                 <input type="text" id="ssid" name="ssid" required placeholder="Ex: Meu-WiFi">
                 <div class="help-text">Nome exato da sua rede WiFi</div>
@@ -228,16 +236,10 @@ private:
             <div class="form-group">
                 <label for="password">Senha do WiFi</label>
                 <input type="password" id="password" name="password" required placeholder="Sua senha WiFi">
+                <label>
+                    <input type="checkbox" id="showPassWifi"> Mostrar senha
+                </label>
                 <div class="help-text">Senha da sua rede WiFi (não será exibida)</div>
-            </div>
-            
-            <!-- Seção: Servidor Raspberry -->
-            <div class="section-title">🖥️ Servidor Raspberry/Cloud</div>
-            
-            <div class="form-group">
-                <label for="serverUrl">URL do Servidor</label>
-                <input type="url" id="serverUrl" name="serverUrl" required placeholder="https://aquario.seu-dominio.com">
-                <div class="help-text">URL completa do seu servidor (com https://)</div>
             </div>
             
             <div class="form-group">
@@ -249,6 +251,9 @@ private:
             <div class="form-group">
                 <label for="serverPassword">Senha do Servidor</label>
                 <input type="password" id="serverPassword" name="serverPassword" required placeholder="Sua senha">
+                <label>
+                    <input type="checkbox" id="showPassServer"> Mostrar senha
+                </label>
                 <div class="help-text">Senha da sua conta no servidor</div>
             </div>
             
@@ -266,66 +271,94 @@ private:
         </form>
     </div>
     
-    <script>
-        document.getElementById('configForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const statusDiv = document.getElementById('status');
-            const loadingDiv = document.getElementById('loading');
-            const button = document.querySelector('button');
-            
-            // Coletar dados do formulário
-            const config = {
-                ssid: document.getElementById('ssid').value,
-                password: document.getElementById('password').value,
-                serverUrl: document.getElementById('serverUrl').value,
-                serverUsername: document.getElementById('serverUsername').value,
-                serverPassword: document.getElementById('serverPassword').value
-            };
-            
-            // Mostrar loading
-            loadingDiv.style.display = 'block';
-            button.disabled = true;
-            statusDiv.style.display = 'none';
-            
-            try {
-                // Enviar configuração para ESP32
-                const response = await fetch('/api/setup', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(config)
-                });
-                
-                const result = await response.json();
-                
-                loadingDiv.style.display = 'none';
-                
-                if (response.ok && result.success) {
-                    statusDiv.className = 'status success';
-                    statusDiv.innerHTML = '✓ Configuração salva! Rearranjando em 5 segundos...';
-                    statusDiv.style.display = 'block';
-                    
-                    // Aguardar 5 segundos e recarregar
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 5000);
-                } else {
-                    statusDiv.className = 'status error';
-                    statusDiv.innerHTML = '✗ Erro: ' + (result.message || 'Falha na configuração');
-                    statusDiv.style.display = 'block';
-                    button.disabled = false;
-                }
-            } catch (error) {
-                loadingDiv.style.display = 'none';
-                statusDiv.className = 'status error';
-                statusDiv.innerHTML = '✗ Erro de conexão: ' + error.message;
-                statusDiv.style.display = 'block';
-                button.disabled = false;
-            }
-        });
-    </script>
+<script>
+  // Envio do formulário
+  document.getElementById('configForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const statusDiv = document.getElementById('status');
+    const loadingDiv = document.getElementById('loading');
+    const button = document.querySelector('button');
+
+    const config = {
+      ssid: document.getElementById('ssid').value,
+      password: document.getElementById('password').value,
+      serverUsername: document.getElementById('serverUsername').value,
+      serverPassword: document.getElementById('serverPassword').value
+    };
+
+    loadingDiv.style.display = 'block';
+    button.disabled = true;
+    statusDiv.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+
+      const result = await response.json();
+      loadingDiv.style.display = 'none';
+
+      if (response.ok && result.success) {
+        statusDiv.className = 'status success';
+        statusDiv.innerHTML = '✓ Configuração salva! Reiniciando em 5 segundos...';
+        statusDiv.style.display = 'block';
+        setTimeout(() => { window.location.href = '/'; }, 5000);
+      } else {
+        statusDiv.className = 'status error';
+        statusDiv.innerHTML = '✗ Erro: ' + (result.message || 'Falha na configuração');
+        statusDiv.style.display = 'block';
+        button.disabled = false;
+      }
+    } catch (error) {
+      loadingDiv.style.display = 'none';
+      statusDiv.className = 'status error';
+      statusDiv.innerHTML = '✗ Erro de conexão: ' + error.message;
+      statusDiv.style.display = 'block';
+      button.disabled = false;
+    }
+  });
+
+  // Mostrar/ocultar senhas + carregar redes
+  document.addEventListener('DOMContentLoaded', () => {
+    const passWifi = document.getElementById('password');
+    const passServer = document.getElementById('serverPassword');
+
+    document.getElementById('showPassWifi').addEventListener('change', (e) => {
+      passWifi.type = e.target.checked ? 'text' : 'password';
+    });
+
+    document.getElementById('showPassServer').addEventListener('change', (e) => {
+      passServer.type = e.target.checked ? 'text' : 'password';
+    });
+
+    loadNetworks();
+  });
+
+  // Buscar redes WiFi disponíveis
+  async function loadNetworks() {
+    try {
+      const res = await fetch('/api/scan');
+      const data = await res.json();
+      const select = document.getElementById('ssidSelect');
+      select.innerHTML = '';
+      data.networks.forEach(ssid => {
+        const opt = document.createElement('option');
+        opt.value = ssid;
+        opt.textContent = ssid;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', () => {
+        document.getElementById('ssid').value = select.value;
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+</script>
+
 </body>
 </html>
         )";
@@ -358,7 +391,6 @@ public:
     // [ONBOARDING] Obter configurações
     String getSSID() const { return ssid; }
     String getPassword() const { return password; }
-    String getServerUrl() const { return serverUrl; }
     String getServerUsername() const { return serverUsername; }
     String getServerPassword() const { return serverPassword; }
 };

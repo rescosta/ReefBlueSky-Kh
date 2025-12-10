@@ -1,6 +1,7 @@
 #include "MeasurementHistory.h"
 #include <cmath>
 #include <ArduinoJson.h>
+#include "TimeProvider.h" 
 
 MeasurementHistory::MeasurementHistory()
     : _measurement_interval_minutes(60), _last_measurement_time(0) {
@@ -20,6 +21,8 @@ void MeasurementHistory::begin() {
     if (historyExists()) {
         if (loadFromSPIFFS()) {
             Serial.printf("[MeasurementHistory] Histórico carregado: %d medições\n", _measurements.size());
+            // NOVO: corrigir timestamps antigos em segundos
+            normalizeTimestampsIfNeeded();
         } else {
             Serial.println("[MeasurementHistory] AVISO: Falha ao carregar histórico");
         }
@@ -29,6 +32,7 @@ void MeasurementHistory::begin() {
     
     _last_measurement_time = millis();
 }
+
 
 // [PERSISTÊNCIA] Adicionar medição e salvar automaticamente
 void MeasurementHistory::addMeasurement(const Measurement& measurement) {
@@ -302,19 +306,42 @@ size_t MeasurementHistory::getHistoryFileSize() {
     return size;
 }
 
+void MeasurementHistory::normalizeTimestampsIfNeeded() {
+    Serial.println("[MeasurementHistory] Normalizando timestamps, se necessário...");
+
+    bool changed = false;
+
+    for (auto &m : _measurements) {
+        // Se estiver em segundos (<= ~ano 2043), converte para ms
+        if (m.timestamp > 0 && m.timestamp < 2000000000UL) {
+            m.timestamp = m.timestamp * 1000UL;
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        Serial.println("[MeasurementHistory] Timestamps antigos detectados. Salvando histórico normalizado...");
+        saveToSPIFFS();  // usa HISTORY_FILE padrão
+    } else {
+        Serial.println("[MeasurementHistory] Timestamps já estão em ms; nada a fazer.");
+    }
+}
+
+
 // ===== Métodos Privados =====
 
 bool MeasurementHistory::isWithinTimeFilter(unsigned long timestamp, TimeFilter filter) {
-    unsigned long now = millis();
-    unsigned long time_diff = now - timestamp;
+    unsigned long long now = getCurrentEpochMs();
+    unsigned long long ts  = static_cast<unsigned long long>(timestamp);
+    unsigned long long time_diff = now - ts;
 
     switch (filter) {
         case LAST_HOUR:
-            return time_diff < (60UL * 60UL * 1000UL);
+            return time_diff < (60ULL * 60ULL * 1000ULL);
         case LAST_24_HOURS:
-            return time_diff < (24UL * 60UL * 60UL * 1000UL);
+            return time_diff < (24ULL * 60ULL * 60ULL * 1000ULL);
         case LAST_WEEK:
-            return time_diff < (7UL * 24UL * 60UL * 60UL * 1000UL);
+            return time_diff < (7ULL * 24ULL * 60ULL * 60ULL * 1000ULL);
         case ALL_DATA:
         default:
             return true;

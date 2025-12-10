@@ -13,10 +13,39 @@
 #ifndef MQTT_INTEGRATION_H
 #define MQTT_INTEGRATION_H
 
+#define MQTT_TOPIC_EVENT "reefbluesky/device/event"
+
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 #include <queue>
+
+#include <ArduinoJson.h>
+
+extern KH_Analyzer khAnalyzer;
+extern MeasurementHistory history;
+extern PumpControl pumpControl;
+extern SystemState systemState;       // enum do .ino
+extern WiFi_MQTT wifiMqtt;
+
+void factoryReset();
+void resetKHReference();
+
+// Tópicos MQTT (já existem no .ino; declare como extern aqui)
+extern const char* mqtt_topic_status;
+extern const char* mqtt_topic_kh;
+extern const char* mqtt_topic_ph;
+extern const char* mqtt_topic_temp;
+extern const char* mqtt_topic_prediction;
+extern const char* mqtt_topic_dosage;
+extern const char* mqtt_topic_trend;
+extern const char* mqtt_topic_reset;
+extern const char* mqtt_topic_reset_kh;
+
+void handleMqttCommand(const String& topic, const String& payload);
+
+void publishEvent(const char* type, const char* severity, const String& message);
+
 
 // [MQTT] Configurações
 #define MQTT_BROKER "mqtt.seu-dominio.com"
@@ -281,6 +310,8 @@ private:
         
         // [MQTT] Rotear para callback apropriado
         if (topicStr == MQTT_TOPIC_COMMAND) {
+            handleMqttCommand(topicStr, payloadStr);
+            
             if (onCommandCallback) {
                 onCommandCallback(payloadStr);
             }
@@ -299,4 +330,165 @@ private:
     }
 };
 
+
+
+// ======================================================================
+// Implementação de comandos MQTT em JSON
+// ======================================================================
+
+void publishEvent(const char* type, const char* severity, const String& message) {
+    StaticJsonDocument<256> doc;
+    doc["type"]      = type;
+    doc["severity"]  = severity;          // INFO, WARN, ERROR
+    doc["message"]   = message;
+    doc["timestamp"] = millis();
+
+    String payload;
+    serializeJson(doc, payload);
+
+    Serial.printf("[EVENT] %s | %s | %s\n", type, severity, message.c_str());
+
+    if (wifiMqtt.isMQTTConnected()) {
+        wifiMqtt.publish(MQTT_TOPIC_EVENT, payload.c_str());
+    } else {
+        Serial.println("[EVENT] MQTT offline, evento não publicado");
+    }
+}
+
+
+void handleMqttCommand(const String& topic, const String& payload) {
+    Serial.println("[MQTT] Comando recebido em " + topic + ": " + payload);
+
+    StaticJsonDocument<512> doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err) {
+        Serial.printf("[MQTT] ERRO: JSON inválido (%s)\n", err.c_str());
+        publishEvent("mqtt_cmd_error", "WARN", "JSON invalido no comando");
+        return;
+    }
+
+    String cmd = doc["cmd"] | "";
+    if (cmd.length() == 0) {
+        publishEvent("mqtt_cmd_error", "WARN", "Campo cmd ausente");
+        return;
+    }
+
+    // 1) Configurar KH de referência
+    if (cmd == "set_kh_reference") {
+        float kh = doc["kh_reference"] | 0.0f;
+        khAnalyzer.setReferenceKH(kh);
+        publishEvent("set_kh_reference", "INFO", "KH referencia atualizado via MQTT");
+    }
+
+    // 2) Controle manual de bomba
+    else if (cmd == "pump_control") {
+        String target = doc["target"] | "kh_pump";   // por enquanto, vamos mapear manualmente
+        String action = doc["action"] | "";
+        String pump   = doc["pump"]   | "A";         // A, B, C, D
+        int speed     = doc["speed"]  | 200;         // opcional
+        int pumpId    = 1;
+    
+        if      (pump == "A") pumpId = 1;
+        else if (pump == "B") pumpId = 2;
+        else if (pump == "C") pumpId = 3;
+        else if (pump == "D") pumpId = 4;
+    
+        // permitir ajuste de velocidade
+        pumpControl.setPumpSpeed(pumpId, speed);
+    
+        if (pump == "A") {
+            if (action == "fill")      pumpControl.pumpA_fill();
+            else if (action == "discharge") pumpControl.pumpA_discharge();
+            else if (action == "stop") pumpControl.pumpA_stop();
+        } else if (pump == "B") {
+            if (action == "fill")      pumpControl.pumpB_fill();
+            else if (action == "discharge") pumpControl.pumpB_discharge();
+            else if (action == "stop") pumpControl.pumpB_stop();
+        } else if (pump == "C") {
+            if (action == "fill")      pumpControl.pumpC_fill();
+            else if (action == "stop") pumpControl.pumpC_stop();
+        } else if (pump == "D") {
+            if (action == "start")     pumpControl.pumpD_start();
+            else if (action == "stop") pumpControl.pumpD_stop();
+        } else {
+            publishEvent("pump_control", "WARN", "Bomba desconhecida");
+            return;
+        }
+    
+        publishEvent("pump_control", "INFO", "Comando de bomba executado");
+    }
+
+
+    // 3) Iniciar ciclo de teste
+    else if (cmd == "start_test") {
+        String mode = doc["mode"] | "full_cycle";
+        if (systemState == IDLE || systemState == WAITING_CALIBRATION) {
+            if (!khAnalyzer.isReferenceKHConfigured()) {
+                publishEvent("start_test", "WARN", "KH nao configurado");
+            } else {
+                systemState = MEASURING;
+                publishEvent("start_test", "INFO", "Ciclo de medicao iniciado via MQTT");
+            }
+        } else {
+            publishEvent("start_test", "WARN", "Sistema ocupado, nao iniciou teste");
+        }
+    }
+
+    // 4) Abort test
+    else if (cmd == "abort_test") {
+        khAnalyzer.stopMeasurement();
+        systemState = IDLE;
+        publishEvent("abort_test", "INFO", "Teste abortado via MQTT");
+    }
+
+    // 5) Reset de fábrica
+    else if (cmd == "factory_reset") {
+        factoryReset();
+        publishEvent("factory_reset", "INFO", "Factory reset via MQTT");
+    }
+
+    // 6) Reset só de KH
+    else if (cmd == "reset_kh_reference") {
+        resetKHReference();
+        publishEvent("reset_kh_reference", "INFO", "Reset de KH via MQTT");
+    }
+
+    // 7) Programação de testes (intervalo)
+    else if (cmd == "set_schedule") {
+        int intervalMin = doc["interval_minutes"] | 60;
+        intervalMin = constrain(intervalMin, 60, 24 * 60);  // 1h a 24h
+        history.setMeasurementInterval(intervalMin);
+        publishEvent("set_schedule", "INFO", "Intervalo de medicao ajustado");
+    }
+
+    // 8) Etapas de calibração de bomba
+
+    else if (cmd == "calibration_step") {
+        String step  = doc["step"]  | "";
+        publishEvent("calibration_step", "WARN",
+                     "API de calibracao ainda nao implementada: " + step);
+    }
+  
+//    else if (cmd == "calibration_step") {
+//        String step  = doc["step"]  | "";
+//        String target = doc["target"] | "kh_pump";
+//        float refVol  = doc["reference_volume_ml"] | 0.0f;
+//        float measVol = doc["measured_volume_ml"]   | 0.0f;
+//
+//        if (step == "start_pump_calibration") {
+//            pumpControl.startCalibration(refVol);
+//            publishEvent("calibration_step", "INFO", "Calibracao de bomba iniciada");
+//       } else if (step == "save_pump_factor") {
+//            pumpControl.finishCalibration(measVol);
+//            publishEvent("calibration_step", "INFO", "Calibracao de bomba concluida");
+//        } else {
+//            publishEvent("calibration_step", "WARN", "Step de calibracao desconhecido");
+//        }
+//    }
+
+    else {
+        publishEvent("mqtt_cmd_error", "WARN", "Comando desconhecido: " + cmd);
+    }
+}  
+    
 #endif  // MQTT_INTEGRATION_H

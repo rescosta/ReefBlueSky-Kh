@@ -1,4 +1,9 @@
-#include "WiFiSetup.h"
+#include "WiFiSetup.h" 
+#include <WiFi.h> 
+
+// Declaração da função implementada em MultiDeviceAuth.h
+bool saveCredentialsToNVS(String email, String password);
+
 
 // ============================================================================
 // [ONBOARDING] Implementação do Sistema de Configuração Inicial
@@ -43,6 +48,8 @@ bool WiFiSetup::createAccessPoint() {
     Serial.printf("[WiFiSetup] IP do AP: %s\n", apIP.toString().c_str());
     Serial.printf("[WiFiSetup] Acesse: http://%s para configurar\n", apIP.toString().c_str());
     
+    dnsServer.start(DNS_PORT, "*", apIP);
+    
     // Configurar rotas HTTP
     server.on("/", HTTP_GET, [this]() {
         server.send(200, "text/html; charset=utf-8", getConfigHTML());
@@ -55,7 +62,19 @@ bool WiFiSetup::createAccessPoint() {
     server.on("/api/status", HTTP_GET, [this]() {
         handleStatus();
     });
-    
+
+    server.on("/api/scan", HTTP_GET, [this]() {
+        int n = WiFi.scanNetworks();
+        DynamicJsonDocument doc(1024);
+        JsonArray arr = doc.createNestedArray("networks");
+        for (int i = 0; i < n; i++) {
+          arr.add(WiFi.SSID(i));
+        }
+        String out;
+        serializeJson(doc, out);
+        server.send(200, "application/json", out);
+      });
+        
     // Iniciar servidor web
     server.begin();
     Serial.println("[WiFiSetup] Servidor web iniciado na porta 80");
@@ -117,11 +136,13 @@ bool WiFiSetup::loadConfigFromSPIFFS() {
     // Extrair configurações
     ssid = doc["ssid"].as<String>();
     password = doc["password"].as<String>();
-    serverUrl = doc["serverUrl"].as<String>();
     serverUsername = doc["serverUsername"].as<String>();
     serverPassword = doc["serverPassword"].as<String>();
+  
+    saveCredentialsToNVS(serverUsername, serverPassword);
+
     
-    if (ssid.isEmpty() || serverUrl.isEmpty()) {
+    if (ssid.isEmpty()) {
         Serial.println("[WiFiSetup] Configuração incompleta");
         return false;
     }
@@ -172,8 +193,8 @@ void WiFiSetup::handleConfigSubmit() {
     
     // Validar campos obrigatórios
     if (!doc.containsKey("ssid") || !doc.containsKey("password") || 
-        !doc.containsKey("serverUrl") || !doc.containsKey("serverUsername") || 
-        !doc.containsKey("serverPassword")) {
+        !doc.containsKey("serverUsername") || !doc.containsKey("serverPassword"))
+        {
         server.send(400, "application/json", "{\"success\":false,\"message\":\"Campos obrigatórios faltando\"}");
         return;
     }
@@ -181,7 +202,6 @@ void WiFiSetup::handleConfigSubmit() {
     // Extrair e salvar configuração
     ssid = doc["ssid"].as<String>();
     password = doc["password"].as<String>();
-    serverUrl = doc["serverUrl"].as<String>();
     serverUsername = doc["serverUsername"].as<String>();
     serverPassword = doc["serverPassword"].as<String>();
     
@@ -214,5 +234,6 @@ void WiFiSetup::handleStatus() {
 }
 
 void WiFiSetup::handleClient() {
+    dnsServer.processNextRequest();
     server.handleClient();
 }
