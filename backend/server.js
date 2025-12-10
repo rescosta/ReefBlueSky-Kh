@@ -1670,9 +1670,27 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
-    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+    if (!chk.length) {
+      return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+    }
 
-    const cmd = await enqueueDbCommand(deviceId, type, {}); // payload opcional
+    // normalizar para o formato que o ESP entende
+    let dbType = type;
+    switch (type) {
+      case 'factory_reset':
+        dbType = 'factoryreset';
+        break;
+      case 'reset_kh':
+        dbType = 'resetkh';
+        break;
+      case 'test_now':
+        dbType = 'testnow';
+        break;
+      default:
+        break;
+    }
+
+    const cmd = await enqueueDbCommand(deviceId, dbType, {}); // <‑‑ dbType
     console.log('[CMD] comando enfileirado', deviceId, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id, type } });
@@ -1697,7 +1715,9 @@ app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (r
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
-    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+    if (!chk.length) {
+      return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+    }
 
     // normalizar para o formato que o ESP entende
     let dbType = type;
@@ -1718,11 +1738,10 @@ app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (r
         dbType = 'khcorrection';
         break;
       default:
-        // 'restart' etc. já batem
         break;
     }
 
-    const cmd = await enqueueDbCommand(deviceId, type, payload || null);
+    const cmd = await enqueueDbCommand(deviceId, dbType, payload || null); // <‑‑ dbType
     console.log('[CMD] genérico enfileirado', deviceId, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id, type } });
