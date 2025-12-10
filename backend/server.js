@@ -1780,11 +1780,28 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
       );
     }
 
-    const commands = rows.map(r => ({
-      id:      r.id,
-      type:    r.type,
-      payload: r.payload ? JSON.parse(r.payload) : null,
-    }));
+    const commands = rows.map((r) => {
+      let payload = null;
+
+      if (r.payload != null) {
+        if (typeof r.payload === 'string') {
+          try {
+            payload = JSON.parse(r.payload);
+          } catch (e) {
+            console.error('Erro ao fazer JSON.parse do payload de comando', e.message, r.payload);
+            payload = null;
+          }
+        } else if (typeof r.payload === 'object') {
+          payload = r.payload; // já é objeto
+        }
+      }
+
+      return {
+        id: r.id,
+        type: r.type,
+        payload,
+      };
+    });
 
     return res.json({ success: true, data: commands });
   } catch (err) {
