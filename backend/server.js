@@ -1809,7 +1809,7 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
         WHERE deviceId = ?
           AND status = 'pending'
         ORDER BY createdAt ASC
-        LIMIT 5`,
+        LIMIT 1`,
       [deviceId]
     );
 
