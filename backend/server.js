@@ -149,10 +149,10 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Rate limiting global (10 requisições por minuto)
+// Rate limiting global (200 requisições por minuto)
 const globalLimiter = rateLimit({
     windowMs: 60 * 1000,  // 1 minuto
-    max: 200, //200 req/min por IP
+    max: 1000, //1000 req/min por IP
     message: 'Muitas requisições, tente novamente mais tarde',
     standardHeaders: true,
     legacyHeaders: false
