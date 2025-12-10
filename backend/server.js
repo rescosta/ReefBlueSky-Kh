@@ -1628,8 +1628,9 @@ app.post('/api/v1/user/devices/:deviceId/command/kh-correction', authUserMiddlew
     );
     if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
 
-    const cmd = await enqueueDbCommand(deviceId, 'kh_correction', { volume });
-    console.log('[CMD] kh_correction enfileirado', deviceId, cmd);
+  const cmd = await enqueueDbCommand(deviceId, 'khcorrection', { volume });
+  console.log('[CMD] khcorrection enfileirado', deviceId, cmd);
+
 
     return res.json({ success: true, data: { commandId: cmd.id } });
   } catch (err) {
