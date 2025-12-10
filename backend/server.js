@@ -1781,6 +1781,9 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
     }
 
     const commands = rows.map((r) => {
+
+      // normalizar id e eventualmente outros campos BigInt
+      const id = typeof r.id === 'bigint' ? Number(r.id) : r.id;
       let payload = null;
 
       if (r.payload != null) {
@@ -1797,13 +1800,14 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
       }
 
       return {
-        id: r.id,
+        id,
         type: r.type,
         payload,
       };
     });
 
     return res.json({ success: true, data: commands });
+
   } catch (err) {
     console.error('POST /device/commands/poll error', err);
     return res.status(500).json({ success: false, message: 'Erro ao buscar comandos' });
