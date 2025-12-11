@@ -83,6 +83,13 @@ void PumpControl::pumpC_fill() {
     pump3.running = true;
 }
 
+void PumpControl::pumpC_discharge() {
+    Serial.println("[PumpControl] Bomba C: Descarregando (Referência)");
+    setPumpDirection(3, false);
+    setPumpPWM(3, PUMP_SPEED);
+    pump3.running = true;
+}
+
 void PumpControl::pumpC_stop() {
     Serial.println("[PumpControl] Bomba C: Parando");
     setPumpPWM(3, 0);

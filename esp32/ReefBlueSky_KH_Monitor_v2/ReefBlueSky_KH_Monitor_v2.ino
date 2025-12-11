@@ -15,6 +15,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "TimeProvider.h"
+#include <time.h>
 
 // Incluir módulos de controle
 #include "PumpControl.h"
@@ -30,19 +31,17 @@
 
 // teste forçando mediçao fake
 
-
-
 extern CloudAuth cloudAuth;
 
 void debugForceSync() {
   Measurement m;
   m.timestamp   = getCurrentEpochMs(); 
-  m.kh          = 8.0;
-  m.ph_reference= 8.2;
-  m.ph_sample   = 8.0;
-  m.temperature = 26.0;
-  m.is_valid    = true;
-  m.confidence  = 0.9;
+  m.kh          = 7.0; // resultado da conta
+  m.ph_reference= 8.2; //puxar do sistema
+  m.ph_sample   = 8.0; // puxar da sonda de ph
+  m.temperature = 24.0; // puxar do termometro
+  m.is_valid    = true; // criar validação
+  m.confidence  = 0.9; // criar desvio esperado
 
   cloudAuth.queueMeasurement(m);
   cloudAuth.syncOfflineMeasurements();
@@ -65,7 +64,8 @@ void debugForceSync() {
 // =================================================================================
 // Configurações de Comunicação
 // =================================================================================
-
+const unsigned long SYNC_INTERVAL_MS = 60UL * 1000UL; // 1 minuto
+unsigned long lastSyncAttempt = 0;                    // global
 
 const char* ssid = "CRB_Engenharia_2G";
 const char* password = "crbengenharia2022";
@@ -85,8 +85,14 @@ const char* mqtt_topic_reset = "reefbluesky/kh_monitor/reset";
 const char* mqtt_topic_reset_kh = "reefbluesky/kh_monitor/reset_kh";
 
 // Vazão calibrada da bomba 1 (mL/s). Ajuste após teste real.
-const float PUMP1_ML_PER_SEC = 0.8f;
+const float PUMP1MLPERSEC = 0.8f;
 const int   MAX_CORRECTION_SECONDS = 120;  // safety
+
+//NTP
+
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = -3 * 3600;  // fuso -03
+const int   daylightOffset_sec = 0;
 
 
 // =================================================================================
@@ -164,26 +170,34 @@ void setup() {
     cloudAuth.init();  
     Serial.print("[DEBUG] deviceToken tamanho = ");
     Serial.println(deviceToken.length());
+    // configurar NTP DEPOIS que o Wi‑Fi estiver conectado
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
   } else {
     Serial.println("[Main] WiFiSetup falhou. Rodando apenas em modo local/AP.");
   }
 
   // [BOOT] Verificar se KH referência foi configurado
-  if (!khAnalyzer.isReferenceKHConfigured()) {
-    Serial.println("\n[ATENÇÃO] ===================================");
-    Serial.println("[ATENÇÃO] Realizar calibração inicial do KH");
-    Serial.println("[ATENÇÃO] ===================================\n");
-    systemState = WAITING_CALIBRATION;
-  } else {
+//  if (!khAnalyzer.isReferenceKHConfigured()) {
+//    Serial.println("\n[ATENÇÃO] ===================================");
+//    Serial.println("[ATENÇÃO] Realizar calibração inicial do KH");
+//    Serial.println("[ATENÇÃO] ===================================\n");
+//    systemState = WAITING_CALIBRATION;
+//  } else {
+//    systemState = IDLE;
+  
+    // Permitir iniciar mesmo sem KH, só logando
+    if (!khAnalyzer.isReferenceKHConfigured()) {
+      Serial.println("[BOOT] KH de referência ainda não configurado (servidor vai enviar depois).");
+    }
     systemState = IDLE;
-  }
 
   // [RESET] Configurar endpoints web
   setupWebServer();
 
   // [RESET] Configurar callbacks MQTT para reset
-  setupMQTTCallbacks();
+  //setupMQTTCallbacks();
+
 }
 
 // =================================================================================
@@ -207,7 +221,7 @@ void loop() {
   webServer.handleClient();
   
   // Processar portal de configuração WiFi (se AP ativo)
-  //wifiSetup.handleClient();
+  wifiSetup.handleClient();
 
 
   // Processar MQTT
@@ -225,13 +239,11 @@ void loop() {
     case WAITING_CALIBRATION:
     
       // Se durante o runtime o KH passar a estar configurado, sai desse estado
-      if (khAnalyzer.isReferenceKHConfigured()) {
-        Serial.println("[Main] KH configurado durante o runtime. Indo para IDLE.");
+      //if (khAnalyzer.isReferenceKHConfigured()) {
+      //  Serial.println("[Main] KH configurado durante o runtime. Indo para IDLE.");
         systemState = IDLE;
         break;
-      }
 
-    
       // [BOOT] Aguardar configuração de KH
       delay(1000);
       Serial.println("[Main] Aguardando calibração... Configure KH via web");
@@ -271,6 +283,12 @@ void loop() {
 
   // processar comandos da nuvem
   processCloudCommand();
+  if (now - lastSyncAttempt >= SYNC_INTERVAL_MS) {
+    lastSyncAttempt = now;
+    if (cloudAuth.getQueueSize() > 0) {
+      cloudAuth.syncOfflineMeasurements();
+    }
+  }
 
 }
 
@@ -607,85 +625,161 @@ void processCloudCommand() {
     return; // sem comando ou erro
   }
 
-  Serial.printf("[CMD] Recebido comando %s (id=%s)\n", cmd.action.c_str(), cmd.command_id.c_str());
+  // DEBUG extra
+  Serial.printf("[CMD] action='%s'\n", cmd.action.c_str());
+  if (!cmd.params.isNull()) {
+    Serial.print("[CMD] params=");
+    serializeJson(cmd.params, Serial);
+    Serial.println();
+  } else {
+    Serial.println("[CMD] params is NULL/empty");
+  }
+
+  Serial.printf("[CMD] Recebido comando %s (id=%s)\n",
+                cmd.action.c_str(), cmd.command_id.c_str());
 
   bool ok = true;
   String errorMsg = "";
 
   if (cmd.action == "restart") {
     ESP.restart();
-    // se reiniciar imediatamente, nem chega a confirmar; se quiser,
-    // pode atrasar o restart e confirmar antes.
-  } else if (cmd.action == "factory_reset") {
+
+  } else if (cmd.action == "factoryreset") {
     factoryReset();
-  } else if (cmd.action == "reset_kh") {
+
+  } else if (cmd.action == "resetkh") {
     resetKHReference();
-  } else if (cmd.action == "test_now") {
+
+  } else if (cmd.action == "testnow") {
     forceImmediateMeasurement = true;
-  } else if (cmd.action == "manual_pump") {
-    int pumpId = cmd.params["pumpId"] | 0;
-    const char* dirStr = cmd.params["direction"] | "forward";
-    int seconds = cmd.params["seconds"] | 0;
 
-    if (pumpId < 1 || pumpId > 3 || seconds <= 0) {
+  } else if (cmd.action == "manualpump") {
+    if (cmd.params.isNull()) {
       ok = false;
-      errorMsg = "invalid pumpId/seconds";
+      errorMsg = "missing payload";
     } else {
-      bool reverse = (String(dirStr) == "reverse");
-      Serial.printf("[CMD] manual_pump: pump=%d dir=%s sec=%d\n", pumpId, dirStr, seconds);
+      Serial.println("[CMD] manualpump - inicio");
+      int pumpId = cmd.params["pumpId"] | 0;
+      const char* dirStr = cmd.params["direction"] | "forward";
+      int seconds = cmd.params["seconds"] | 0;
+      Serial.printf("[CMD] manualpump params: pumpId=%d dir=%s sec=%d\n",
+                    pumpId, dirStr, seconds);
 
-      // ligar bomba conforme o ID
-      if (pumpId == 1) {        // Bomba A
-        if (!reverse) pumpControl.pumpA_fill();
-        else          pumpControl.pumpA_discharge();
-      } else if (pumpId == 2) { // Bomba B
-        if (!reverse) pumpControl.pumpB_fill();
-        else          pumpControl.pumpB_discharge();
-      } else if (pumpId == 3) { // Bomba C
-        if (!reverse) pumpControl.pumpC_fill();
-        else          pumpControl.pumpC_stop(); // não há "discharge" pra C hoje
-      }
-
-      delay(seconds * 1000);
-
-      // desligar conforme o ID
-      if (pumpId == 1)      pumpControl.pumpA_stop();
-      else if (pumpId == 2) pumpControl.pumpB_stop();
-      else if (pumpId == 3) pumpControl.pumpC_stop();
-    }
-
-  } else if (cmd.action == "kh_correction") {
-    float volume = cmd.params["volume"] | 0.0f;  // mL desejados
-    if (volume <= 0) {
-      ok = false;
-      errorMsg = "invalid volume";
-    } else {
-      float secondsF = volume / PUMP1_ML_PER_SEC;
-      int seconds = (int)roundf(secondsF);
-
-      if (seconds <= 0) {
+      if (pumpId < 1 || pumpId > 3 || seconds <= 0) {
         ok = false;
-        errorMsg = "volume too small";
-      } else if (seconds > MAX_CORRECTION_SECONDS) {
-        ok = false;
-        errorMsg = "volume too large";
+        errorMsg = "invalid pumpId/seconds";
       } else {
-        int pumpId = 1;          // usar bomba A para correção
-        bool reverse = false;    // dosagem na direção normal
-        Serial.printf("[CMD] kh_correction: volume=%.2f mL -> pump=%d, sec=%d\n",
-                      volume, pumpId, seconds);
+        bool reverse = String(dirStr) == "reverse";
+        Serial.printf("[CMD] manualpump executando: pump=%d reverse=%d sec=%d\n",
+                      pumpId, reverse, seconds);
 
-        // mesma lógica de ligar por tempo, reaproveitando o código acima:
-        pumpControl.pumpA_fill();      // forward da bomba A
-        delay(seconds * 1000);
-        pumpControl.pumpA_stop();
+        // ligar bomba
+        if (pumpId == 1) {
+          if (!reverse) pumpControl.pumpA_fill();
+          else          pumpControl.pumpA_discharge();
+        } else if (pumpId == 2) {
+          if (!reverse) pumpControl.pumpB_fill();
+          else          pumpControl.pumpB_discharge();
+        } else if (pumpId == 3) {
+          if (!reverse) pumpControl.pumpC_fill();
+          else          pumpControl.pumpC_discharge();
+        }
+
+        unsigned long endTime = millis() + (unsigned long)seconds * 1000UL;
+        while (millis() < endTime) {
+          delay(10);
+        }
+
+        // desligar bomba
+        if (pumpId == 1)      pumpControl.pumpA_stop();
+        else if (pumpId == 2) pumpControl.pumpB_stop();
+        else if (pumpId == 3) pumpControl.pumpC_stop();
       }
     }
-}
 
+  } else if (cmd.action == "khcorrection") {
+    if (cmd.params.isNull()) {
+      ok = false;
+      errorMsg = "missing payload";
+    } else {
+      float volume = cmd.params["volume"] | 0.0f;  // mL desejados
+      if (volume <= 0) {
+        ok = false;
+        errorMsg = "invalid volume";
+      } else {
+        float secondsF = volume / PUMP1MLPERSEC;
+        int seconds = (int)roundf(secondsF);
 
+        if (seconds <= 0) {
+          ok = false;
+          errorMsg = "volume too small";
+        } else if (seconds > MAX_CORRECTION_SECONDS) {
+          ok = false;
+          errorMsg = "volume too large";
+        } else {
+          int pumpId = 1;
+          bool reverse = false;
+          Serial.printf("[CMD] khcorrection: volume=%.2f mL -> pump=%d, sec=%d\n",
+                        volume, pumpId, seconds);
+
+          pumpControl.pumpA_fill();
+          unsigned long endTime = millis() + (unsigned long)seconds * 1000UL;
+          while (millis() < endTime) {
+            delay(10);
+          }
+          pumpControl.pumpA_stop();
+        }
+      }
+    }
+  } else if (cmd.action == "setkhreference") {
+    if (cmd.params.isNull()) {
+      ok = false;
+      errorMsg = "missing payload";
+    } else {
+      float v = cmd.params["value"] | 0.0f;
+      if (v <= 0.0f || v > 25.0f) {
+        ok = false;
+        errorMsg = "invalid value";
+      } else {
+        Serial.printf("[CMD] setkhreference: %.2f dKH\n", v);
+        khAnalyzer.setReferenceKH(v);
+        systemState = IDLE;
+      }
+    }
+  } else if (cmd.action == "setintervalminutes") {      // <<< AQUI
+    if (cmd.params.isNull()) {
+      ok = false;
+      errorMsg = "missing payload";
+    } else {
+      int minutes = cmd.params["minutes"] | 0;
+      if (minutes <= 0 || minutes > 24 * 60) {
+        ok = false;
+        errorMsg = "invalid minutes";
+      } else {
+        unsigned long ms = (unsigned long)minutes * 60UL * 1000UL;
+        measurementInterval = ms;
+        Serial.printf("[CMD] setintervalminutes: %d min (interval=%lu ms)\n", minutes, ms);
+      }
+    }
+  } else if (cmd.action == "testmode") {
+    if (cmd.params.isNull()) {
+      ok = false;
+      errorMsg = "missing payload";
+    } else {
+      bool enabled = cmd.params["enabled"] | false;
+      testModeEnabled = enabled;
+      Serial.printf("[CMD] testmode: %s\n", enabled ? "ON" : "OFF");
+    }
+
+  } else if (cmd.action == "abort") {
+    // Para qualquer ciclo em andamento e volta para IDLE
+    khAnalyzer.stopMeasurement();
+    forceImmediateMeasurement = false;   // opcional, mas recomendado
+    systemState = IDLE;
+  }
 
   String statusStr = ok ? "done" : "error";
   cloudAuth.confirmCommandExecution(cmd.command_id, statusStr, errorMsg);
 }
+
 

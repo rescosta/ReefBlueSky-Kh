@@ -64,6 +64,11 @@ public:
     void pumpC_fill();
 
     /**
+     * Bomba C: Descarregar câmara C (água de referência)
+     */
+    void pumpC_discharge();
+
+    /**
      * Bomba C: Parar
      */
     void pumpC_stop();

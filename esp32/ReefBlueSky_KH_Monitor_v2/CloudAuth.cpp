@@ -488,7 +488,7 @@ bool CloudAuth::sendHealthMetrics(const SystemHealth& health) {
     
     DynamicJsonDocument doc(512);
     doc["deviceId"] = deviceId;
-    doc["timestamp"] = getCurrentEpochMs() / 1000ULL; 
+    doc["timestamp"] = getCurrentEpochMs(); 
     doc["cpuUsage"] = health.cpu_usage;
     doc["memoryUsage"] = health.memory_usage;
     doc["spiffsUsage"] = health.spiffs_usage;
@@ -530,11 +530,14 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
     http.addHeader("Authorization", "Bearer " + deviceToken);
     http.addHeader("Content-Type", "application/json");
 
-    // corpo vazio ou {} – backend ignora o body
     int httpCode = http.POST("{}");
 
     if (httpCode == 200) {
         String response = http.getString();
+
+        Serial.println("[CloudAuth] resposta recebida:");
+        Serial.println(response);
+
         DynamicJsonDocument responseDoc(2048);
         DeserializationError err = deserializeJson(responseDoc, response);
         if (err) {
@@ -549,6 +552,8 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
         }
 
         JsonArray arr = responseDoc["data"].as<JsonArray>();
+        Serial.printf("[CloudAuth] data size=%d\n", arr.size());
+
         if (!arr || arr.size() == 0) {
             http.end();
             return false; // sem comandos pendentes
@@ -556,10 +561,8 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
 
         JsonObject cmdObj = arr[0];
 
-        // tipo e payload do backend
         String type = cmdObj["type"].as<String>();
 
-        // opcional: validar tipo permitido
         if (!commandValidator.isCommandAllowed(type)) {
             Serial.println("[CloudAuth::pullCommandFromServer] Comando não permitido");
             http.end();
@@ -567,8 +570,27 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
         }
 
         command.command_id = String(cmdObj["id"].as<int>());
-        command.action = type;
-        command.params = cmdObj["payload"].as<JsonObject>(); // pode ser null
+        command.action     = type;
+
+        // aqui você limpa o documento antes de reutilizar
+        command.paramsDoc.clear();
+
+        JsonVariant payloadVar = cmdObj["payload"];
+        Serial.printf("[CloudAuth] payload isNull=%d isObject=%d\n",
+                    payloadVar.isNull(), payloadVar.is<JsonObject>());
+
+        if (!payloadVar.isNull() && payloadVar.is<JsonObject>()) {
+            JsonObject src = payloadVar.as<JsonObject>();
+            JsonObject dst = command.paramsDoc.to<JsonObject>();
+            for (JsonPair kv : src) {
+                dst[kv.key()] = kv.value();
+            }
+        } else {
+            command.paramsDoc.to<JsonObject>(); // deixa vazio
+        }
+
+        // reata params ao paramsDoc
+        command.params = command.paramsDoc.as<JsonObject>();
 
         Serial.printf("[CloudAuth::pullCommandFromServer] Comando recebido: %s\n", type.c_str());
         http.end();
@@ -579,7 +601,6 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
     http.end();
     return false;
 }
-
 
 // ============================================================================
 // [SEGURANÇA] Confirmar Execução de Comando

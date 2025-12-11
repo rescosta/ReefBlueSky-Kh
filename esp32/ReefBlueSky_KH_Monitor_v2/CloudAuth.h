@@ -21,7 +21,7 @@ extern const char* CLOUD_BASE_URL;
 // ============================================================================
 
 struct Measurement {
-    unsigned long timestamp;
+    unsigned long long timestamp;
     float kh;
     float ph_reference;
     float ph_sample;
@@ -56,8 +56,12 @@ struct SystemHealth {
 struct Command {
     String command_id;
     String action;
+    StaticJsonDocument<256> paramsDoc;
     JsonObject params;
+
+    Command() : paramsDoc(), params(paramsDoc.to<JsonObject>()) {}
 };
+
 
 // ============================================================================
 // [SEGURANÇA] Rate Limiter para Proteção contra DoS
@@ -69,7 +73,7 @@ private:
     unsigned long minIntervalMs = 1000;  // Mínimo 1 segundo entre requisições
     int requestCount = 0;
     unsigned long windowStart = 0;
-    static constexpr int MAX_REQUESTS_PER_MINUTE = 10;
+    static constexpr int MAX_REQUESTS_PER_MINUTE = 60;
     
 public:
     bool canMakeRequest() {
@@ -112,9 +116,13 @@ private:
         "factoryReset",
         "resetKH",
         "getStatus",
-        "syncNow"
+        "syncNow",
+        "restart",      
+        "factoryreset", 
+        "manualpump",     
+        "khcorrection" 
     };
-    static constexpr int ALLOWED_COUNT = 8;
+    static constexpr int ALLOWED_COUNT = 14;
     
 public:
     bool isCommandAllowed(const String& command) {
