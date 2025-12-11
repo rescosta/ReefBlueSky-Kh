@@ -2118,18 +2118,19 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
       return res.status(400).json({ success: false, message: 'kh_target não configurado' });
     }
 
-    const now = Math.floor(Date.now() / 1000); // timestamp em segundos
+    const now = Date.now(); // ms
+
     const windows = {
-      '24h': 24 * 3600,
-      '3d': 3 * 24 * 3600,
-      '7d': 7 * 24 * 3600,
-      '15d': 15 * 24 * 3600,
+      '24h': 24 * 3600 * 1000,
+      '3d':  3  * 24 * 3600 * 1000,
+      '7d':  7  * 24 * 3600 * 1000,
+      '15d': 15 * 24 * 3600 * 1000,
     };
 
     const metrics = {};
 
-    for (const [label, seconds] of Object.entries(windows)) {
-      const fromTs = now - seconds;
+    for (const [label, windowMs] of Object.entries(windows)) {
+      const fromTs = now - windowMs; // também em ms
 
       const rows = await pool.query(
         `SELECT MIN(kh) AS minKh, MAX(kh) AS maxKh
