@@ -2219,6 +2219,33 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
   }
 });
 
+
+// novo endpoint para ON/OFF via comando
+app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
+  const { deviceId } = req.params;
+  const userId = req.user.userId;
+  const { enabled } = req.body;
+
+  try {
+    const devRows = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!devRows.length) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const cmd = await enqueueDbCommand(deviceId, 'testmode', { enabled: !!enabled });
+    console.log('[CMD] testmode enfileirado', deviceId, enabled);
+
+    return res.json({ success: true, data: { commandId: cmd.id } });
+  } catch (err) {
+    console.error('Erro em /test-mode', err.message);
+    return res.status(500).json({ success: false, message: 'Falha ao acionar testmode no device' });
+  }
+});
+
+
 // Saúde do device (stub funcional)
 app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req, res) => {
   try {
