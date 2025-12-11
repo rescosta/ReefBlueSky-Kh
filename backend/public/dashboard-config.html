@@ -185,6 +185,28 @@
       filter: brightness(1.05);
     }
 
+    .btn-abort {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 999;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      color: #fff;
+      box-shadow: 0 8px 20px rgba(239, 68, 68, 0.7);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-abort:hover {
+      filter: brightness(1.05);
+    }
+
     .badge-level {
       padding: 3px 8px;
       border-radius: 999px;
@@ -302,10 +324,22 @@
           <input id="intervalRange" type="range" min="1" max="24" value="1" />
           <div class="inline">
             <span id="intervalLabel">1 hora</span>
-            <button id="saveIntervalBtn" class="btn-primary">Salvar agendamento</button>
+            <button id="saveIntervalBtn" class="btn-primary">  Salvar agendamento  </button>
           </div>
           <div class="hint">
             As medições são agendadas para a próxima hora redonda a partir do momento do salvamento.
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label>Calibração de KH</label>
+          <div class="inline">
+            <button id="startCalibrationBtn" class="btn-primary">
+              Iniciar calibração
+            </button>
+            <span id="calibrationStatus" class="hint">
+              Nenhuma calibração em andamento.
+            </span>
           </div>
         </div>
       </div>
@@ -454,6 +488,11 @@
     <div id="userInfo">Usuário --</div>
     <div>ReefBlueSky KH Monitor — Configurações</div>
   </div>
+
+  <button id="abortBtn" class="btn-abort" style="display:none;">
+  &#9888; ABORTAR
+  </button>
+
 
   <script src="js/dashboard-common.js"></script>
   <script src="js/dashboard-config.js"></script>
