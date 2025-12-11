@@ -45,9 +45,8 @@ function applyTestModeUI(testModeEnabled) {
 }
 
 // Utilitário simples de data/hora
-function formatDateTime(ts) {
-  if (!ts) return '--';
-  const ms = ts < 1e11 ? ts * 1000 : ts;
+function formatDateTime(ms) {
+  if (!ms) return '--';
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return '--';
   return d.toLocaleString(undefined, {
