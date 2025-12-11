@@ -1688,6 +1688,7 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
 
     // normalizar para o formato que o ESP entende
     let dbType = type;
+    let payload = {};   
     switch (type) {
       case 'factory_reset':
         dbType = 'factoryreset';
