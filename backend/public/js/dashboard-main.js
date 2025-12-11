@@ -44,11 +44,10 @@ function applyTestModeUI(testModeEnabled) {
   testNowBtn.disabled = !testModeEnabled;
 }
 
-
-
 // Utilitário simples de data/hora
-function formatDateTime(ms) {
-  if (!ms) return '--';
+function formatDateTime(ts) {
+  if (!ts) return '--';
+  const ms = ts < 1e11 ? ts * 1000 : ts;
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return '--';
   return d.toLocaleString(undefined, {

@@ -46,6 +46,15 @@ const pumpProgEls = {
 const khCorrectionVolumeInput = document.getElementById('khCorrectionVolume');
 const khCorrectionBtn = document.getElementById('khCorrectionBtn');
 const khCorrectionStatus = document.getElementById('khCorrectionStatus');
+const startCalibrationBtn = document.getElementById('startCalibrationBtn');
+const calibrationStatus = document.getElementById('calibrationStatus');
+const abortBtn = document.getElementById('abortBtn');
+let isRunningCycle = false;
+
+function updateAbortVisibility() {
+  abortBtn.style.display = isRunningCycle ? 'flex' : 'none';
+}
+
 
 function updateIntervalLabel(v) {
   const n = parseInt(v, 10) || 1;
@@ -386,3 +395,63 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('deviceChanged', () => {
   loadConfigForSelected();
 });
+
+async function apiStartCalibration(deviceId) {
+  // por enquanto usa o mesmo fluxo de test_now
+  const res = await fetch(
+    `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
+    {
+      method: 'POST',
+      headers: headersAuthCfg,
+      body: JSON.stringify({ type: 'test_now' }),
+    }
+  );
+  const json = await res.json();
+  return res.ok && json.success;
+}
+
+async function apiAbort(deviceId) {
+  const res = await fetch(
+    `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
+    {
+      method: 'POST',
+      headers: headersAuthCfg,
+      body: JSON.stringify({ type: 'abort' }),
+    }
+  );
+  const json = await res.json();
+  return res.ok && json.success;
+}
+
+abortBtn.addEventListener('click', async () => {
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+  if (!deviceId) return;
+  if (!confirm('Deseja realmente abortar o teste/calibração em andamento?')) return;
+
+  const ok = await apiAbort(deviceId);
+  if (ok) {
+    isRunningCycle = false;
+    updateAbortVisibility();
+    calibrationStatus.textContent = 'Ciclo abortado pelo usuário.';
+  }
+});
+
+
+document
+  .getElementById('startCalibrationBtn')
+  .addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+    calibrationStatus.textContent = 'Iniciando calibração...';
+    const ok = await apiStartCalibration(deviceId);
+    calibrationStatus.textContent = ok
+      ? 'Calibração iniciada. Aguardando resposta do device...'
+      : 'Erro ao iniciar calibração.';
+
+    if (ok) {
+    isRunningCycle = true;
+    updateAbortVisibility();
+    }
+
+  });
+
