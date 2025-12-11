@@ -205,11 +205,16 @@ function updateMeasurementsView(measures) {
   calibrationDateEl.textContent = '--';
 
   const stats = computeStats(measures);
-  if (stats && typeof stats.last === 'number' && typeof currentKhTarget === 'number') {
+  if (
+    stats &&
+    typeof stats.last === 'number' &&
+    typeof currentKhTarget === 'number'
+  ) {
     updateStatusFromKh(stats.last, currentKhTarget);
   } else {
     updateStatusFromKh(undefined, currentKhTarget);
   }
+
 }
 
 // Carrega medições para o device atualmente selecionado no topo
