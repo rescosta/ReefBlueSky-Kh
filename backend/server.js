@@ -1542,6 +1542,8 @@ app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, a
     const chk = await pool.query(
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
+    );
+
     if (!chk.length) {
       return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
     }
