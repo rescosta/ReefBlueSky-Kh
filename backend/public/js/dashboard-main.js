@@ -45,7 +45,7 @@ function applyTestModeUI(testModeEnabled) {
 }
 
 // Utilitário simples de data/hora
-function formatDateTime(ts) {
+function formatDateTime(ms) {
   if (!ts) return '--';
   const ms = ts < 1e11 ? ts * 1000 : ts;
   const d = new Date(ms);
