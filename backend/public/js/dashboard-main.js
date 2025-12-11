@@ -45,7 +45,7 @@ function applyTestModeUI(testModeEnabled) {
 }
 
 // Utilitário simples de data/hora
-function formatDateTime(ms) {
+function formatDateTime(ts) {
   if (!ts) return '--';
   const ms = ts < 1e11 ? ts * 1000 : ts;
   const d = new Date(ms);
@@ -165,6 +165,8 @@ function updateMeasurementsView(measures) {
     updateStatusFromKh(undefined);
     return;
   }
+
+
 
   lastCountInfo.textContent = `${measures.length} registros recentes`;
 
