@@ -38,6 +38,9 @@ const kh15dSpan = document.getElementById('kh15dSpan');
 const testModeToggle = document.getElementById('testModeToggle');
 const testNowBtn     = document.getElementById('testNowBtn');
 
+let currentKhTarget = null;
+
+
 function applyTestModeUI(testModeEnabled) {
   if (!testModeToggle || !testNowBtn) return;
   testModeToggle.checked = !!testModeEnabled;
@@ -136,15 +139,15 @@ function formatMetricWindow(labelEl, metric, khTarget) {
 
 
 // Score simples de “saúde do KH” baseado no último valor
-function updateStatusFromKh(kh) {
-  if (typeof kh !== 'number') {
+function updateStatusFromKh(kh, khTarget) {
+  if (typeof kh !== 'number' || typeof khTarget !== 'number') {
     statusPhEl.textContent = '--';
     statusPhEl.className = 'status-badge off';
     return;
   }
 
-  // 100 entre 7.5 e 8.5, cai linearmente fora
-  let score = 100 - Math.abs(kh - 8.0) * 40;
+  // 100 quando KH == khTarget, cai linearmente com o desvio
+  let score = 100 - Math.abs(kh - khTarget) * 40;
   if (score < 0) score = 0;
   if (score > 100) score = 100;
 
@@ -202,10 +205,10 @@ function updateMeasurementsView(measures) {
   calibrationDateEl.textContent = '--';
 
   const stats = computeStats(measures);
-  if (stats && typeof stats.last === 'number') {
-    updateStatusFromKh(stats.last);
+  if (stats && typeof stats.last === 'number' && typeof currentKhTarget === 'number') {
+    updateStatusFromKh(stats.last, currentKhTarget);
   } else {
-    updateStatusFromKh(undefined);
+    updateStatusFromKh(undefined, currentKhTarget);
   }
 }
 
@@ -298,6 +301,10 @@ async function loadKhInfo(deviceId) {
     const khReference = typeof data.khReference === 'number'
       ? data.khReference
       : (data.khReference != null ? parseFloat(data.khReference) : null);
+
+    currentKhTarget = (khTarget != null && !Number.isNaN(khTarget))
+      ? khTarget
+      : null;
 
     if (khTargetSpan) {
       khTargetSpan.textContent =
