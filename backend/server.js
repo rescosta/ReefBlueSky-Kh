@@ -1652,7 +1652,7 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
   try {
     const { deviceId } = req.params;
     const userId = req.user.userId;
-    const { type } = req.body;
+    const { type, value } = req.body;
 
     if (!type) {
       return res.status(400).json({ success: false, message: 'type obrigatório' });
@@ -1670,6 +1670,9 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'custom_1',
       'custom_2',
       'custom_3',
+      'test_mode', 
+      'abort',
+
     ]);
     if (!allowed.has(type)) {
       return res.status(400).json({ success: false, message: 'type inválido' });
@@ -1697,12 +1700,20 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
         break;
       case 'set_kh_reference':
         dbType = 'setkhreference';
+        payload = { value };
         break;
+      case 'test_mode':
+        dbType = 'testmode';
+        payload = { enabled: !!req.body.enabled };
+        break;
+      case 'abort':
+        dbType = 'abort';
+        payload = {};        
+        break;  
       default:
         break;
     }
 
-    const payload = type === 'set_kh_reference' ? { value } : {};
     const cmd = await enqueueDbCommand(deviceId, dbType, payload);
 
     console.log('[CMD] comando enfileirado', deviceId, cmd);
@@ -1750,6 +1761,10 @@ app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (r
         break;
       case 'kh_correction':
         dbType = 'khcorrection';
+        break;
+
+      case 'abort':
+        dbType = 'abort';
         break;
       default:
         break;
@@ -1966,14 +1981,13 @@ async function getDeviceBaseUrl(deviceId) {
 }
 
 
-// Test mode ON/OFF
+// Test mode ON/OFF via CLOUD
 app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
   const { deviceId } = req.params;
-  const { enabled } = req.body;
   const userId = req.user.userId;
+  const { enabled } = req.body || {};
 
   try {
-    // garante que o device pertence ao usuário
     const devRows = await pool.query(
       'SELECT deviceId FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
@@ -1982,20 +1996,19 @@ app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (
       return res.status(404).json({ success: false, message: 'Device not found' });
     }
 
-    const baseUrl = await getDeviceBaseUrl(deviceId);
-    await axios.post(`${baseUrl}/test_mode`, null, {
-      params: { enabled: enabled ? '1' : '0' },
-      timeout: 5000,
-    });
+    const cmd = await enqueueDbCommand(deviceId, 'testmode', { enabled: !!enabled });
+    console.log('[CMD] testmode enfileirado', deviceId, !!enabled);
 
-    return res.json({ success: true, data: { testModeEnabled: !!enabled } });
+    return res.json({ success: true, data: { commandId: cmd.id } });
   } catch (err) {
     console.error('Erro em /test-mode', err.message);
-    return res
-      .status(500)
-      .json({ success: false, message: 'Falha ao acionar test_mode no device' });
+    return res.status(500).json({
+      success: false,
+      message: 'Falha ao enfileirar testmode para o device',
+    });
   }
 });
+
 
 app.post('/api/v1/user/devices/:deviceId/test-now', authUserMiddleware, async (req, res) => {
   const { deviceId } = req.params;
@@ -2184,7 +2197,7 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
       return res.json({
         success: true,
         data: {
-          intervalHours: null,
+          intervalHours: s.interval_hours != null ? Number(s.interval_hours) : null,
           levels: { A: false, B: false, C: false },
           pumps: {
             1: { running: false, direction: 'forward' },
@@ -2215,10 +2228,9 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
 
   } catch (err) {
     console.error('Error fetching device status', err);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
+    return res.status(500).json({ success: false, message: 'Internal server error', error: err.message, });
   }
 });
-
 
 // novo endpoint para ON/OFF via comando
 app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
