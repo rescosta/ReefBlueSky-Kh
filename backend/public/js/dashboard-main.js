@@ -227,9 +227,21 @@ async function loadMeasurementsForSelected() {
   }
 
   try {
-    const res = await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`, {
+
+    // 1) Primeiro carrega KH target/config
+    await loadKhInfo(deviceId);
+
+    // 2) Depois metrics (se quiser manter aqui)
+    await loadKhMetrics(deviceId);
+
+    // 3) Por fim, medições (vai usar currentKhTarget já setado)
+    
+    const res = await 
+
+fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
     const json = await res.json();
     if (!json.success) {
       console.error(json.message || 'Erro ao buscar medições');
@@ -240,8 +252,6 @@ async function loadMeasurementsForSelected() {
 
     const measures = json.data || [];
     updateMeasurementsView(measures);
-    await loadKhMetrics(deviceId);
-    await loadKhInfo(deviceId);
   } catch (err) {
     console.error('loadMeasurementsForSelected error', err);
     lastCountInfo.textContent = 'Erro de comunicação ao carregar medições';
