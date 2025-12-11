@@ -1542,8 +1542,9 @@ app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, a
     const chk = await pool.query(
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
-    );
-    if (!chk.length) return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+    if (!chk.length) {
+      return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+    }
 
     const sql = `
       INSERT INTO device_status
@@ -1553,7 +1554,11 @@ app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, a
         interval_hours = VALUES(interval_hours),
         updatedAt = NOW()
     `;
-    const result = await pool.query(sql, [deviceId, userId, n]);
+    await pool.query(sql, [deviceId, userId, n]);
+
+    // NOVO: empurrar intervalo para o ESP (minutos = horas * 60)
+    await enqueueDbCommand(deviceId, 'setintervalminutes', { minutes: n * 60 });
+    console.log('[CMD] setintervalminutes enfileirado', deviceId, n);
 
     return res.json({ success: true, message: 'Intervalo atualizado.' });
   } catch (err) {
@@ -1561,6 +1566,7 @@ app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, a
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 // Enfileirar comando genérico usando device_commands (substitui o Map em memória)
 async function enqueueDbCommand(deviceId, type, payload = null) {
@@ -1687,11 +1693,16 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       case 'test_now':
         dbType = 'testnow';
         break;
+      case 'set_kh_reference':
+        dbType = 'setkhreference';
+        break;
       default:
         break;
     }
 
-    const cmd = await enqueueDbCommand(deviceId, dbType, {}); // <‑‑ dbType
+    const payload = type === 'set_kh_reference' ? { value } : {};
+    const cmd = await enqueueDbCommand(deviceId, dbType, payload);
+
     console.log('[CMD] comando enfileirado', deviceId, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id, type } });
@@ -1997,19 +2008,18 @@ app.post('/api/v1/user/devices/:deviceId/test-now', authUserMiddleware, async (r
       return res.status(404).json({ success: false, message: 'Device not found' });
     }
 
-    const baseUrl = await getDeviceBaseUrl(deviceId);
-    await axios.post(`${baseUrl}/test_now`, null, { timeout: 5000 });
+    // Em vez de chamar HTTP local /test_now, enfileira comando testnow
+    const cmd = await enqueueDbCommand(deviceId, 'testnow', {});
+    console.log('[CMD] testnow enfileirado', deviceId, cmd.id);
 
-    return res.json({ success: true });
+    return res.json({ success: true, data: { commandId: cmd.id } });
   } catch (err) {
     console.error('Erro em /test-now', err.message);
     return res
       .status(500)
-      .json({ success: false, message: 'Falha ao acionar test_now no device' });
+      .json({ success: false, message: 'Falha ao acionar testnow no device' });
   }
 });
-
-
 
 
 app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (req, res) => {
@@ -2058,6 +2068,11 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    if (khReference != null) {
+      await enqueueDbCommand(deviceId, 'setkhreference', { value: khReference });
+      console.log('[CMD] setkhreference enfileirado', deviceId, khReference);
     }
 
     return res.json({ success: true, message: 'KH config atualizada.' });
