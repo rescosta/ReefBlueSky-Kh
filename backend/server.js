@@ -1472,23 +1472,33 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
 });
 
 // GET /api/v1/device/kh-reference
-router.get('/device/kh-reference', authMiddleware, async (req, res) => {
+app.get('/api/v1/device/kh-reference', verifyToken, async (req, res) => {
   try {
-    const deviceId = req.device.id; // vindo do token decodificado
-    const device = await Device.findOne({ where: { id: deviceId } });
+    const deviceId = req.user.deviceId; // mesmo campo que já usa em /device/health e /device/sync
+    const conn = await pool.getConnection();
+    try {
+      const rows = await conn.query(
+        'SELECT khreference FROM devices WHERE deviceId = ? LIMIT 1',
+        [deviceId]
+      );
 
-    if (!device || device.kh_reference == null) {
-      return res.json({ success: true, data: null });
+      if (!rows.length || rows[0].khreference == null) {
+        return res.json({ success: true, data: null });
+      }
+
+      return res.json({
+        success: true,
+        data: { khreference: rows[0].khreference }
+      });
+    } finally {
+      conn.release();
     }
-
-    return res.json({
-      success: true,
-      data: { kh_reference: device.kh_reference }
-    });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'server_error' });
+    console.error('GET /api/v1/device/kh-reference error', err.message);
+    return res.status(500).json({ success: false, error: 'servererror' });
   }
 });
+
 
 /**
  * GET /api/v1/device/commands
