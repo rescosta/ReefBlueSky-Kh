@@ -1471,6 +1471,24 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/v1/device/kh-reference
+router.get('/device/kh-reference', authMiddleware, async (req, res) => {
+  try {
+    const deviceId = req.device.id; // vindo do token decodificado
+    const device = await Device.findOne({ where: { id: deviceId } });
+
+    if (!device || device.kh_reference == null) {
+      return res.json({ success: true, data: null });
+    }
+
+    return res.json({
+      success: true,
+      data: { kh_reference: device.kh_reference }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'server_error' });
+  }
+});
 
 /**
  * GET /api/v1/device/commands
