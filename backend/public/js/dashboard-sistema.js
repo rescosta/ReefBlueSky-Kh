@@ -104,6 +104,40 @@ function updateDeviceInfoFromList() {
   });
 }
 
+function isDeviceOnline(lastSeenMs) {
+  if (!lastSeenMs) return false;
+  const diff = Date.now() - lastSeenMs;
+  return diff <= 5 * 60 * 1000; // mesmo limiar de 5 min
+}
+
+async function refreshDevicesUI() {
+  const devs = await DashboardCommon.loadDevicesCommon(); // já existe
+  const selectedId = DashboardCommon.getSelectedDeviceId();
+
+  // exemplo: marcar status em algum elemento de UI
+  const statusEl = document.getElementById('deviceOnlineStatus');
+  const dev = devs.find((d) => d.deviceId === selectedId);
+
+  if (!dev) {
+    if (statusEl) statusEl.textContent = '--';
+    return;
+  }
+
+  const last = dev.lastSeen || dev.lastseen;
+  const ts = last ? (typeof last === 'number' ? last : Date.parse(last)) : null;
+  const online = isDeviceOnline(ts);
+
+  if (statusEl) {
+    statusEl.textContent = online ? 'ONLINE' : 'OFFLINE';
+    statusEl.className = online ? 'badge-online' : 'badge-offline';
+  }
+}
+
+setInterval(refreshDevicesUI, 30 * 1000);
+document.addEventListener('DOMContentLoaded', refreshDevicesUI);
+
+
+
 // Stubs de API para saúde e comandos
 
 async function apiLoadDeviceHealth(deviceId) {
@@ -280,7 +314,7 @@ cmdRestartBtn.addEventListener('click', async () => {
     : 'Erro ao enviar comando de restart.';
 });
 
-cmdRestartBtn.addEventListener('click', async () => {
+cmdResetKhBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) return;
   cmdStatusEl.textContent = 'Enviando comando de reset de KH...';
