@@ -100,6 +100,35 @@
       font-size: 13px;
     }
 
+    .online-status-card {
+      margin: 16px 24px 0 24px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      background: #020817;
+      border: 1px solid #1f2937;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .online-status-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .online-status-text {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .online-status-online {
+      color: #4ade80;
+    }
+
+    .online-status-offline {
+      color: #f97373;
+    }
+
+
     .content {
       flex: 1;
       padding: 24px;
@@ -249,6 +278,14 @@
 </head>
 <body>
   <div id="topbar-root"></div>
+
+  <div class="online-status-card">
+    <div class="online-status-title">Online status</div>
+    <div id="onlineStatusText" class="online-status-text">
+      Aguardando dados do dispositivo...
+    </div>
+  </div>
+
 
   <div class="content">
     <!-- Coluna esquerda: infos do device + saúde -->
