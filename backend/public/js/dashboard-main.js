@@ -38,7 +38,167 @@ const kh15dSpan = document.getElementById('kh15dSpan');
 const testModeToggle = document.getElementById('testModeToggle');
 const testNowBtn     = document.getElementById('testNowBtn');
 
+
+const testNowProgressWrapper = document.getElementById('testNowProgressWrapper');
+const testNowProgressFill   = document.getElementById('testNowProgressFill');
+const testNowProgressLabel  = document.getElementById('testNowProgressLabel');
+const abortArea             = document.getElementById('abortArea');
+const abortBtn              = document.getElementById('abortBtn');
+const abortStatusText       = document.getElementById('abortStatusText');
+
+
+const doseVolumeInput   = document.getElementById('doseVolumeInput');
+const pump4RateSpan     = document.getElementById('pump4RateSpan');
+const applyDoseBtn      = document.getElementById('applyDoseBtn');
+
+const doseProgressWrapper = document.getElementById('doseProgressWrapper');
+const doseProgressFill    = document.getElementById('doseProgressFill');
+const doseProgressLabel   = document.getElementById('doseProgressLabel');
+
+let pump4MlPerSec   = null;  // virá da API futuramente
+let isRunningDose   = false;
+let doseStartedAt   = null;
+let doseTotalMs     = 0;
+let doseTimerId     = null;
+
+
+let isRunningTestNow = false;
+let testNowStartedAt = null;
+let testNowTotalMs   = 8 * 60 * 1000; // 8 minutos
+let testNowStep      = 0;
+let testNowTimerId   = null;
+
 let currentKhTarget = null;
+
+
+function updateTestNowProgress() {
+  if (!isRunningTestNow || !testNowStartedAt || !testNowProgressFill) return;
+
+  const elapsed = Date.now() - testNowStartedAt;
+  const stepDuration = testNowTotalMs / 5;
+  let step = Math.floor(elapsed / stepDuration) + 1;
+  if (step < 1) step = 1;
+  if (step > 5) step = 5;
+
+  testNowStep = step;
+
+  const percent = step * 20; // 5 etapas => 20% cada
+  testNowProgressFill.style.width = `${percent}%`;
+
+  if (testNowProgressLabel) {
+    testNowProgressLabel.textContent = `Teste em andamento — etapa ${step} de 5`;
+  }
+
+  if (elapsed >= testNowTotalMs) {
+    // terminou tempo estimado
+    stopTestNowProgress(false);
+  }
+}
+
+function startTestNowProgress() {
+  if (!testNowProgressWrapper) return;
+
+  isRunningTestNow = true;
+  testNowStartedAt = Date.now();
+  testNowStep = 1;
+
+  testNowProgressFill.style.width = '20%';
+  testNowProgressLabel.textContent = 'Teste em andamento — etapa 1 de 5';
+
+  testNowProgressWrapper.style.display = 'block';
+  abortArea.style.display = 'block';
+  abortStatusText.innerHTML = '&nbsp;';
+
+  if (testNowTimerId) clearInterval(testNowTimerId);
+  testNowTimerId = setInterval(updateTestNowProgress, 1000);
+}
+
+function stopTestNowProgress(wasAborted) {
+  isRunningTestNow = false;
+  testNowStartedAt = null;
+  testNowStep = 0;
+
+  if (testNowTimerId) {
+    clearInterval(testNowTimerId);
+    testNowTimerId = null;
+  }
+
+  if (testNowProgressWrapper) {
+    testNowProgressWrapper.style.display = 'none';
+    testNowProgressFill.style.width = '0%';
+    testNowProgressLabel.textContent = wasAborted
+      ? 'Teste cancelado'
+      : 'Teste concluído';
+  }
+
+  if (abortArea) {
+    abortArea.style.display = 'none';
+  }
+
+  if (abortStatusText) {
+    abortStatusText.textContent = wasAborted
+      ? 'Cancelado pelo usuário.'
+      : '';
+  }
+}
+
+function updateDoseProgress() {
+  if (!isRunningDose || !doseStartedAt || !doseProgressFill || doseTotalMs <= 0) return;
+
+  const elapsed = Date.now() - doseStartedAt;
+  let fraction = elapsed / doseTotalMs;
+  if (fraction < 0) fraction = 0;
+  if (fraction > 1) fraction = 1;
+
+  const percent = Math.round(fraction * 100);
+  doseProgressFill.style.width = `${percent}%`;
+
+  if (doseProgressLabel) {
+    doseProgressLabel.textContent = `Dose em andamento — ${percent}%`;
+  }
+
+  if (elapsed >= doseTotalMs) {
+    stopDoseProgress(false);
+  }
+}
+
+function startDoseProgress(totalMs) {
+  if (!doseProgressWrapper || !totalMs || totalMs <= 0) return;
+
+  isRunningDose = true;
+  doseStartedAt = Date.now();
+  doseTotalMs   = totalMs;
+
+  doseProgressFill.style.width = '0%';
+  doseProgressLabel.textContent = 'Dose em andamento...';
+
+  doseProgressWrapper.style.display = 'block';
+  abortArea.style.display = 'block';
+  abortStatusText.innerHTML = '&nbsp;';
+
+  if (doseTimerId) clearInterval(doseTimerId);
+  doseTimerId = setInterval(updateDoseProgress, 500);
+}
+
+function stopDoseProgress(wasAborted) {
+  isRunningDose = false;
+  doseStartedAt = null;
+  doseTotalMs   = 0;
+
+  if (doseTimerId) {
+    clearInterval(doseTimerId);
+    doseTimerId = null;
+  }
+
+  if (doseProgressWrapper) {
+    doseProgressWrapper.style.display = 'none';
+    doseProgressFill.style.width = '0%';
+    doseProgressLabel.textContent = wasAborted
+      ? 'Dose cancelada'
+      : 'Dose concluída';
+  }
+}
+
 
 
 function applyTestModeUI(testModeEnabled) {
@@ -317,6 +477,24 @@ async function loadKhInfo(deviceId) {
       ? data.khReference
       : (data.khReference != null ? parseFloat(data.khReference) : null);
 
+    // >>> NOVO: taxa da bomba 4 se vier da API
+    if (typeof data.pump4MlPerSec === 'number') {
+      pump4MlPerSec = data.pump4MlPerSec;
+    } else if (data.pump4MlPerSec != null) {
+      const v = parseFloat(data.pump4MlPerSec);
+      pump4MlPerSec = Number.isNaN(v) ? null : v;
+    } else {
+      pump4MlPerSec = null;
+    }
+
+    if (pump4RateSpan) {
+      pump4RateSpan.textContent =
+        pump4MlPerSec != null
+          ? `${pump4MlPerSec.toFixed(2)} mL/s`
+          : '-- mL/s';
+    }
+    // <<< FIM NOVO
+
     currentKhTarget = (khTarget != null && !Number.isNaN(khTarget))
       ? khTarget
       : null;
@@ -337,6 +515,7 @@ async function loadKhInfo(deviceId) {
     console.error('loadKhInfo error', err);
   }
 }
+
 
 if (testModeToggle) {
   testModeToggle.addEventListener('change', async (e) => {
@@ -363,13 +542,79 @@ if (testNowBtn) {
     if (!deviceId) return;
 
     try {
-      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/test-now`, {
+      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
         method: 'POST',
         headers: headersAuth,
+        body: JSON.stringify({ type: 'testnow' }),
       });
+
+      // inicia barra de 5 etapas
+      startTestNowProgress();
+
       await loadMeasurementsForSelected();
     } catch (err) {
-      console.error('test_now error', err);
+      console.error('testnow command error', err);
+    }
+  });
+}
+
+
+if (applyDoseBtn) {
+  applyDoseBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    const volumeStr = doseVolumeInput ? doseVolumeInput.value : '';
+    const volume = parseFloat(volumeStr);
+    if (!volume || Number.isNaN(volume) || volume <= 0) {
+      alert('Informe um volume válido em mL.');
+      return;
+    }
+
+    // Enquanto a taxa não vier da API, você pode:
+    // - testar com um valor fixo (ex.: 0.8 mL/s), ou
+    // - só mandar o comando sem barra se pump4MlPerSec não estiver setado.
+    const effectivePump4 = pump4MlPerSec && pump4MlPerSec > 0 ? pump4MlPerSec : 0.8;
+    const seconds = volume / effectivePump4;
+    const totalMs = seconds * 1000;
+
+    try {
+      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
+        method: 'POST',
+        headers: headersAuth,
+        body: JSON.stringify({
+          type: 'khcorrection',
+          params: { volume },
+        }),
+      });
+
+      startDoseProgress(totalMs);
+    } catch (err) {
+      console.error('khcorrection command error', err);
+    }
+  });
+}
+
+
+if (abortBtn) {
+  abortBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    try {
+      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
+        method: 'POST',
+        headers: headersAuth,
+        body: JSON.stringify({ type: 'abort' }),
+      });
+
+      stopTestNowProgress(true);
+      stopDoseProgress(true);
+    } catch (err) {
+      console.error('abort command error', err);
+      // em caso de erro, ainda assim paramos visualmente para não deixar a UI travada
+      stopTestNowProgress(true);
+      stopDoseProgress(true);
     }
   });
 }
