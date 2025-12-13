@@ -152,6 +152,13 @@
       font-size: 13px;
     }
 
+    #deviceOnlineStatus {
+      font-weight: 600;
+    }
+
+    .badge-online { color: #4ade80; }
+    .badge-offline { color: #f97373; }
+
     .health-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -269,6 +276,11 @@
         <div class="field-row">
           <span class="label">Último sinal (lastSeen)</span>
           <span id="infoLastSeen" class="value">--</span>
+        </div>
+
+        <div class="field-row">
+          <span class="label">Status online</span>
+          <span id="deviceOnlineStatus" class="value">--</span>
         </div>
       </div>
 
