@@ -321,6 +321,23 @@
       background: #030712;
     }
 
+    .progress-wrapper { font-size: 12px; }
+    .progress-label { margin-bottom: 4px; color: #9ca3af; }
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #020617;
+      border: 1px solid #1f2937;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #eab308);
+      transition: width 0.3s linear;
+    }
+
     /* BARRA INFERIOR */
     .footer {
       font-size: 11px;
@@ -329,6 +346,7 @@
       display: flex;
       justify-content: space-between;
     }
+
   </style>
 </head>
 <body>
@@ -418,8 +436,25 @@
             </button>
           </span>
         </div>
+
+    <!-- Progresso do teste manual + botão ABORT -->
+        <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+          <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="testNowProgressFill"></div>
+          </div>
+        </div>
+
+        <div id="abortArea" style="display:none; margin-top:8px;">
+          <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
+            ABORTAR teste/dose
+          </button>
+          <div id="abortStatusText" class="muted" style="margin-top:4px;">&nbsp;</div>
+        </div>
       </div>
     </div>
+
+  
 
     <!-- Coluna direita -->
     <div class="right-col" style="display:flex; flex-direction:column; gap:16px;">
@@ -439,6 +474,49 @@
           <div class="status-circle">
             <div id="statusReactor" class="status-badge off">OFF</div>
             <div class="status-label">Reator CA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOVO CARD: Correção de KH (Bomba 4) -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Correção de KH (Bomba 4)</div>
+            <div class="card-subtitle">Dose manual baseada na calibração</div>
+          </div>
+        </div>
+
+        <div class="measure-info">
+          <span>
+            <span class="label">Volume a dosar (mL):</span>
+            <input
+              type="number"
+              id="doseVolumeInput"
+              min="0"
+              step="0.1"
+              style="margin-top:4px; width:100%; padding:4px 6px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb; font-size:13px;"
+            />
+          </span>
+          <span style="margin-top:4px;">
+            <span class="label">Taxa calibrada bomba 4:</span>
+            <span id="pump4RateSpan" class="value">-- mL/s</span>
+          </span>
+        </div>
+
+        <div class="measure-info" style="margin-top:8px;">
+          <span>
+            <button id="applyDoseBtn" class="btn-small">
+              Aplicar dose
+            </button>
+          </span>
+        </div>
+
+        <!-- Progresso da dose bomba 4 -->
+        <div id="doseProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+          <div class="progress-label" id="doseProgressLabel">Dose em andamento...</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="doseProgressFill"></div>
           </div>
         </div>
       </div>
