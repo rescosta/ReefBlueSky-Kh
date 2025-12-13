@@ -110,16 +110,19 @@ function isDeviceOnline(lastSeenMs) {
   return diff <= 5 * 60 * 1000; // mesmo limiar de 5 min
 }
 
-async function refreshDevicesUI() {
-  const devs = await DashboardCommon.loadDevicesCommon(); // já existe
-  const selectedId = DashboardCommon.getSelectedDeviceId();
-
-  // exemplo: marcar status em algum elemento de UI
-  const statusEl = document.getElementById('deviceOnlineStatus');
-  const dev = devs.find((d) => d.deviceId === selectedId);
+function updateOnlineUI(dev) {
+  const badgeEl = document.getElementById('deviceOnlineStatus');
+  const statusCardEl = document.getElementById('onlineStatusText');
 
   if (!dev) {
-    if (statusEl) statusEl.textContent = '--';
+    if (badgeEl) {
+      badgeEl.textContent = '--';
+      badgeEl.className = '';
+    }
+    if (statusCardEl) {
+      statusCardEl.textContent = 'Nenhum dispositivo selecionado.';
+      statusCardEl.classList.remove('online-status-online', 'online-status-offline');
+    }
     return;
   }
 
@@ -127,11 +130,48 @@ async function refreshDevicesUI() {
   const ts = last ? (typeof last === 'number' ? last : Date.parse(last)) : null;
   const online = isDeviceOnline(ts);
 
-  if (statusEl) {
-    statusEl.textContent = online ? 'ONLINE' : 'OFFLINE';
-    statusEl.className = online ? 'badge-online' : 'badge-offline';
+  // Badge existente
+  if (badgeEl) {
+    badgeEl.textContent = online ? 'ONLINE' : 'OFFLINE';
+    badgeEl.className = online ? 'badge-online' : 'badge-offline';
+  }
+
+  // Card novo
+  if (statusCardEl) {
+    if (ts) {
+      const diffMs = Date.now() - ts;
+      const diffSec = Math.floor(diffMs / 1000);
+      let human;
+      if (diffSec < 60) {
+        human = `${diffSec} seconds ago`;
+      } else {
+        const mins = Math.floor(diffSec / 60);
+        human = mins === 1 ? '1 minute ago' : `${mins} minutes ago`;
+      }
+
+      statusCardEl.textContent = online
+        ? `Last time your device was seen online: ${human}.`
+        : `Device is offline. Last time it was seen online: ${human}.`;
+    } else {
+      statusCardEl.textContent =
+        'Ainda não há registro de lastSeen para este device.';
+    }
+
+    statusCardEl.classList.toggle('online-status-online', online);
+    statusCardEl.classList.toggle('online-status-offline', !online);
   }
 }
+
+
+async function refreshDevicesUI() {
+  const devs = await DashboardCommon.loadDevicesCommon();
+  const selectedId = DashboardCommon.getSelectedDeviceId();
+  const dev = devs.find((d) => d.deviceId === selectedId);
+
+  updateOnlineUI(dev);
+}
+
+
 
 setInterval(refreshDevicesUI, 30 * 1000);
 document.addEventListener('DOMContentLoaded', refreshDevicesUI);
@@ -293,6 +333,13 @@ async function loadSystemForSelected() {
   }
 
   updateDeviceInfoFromList();
+
+
+  // Atualiza status online / card com o mesmo device
+  const devs = await DashboardCommon.loadDevicesCommon();
+  const dev = devs.find((d) => d.deviceId === deviceId);
+  updateOnlineUI(dev);
+
 
   const [health, events] = await Promise.all([
     apiLoadDeviceHealth(deviceId),
