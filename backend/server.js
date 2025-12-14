@@ -2021,7 +2021,7 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
       [deviceId]
     );
 
-    const ids = rows.map(r => r.id);dbType = 'setpum
+    const ids = rows.map(r => r.id);
     if (ids.length > 0) {
       await conn.query(
         `UPDATE device_commands
