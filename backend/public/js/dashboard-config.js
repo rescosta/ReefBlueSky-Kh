@@ -67,13 +67,16 @@ const abortBtn = document.getElementById('abortBtn');
 let isRunningCycle = false;
 
 
-async function sendDeviceCommand(deviceId, type, params = {}) {
+
+async function sendDeviceCommand(deviceId, type, value = null) {
+  const payload = value != null ? { type, value } : { type };
+
   const res = await fetch(
     `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
     {
       method: 'POST',
-      headers: headersAuthCfg, // mesmo pattern das outras telas
-      body: JSON.stringify({ type, params }),
+      headers: headersAuthCfg,
+      body: JSON.stringify(payload),
     }
   );
   const json = await res.json();
@@ -82,6 +85,7 @@ async function sendDeviceCommand(deviceId, type, params = {}) {
   }
   return json;
 }
+
 
 
 function updateAbortVisibility() {
@@ -205,28 +209,16 @@ async function apiManualPump(deviceId, pumpId, direction, seconds) {
 }
 
 async function apiKhCorrection(deviceId, volume) {
-  // Futuro: POST /api/v1/user/devices/:deviceId/command/kh-correction
   console.log('KH CORRECTION', deviceId, volume);
   try {
-    const res = await fetch(
-      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command/kh-correction`,
-      {
-        method: 'POST',
-        headers: headersAuthCfg,
-        body: JSON.stringify({ volume }),
-      },
-    );
-    const json = await res.json();
-    if (!res.ok || !json.success) {
-      console.error(json.message || 'Erro ao aplicar correção de KH');
-      return false;
-    }
+    await sendDeviceCommand(deviceId, 'khcorrection', volume);
     return true;
   } catch (err) {
     console.error('apiKhCorrection error', err);
     return false;
   }
 }
+
 
 
 // Calibração bomba 4: rodar calibração por 60s com barra regressiva
@@ -239,18 +231,22 @@ if (pump4RunCalibBtn) {
     pump4RunCalibBtn.disabled = true;
 
     try {
-      await sendDeviceCommand(deviceId, 'pump4calibrate', { seconds: PUMP4_CALIB_SECONDS });
-      
+      // sem payload extra, backend traduz para dbType 'pump4calibrate'
+      await sendDeviceCommand(deviceId, 'pump4calibrate');
+
       // Iniciar barra regressiva de 60s
       startPump4CalibProgress();
-      pump4CalibStatusEl.textContent = 'Calibração em andamento. Meça o volume que saiu.';
+      pump4CalibStatusEl.textContent =
+        'Calibração em andamento. Meça o volume que saiu.';
     } catch (err) {
       console.error('pump4calibrate error', err);
-      pump4CalibStatusEl.textContent = 'Erro ao enviar comando de calibração da bomba 4.';
+      pump4CalibStatusEl.textContent =
+        'Erro ao enviar comando de calibração da bomba 4.';
       pump4RunCalibBtn.disabled = false;
     }
   });
 }
+
 
 function startPump4CalibProgress() {
   pump4CalibRunning = true;
@@ -282,13 +278,14 @@ function startPump4CalibProgress() {
 }
 
 // Calibração bomba 4: salvar mL/s (setpump4mlpersec)
+// Calibração bomba 4: salvar mL/s (setpump4mlpersec)
 if (pump4SaveCalibBtn) {
   pump4SaveCalibBtn.addEventListener('click', async () => {
     const deviceId = DashboardCommon.getSelectedDeviceId();
     if (!deviceId) return;
 
     const volStr = pump4CalibVolumeInput?.value || '';
-    const volume  = parseFloat(volStr);
+    const volume = parseFloat(volStr);
 
     if (!volume || volume <= 0) {
       alert('Informe o volume medido em mL.');
@@ -297,7 +294,7 @@ if (pump4SaveCalibBtn) {
 
     const mlpersec = volume / PUMP4_CALIB_SECONDS;
     if (mlpersec <= 0 || mlpersec > 10) {
-      alert('Valor mL/s inválido (0–10). Verifique o volume..');
+      alert('Valor mL/s inválido (0–10). Verifique o volume.');
       return;
     }
 
@@ -305,7 +302,8 @@ if (pump4SaveCalibBtn) {
       `Gravando calibração: ${mlpersec.toFixed(3)} mL/s...`;
 
     try {
-      await sendDeviceCommand(deviceId, 'setpump4mlpersec', { mlpersec });
+      // backend espera value; ele monta payload { ml_per_sec: value }
+      await sendDeviceCommand(deviceId, 'setpump4mlpersec', mlpersec);
       pump4CalibStatusEl.textContent =
         `Calibração salva: ${mlpersec.toFixed(3)} mL/s.`;
       pump4CalibVolumeInput.value = '';
@@ -316,46 +314,6 @@ if (pump4SaveCalibBtn) {
     }
   });
 }
-
-
-// Calibração bomba 4: salvar mL/s (setpump4mlpersec)
-if (pump4SaveCalibBtn) {
-  pump4SaveCalibBtn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceId();
-    if (!deviceId) return;
-
-    const secStr = pump4CalibSecondsInput?.value || '60';
-    const volStr = pump4CalibVolumeInput?.value || '';
-
-    const seconds = parseInt(secStr, 10);
-    const volume  = parseFloat(volStr);
-
-    if (!seconds || seconds <= 0 || !volume || volume <= 0) {
-      alert('Informe o tempo de calibração e o volume medido em mL.');
-      return;
-    }
-
-    const mlpersec = volume / seconds;
-    if (mlpersec <= 0 || mlpersec > 10) {
-      alert('Valor mL/s inválido (0–10). Verifique tempo e volume.');
-      return;
-    }
-
-    pump4CalibStatusEl.textContent =
-      `Gravando calibração: ${mlpersec.toFixed(3)} mL/s...`;
-
-    try {
-      await sendDeviceCommand(deviceId, 'setpump4mlpersec', { mlpersec });
-      pump4CalibStatusEl.textContent =
-        `Calibração salva: ${mlpersec.toFixed(3)} mL/s.`;
-    } catch (err) {
-      console.error('setpump4mlpersec error', err);
-      pump4CalibStatusEl.textContent =
-        'Erro ao salvar calibração da bomba 4.';
-    }
-  });
-}
-
 
 async function loadConfigForSelected() {
   const deviceId = DashboardCommon.getSelectedDeviceId();
