@@ -1785,8 +1785,11 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'custom_3',
       'test_mode', 
       'abort',
-
+      'pump4calibrate',
+      'setpump4mlpersec',
+      'khcorrection',
     ]);
+
     if (!allowed.has(type)) {
       return res.status(400).json({ success: false, message: 'type inválido' });
     }
@@ -1799,45 +1802,108 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
     }
 
-    // normalizar para o formato que o ESP entende
+    // normalizar para o formato que o ESP entende (cmd.action no firmware)
     let dbType = type;
     let payload = {};   
+
     switch (type) {
       case 'factory_reset':
         dbType = 'factoryreset';
         break;
+
       case 'reset_kh':
         dbType = 'resetkh';
         break;
+
       case 'test_now':
         dbType = 'testnow';
         break;
+
       case 'set_kh_reference':
         dbType = 'setkhreference';
         payload = { value };
         break;
+
+      case 'set_kh_target':
+        dbType = 'setkhtarget';
+        payload = { value };
+        break;
+
+      case 'set_interval_minutes':
+        dbType = 'setintervalminutes';
+        payload = { minutes: value };
+        break;
+
       case 'test_mode':
         dbType = 'testmode';
         payload = { enabled: !!req.body.enabled };
         break;
+
       case 'abort':
         dbType = 'abort';
-        payload = {};        
-        break;  
+        payload = {};
+        break;
+
+      // ------- NOVOS COMANDOS BOMBA 4 / KH --------
+
+      case 'pump4calibrate':
+        // firmware: cmd.action == "pump4calibrate"
+        // seconds é opcional, default 60, então não precisamos mandar nada
+        dbType = 'pump4calibrate';
+        payload = {};
+        break;
+
+      case 'setpump4mlpersec':
+        // firmware: cmd.action == "setpump4mlpersec"
+        // espera cmd.params["ml_per_sec"]
+        dbType = 'setpump4mlpersec';
+
+        if (typeof value !== 'number' || value <= 0 || value > 10) {
+          return res.status(400).json({
+            success: false,
+            message: 'value (ml/s) deve ser um número entre 0 e 10'
+          });
+        }
+
+        payload = { ml_per_sec: value }; // <-- bate com cmd.params["ml_per_sec"]
+        break;
+
+      case 'khcorrection':
+        // firmware: cmd.action == "khcorrection"
+        // espera cmd.params["volume"] em mL
+        dbType = 'khcorrection';
+
+        if (typeof value !== 'number' || value <= 0 || value > 500) {
+          return res.status(400).json({
+            success: false,
+            message: 'value (mL) deve ser um número entre 0 e 500'
+          });
+        }
+
+        payload = { volume: value };
+        break;
+
       default:
         break;
     }
 
     const cmd = await enqueueDbCommand(deviceId, dbType, payload);
 
-    console.log('[CMD] comando enfileirado', deviceId, cmd);
+    console.log('[CMD] comando enfileirado', {
+      deviceId,
+      type,
+      dbType,
+      payload,
+      commandId: cmd.id,
+    });
 
-    return res.json({ success: true, data: { commandId: cmd.id, type } });
+    return res.json({ success: true, data: { commandId: cmd.id, type, dbType } });
   } catch (err) {
     console.error('POST /command error', err);
     return res.status(500).json({ success: false, message: 'Erro ao enviar comando' });
   }
 });
+
 
 // endpoint genérico opcional para front mandar qualquer comando
 app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (req, res) => {
@@ -1955,7 +2021,7 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
       [deviceId]
     );
 
-    const ids = rows.map(r => r.id);
+    const ids = rows.map(r => r.id);dbType = 'setpum
     if (ids.length > 0) {
       await conn.query(
         `UPDATE device_commands
