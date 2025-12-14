@@ -49,6 +49,15 @@ const pump4CalibVolumeInput  = document.getElementById('pump4CalibVolume');
 const pump4SaveCalibBtn      = document.getElementById('pump4SaveCalibBtn');
 const pump4CalibStatusEl     = document.getElementById('pump4CalibStatus');
 
+
+const pump4CalibProgressWrapper = document.getElementById('pump4CalibProgressWrapper');
+const pump4CalibProgressFill    = document.getElementById('pump4CalibProgressFill');
+const pump4CalibProgressLabel   = document.getElementById('pump4CalibProgressLabel');
+
+let pump4CalibRunning = false;
+let pump4CalibTimerId = null;
+const PUMP4_CALIB_SECONDS = 60;
+
 const khCorrectionVolumeInput = document.getElementById('khCorrectionVolume');
 const khCorrectionBtn = document.getElementById('khCorrectionBtn');
 const khCorrectionStatus = document.getElementById('khCorrectionStatus');
@@ -220,33 +229,94 @@ async function apiKhCorrection(deviceId, volume) {
 }
 
 
-// Calibração bomba 4: rodar calibração (pump4calibrate)
+// Calibração bomba 4: rodar calibração por 60s com barra regressiva
 if (pump4RunCalibBtn) {
   pump4RunCalibBtn.addEventListener('click', async () => {
     const deviceId = DashboardCommon.getSelectedDeviceId();
     if (!deviceId) return;
 
-    const secStr = pump4CalibSecondsInput?.value || '60';
-    let seconds = parseInt(secStr, 10);
-    if (!seconds || seconds < 10 || seconds > 300) {
-      alert('Informe um tempo entre 10 e 300 segundos.');
+    pump4CalibStatusEl.textContent = 'Enviando comando de calibração por 60 segundos...';
+    pump4RunCalibBtn.disabled = true;
+
+    try {
+      await sendDeviceCommand(deviceId, 'pump4calibrate', { seconds: PUMP4_CALIB_SECONDS });
+      
+      // Iniciar barra regressiva de 60s
+      startPump4CalibProgress();
+      pump4CalibStatusEl.textContent = 'Calibração em andamento. Meça o volume que saiu.';
+    } catch (err) {
+      console.error('pump4calibrate error', err);
+      pump4CalibStatusEl.textContent = 'Erro ao enviar comando de calibração da bomba 4.';
+      pump4RunCalibBtn.disabled = false;
+    }
+  });
+}
+
+function startPump4CalibProgress() {
+  pump4CalibRunning = true;
+  let secondsRemaining = PUMP4_CALIB_SECONDS;
+
+  pump4CalibProgressWrapper.style.display = 'block';
+  pump4CalibProgressFill.style.width = '100%';
+  pump4CalibProgressLabel.textContent = `Calibrando... ${secondsRemaining}s restantes`;
+
+  if (pump4CalibTimerId) clearInterval(pump4CalibTimerId);
+
+  pump4CalibTimerId = setInterval(() => {
+    secondsRemaining -= 1;
+
+    if (secondsRemaining <= 0) {
+      clearInterval(pump4CalibTimerId);
+      pump4CalibRunning = false;
+      pump4CalibProgressWrapper.style.display = 'none';
+      pump4CalibProgressFill.style.width = '0%';
+      pump4CalibProgressLabel.textContent = 'Calibração concluída!';
+      pump4CalibStatusEl.textContent = 'Informe o volume medido e clique "Salvar calibração".';
+      pump4RunCalibBtn.disabled = false;
+    } else {
+      const percent = ((PUMP4_CALIB_SECONDS - secondsRemaining) / PUMP4_CALIB_SECONDS) * 100;
+      pump4CalibProgressFill.style.width = `${percent}%`;
+      pump4CalibProgressLabel.textContent = `Calibrando... ${secondsRemaining}s restantes`;
+    }
+  }, 1000);
+}
+
+// Calibração bomba 4: salvar mL/s (setpump4mlpersec)
+if (pump4SaveCalibBtn) {
+  pump4SaveCalibBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    const volStr = pump4CalibVolumeInput?.value || '';
+    const volume  = parseFloat(volStr);
+
+    if (!volume || volume <= 0) {
+      alert('Informe o volume medido em mL.');
+      return;
+    }
+
+    const mlpersec = volume / PUMP4_CALIB_SECONDS;
+    if (mlpersec <= 0 || mlpersec > 10) {
+      alert('Valor mL/s inválido (0–10). Verifique o volume..');
       return;
     }
 
     pump4CalibStatusEl.textContent =
-      `Enviando calibração de bomba 4 por ${seconds} s...`;
+      `Gravando calibração: ${mlpersec.toFixed(3)} mL/s...`;
 
     try {
-      await sendDeviceCommand(deviceId, 'pump4calibrate', { seconds });
+      await sendDeviceCommand(deviceId, 'setpump4mlpersec', { mlpersec });
       pump4CalibStatusEl.textContent =
-        `Calibração disparada. Meça o volume que saiu em ${seconds} s e informe abaixo.`;
+        `Calibração salva: ${mlpersec.toFixed(3)} mL/s.`;
+      pump4CalibVolumeInput.value = '';
     } catch (err) {
-      console.error('pump4calibrate error', err);
+      console.error('setpump4mlpersec error', err);
       pump4CalibStatusEl.textContent =
-        'Erro ao enviar comando de calibração da bomba 4.';
+        'Erro ao salvar calibração da bomba 4.';
     }
   });
 }
+
 
 // Calibração bomba 4: salvar mL/s (setpump4mlpersec)
 if (pump4SaveCalibBtn) {
