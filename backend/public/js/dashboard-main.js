@@ -55,6 +55,14 @@ const doseProgressWrapper = document.getElementById('doseProgressWrapper');
 const doseProgressFill    = document.getElementById('doseProgressFill');
 const doseProgressLabel   = document.getElementById('doseProgressLabel');
 
+const pump4CalibBtn            = document.getElementById('pump4CalibBtn');
+const pump4CalibProgressWrapper = document.getElementById('pump4CalibProgressWrapper');
+const pump4CalibProgressFill    = document.getElementById('pump4CalibProgressFill');
+const pump4CalibProgressLabel   = document.getElementById('pump4CalibProgressLabel');
+
+let pump4CalibTimerId = null;
+let pump4CalibEndTime = null;
+
 let pump4MlPerSec   = null;  // virá da API futuramente
 let isRunningDose   = false;
 let doseStartedAt   = null;
@@ -199,6 +207,44 @@ function stopDoseProgress(wasAborted) {
   }
 }
 
+function updatePump4CalibProgress() {
+  if (!pump4CalibEndTime || !pump4CalibProgressFill) return;
+
+  const now = Date.now();
+  const totalMs = 60 * 1000; // 60s fixos
+  const remainingMs = pump4CalibEndTime - now;
+  const clamped = Math.max(0, Math.min(totalMs, remainingMs));
+  const fraction = 1 - clamped / totalMs;
+  const percent = Math.round(fraction * 100);
+
+  pump4CalibProgressFill.style.width = `${percent}%`;
+
+  if (pump4CalibProgressLabel) {
+    const remainingSec = Math.ceil(clamped / 1000);
+    pump4CalibProgressLabel.textContent =
+      remainingMs > 0
+        ? `Calibração em andamento... ${remainingSec}s`
+        : 'Calibração concluída. Informe o volume medido abaixo.';
+  }
+
+  if (remainingMs <= 0 && pump4CalibTimerId) {
+    clearInterval(pump4CalibTimerId);
+    pump4CalibTimerId = null;
+  }
+}
+
+function startPump4CalibProgress() {
+  if (!pump4CalibProgressWrapper) return;
+
+  pump4CalibEndTime = Date.now() + 60 * 1000; // 60s
+  pump4CalibProgressWrapper.style.display = 'block';
+  pump4CalibProgressFill.style.width = '0%';
+  pump4CalibProgressLabel.textContent =
+    'Calibração em andamento... 60s';
+
+  if (pump4CalibTimerId) clearInterval(pump4CalibTimerId);
+  pump4CalibTimerId = setInterval(updatePump4CalibProgress, 500);
+}
 
 
 function applyTestModeUI(testModeEnabled) {
@@ -571,22 +617,23 @@ if (applyDoseBtn) {
       return;
     }
 
-    // Enquanto a taxa não vier da API, você pode:
-    // - testar com um valor fixo (ex.: 0.8 mL/s), ou
-    // - só mandar o comando sem barra se pump4MlPerSec não estiver setado.
-    const effectivePump4 = pump4MlPerSec && pump4MlPerSec > 0 ? pump4MlPerSec : 0.8;
+    const effectivePump4 =
+      pump4MlPerSec && pump4MlPerSec > 0 ? pump4MlPerSec : 0.8;
     const seconds = volume / effectivePump4;
     const totalMs = seconds * 1000;
 
     try {
-      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
-        method: 'POST',
-        headers: headersAuth,
-        body: JSON.stringify({
-          type: 'khcorrection',
-          params: { volume },
-        }),
-      });
+      await fetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
+        {
+          method: 'POST',
+          headers: headersAuth,
+          body: JSON.stringify({
+            type: 'khcorrection',
+            value: volume, // <<< AQUI, não params
+          }),
+        }
+      );
 
       startDoseProgress(totalMs);
     } catch (err) {
@@ -594,6 +641,7 @@ if (applyDoseBtn) {
     }
   });
 }
+
 
 
 if (abortBtn) {
@@ -619,6 +667,28 @@ if (abortBtn) {
   });
 }
 
+if (pump4CalibBtn) {
+  pump4CalibBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    try {
+      await fetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
+        {
+          method: 'POST',
+          headers: headersAuth,
+          body: JSON.stringify({ type: 'pump4calibrate' }),
+        }
+      );
+
+      // Inicia barra regressiva local de 60s
+      startPump4CalibProgress();
+    } catch (err) {
+      console.error('pump4calibrate command error', err);
+    }
+  });
+}
 
 
 // Inicialização da página principal
