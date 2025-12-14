@@ -462,23 +462,22 @@
         </div>
       </div>
 
-      <!-- Card: Calibração bomba 4 (KH) -->
+      <!-- Card: Calibração bomba 4 -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">Calibração bomba 4 (KH)</div>
         </div>
         <div class="card-subtitle">
-          Rode a bomba por um tempo fixo, meça o volume e salve a taxa em mL/s.
+          A bomba 4 rodará continuamente por 60 segundos. Use um béquer graduado para medir o volume.
         </div>
 
         <div class="field-row">
-          <label for="pump4CalibSeconds">Tempo de calibração (s)</label>
-          <div class="inline">
-            <input id="pump4CalibSeconds" type="number" min="10" max="300" value="60" />
-            <button id="pump4RunCalibBtn" class="btn-primary">Rodar calibração</button>
-          </div>
-          <div class="hint">
-            A bomba 4 vai rodar continuamente por esse tempo. Use um béquer graduado para medir o volume.
+          <button id="pump4RunCalibBtn" class="btn-primary">Rodar calibração (60s)</button>
+          <div id="pump4CalibProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+            <div class="progress-label" id="pump4CalibProgressLabel">Calibrando...</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="pump4CalibProgressFill"></div>
+            </div>
           </div>
         </div>
 
@@ -489,10 +488,11 @@
             <button id="pump4SaveCalibBtn" class="btn-primary">Salvar calibração</button>
           </div>
           <div id="pump4CalibStatus" class="hint">
-            Informe o volume que saiu no tempo de calibração para gravar a taxa em mL/s.
+            Informe o volume que saiu em 60 segundos para gravar a taxa em mL/s.
           </div>
         </div>
       </div>
+
 
       <!-- Card: Correção manual de KH (Bomba 4) -->
       <div class="card">
