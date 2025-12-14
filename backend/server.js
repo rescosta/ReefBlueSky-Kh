@@ -1853,20 +1853,25 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
         payload = {};
         break;
 
-      case 'setpump4mlpersec':
+       case 'setpump4mlpersec':
         // firmware: cmd.action == "setpump4mlpersec"
         // espera cmd.params["ml_per_sec"]
         dbType = 'setpump4mlpersec';
 
-        if (typeof value !== 'number' || value <= 0 || value > 10) {
+        // aceita number ou string; normaliza
+        let rate = req.body.value;
+        rate = typeof rate === 'string' ? parseFloat(rate) : rate;
+
+        if (!Number.isFinite(rate) || rate <= 0 || rate > 10) {
           return res.status(400).json({
             success: false,
-            message: 'value (ml/s) deve ser um número entre 0 e 10'
+            message: 'value (ml/s) deve ser um número entre 0 e 10',
           });
         }
 
-        payload = { ml_per_sec: value }; // <-- bate com cmd.params["ml_per_sec"]
+        payload = { ml_per_sec: rate }; // <-- bate com cmd.params["ml_per_sec"]
         break;
+
 
       case 'khcorrection':
         // firmware: cmd.action == "khcorrection"
