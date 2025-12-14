@@ -1106,10 +1106,17 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
       [userId]
     );
 
+    // normalizar lastSeen para ms desde epoch
+    const devices = rows.map((r) => ({
+      ...r,
+      lastSeen: r.lastSeen ? new Date(r.lastSeen).getTime() : null,
+    }));
+
     return res.json({
       success: true,
-      data: rows
+      data: devices,
     });
+
   } catch (err) {
     console.error('API /user/devices error:', err.message);
     return res.status(500).json({
@@ -1419,8 +1426,8 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     // 2) Atualizar IP local se veio no body
     if (local_ip) {
       await conn.query(
-        'UPDATE devices SET local_ip = ?, last_seen = NOW() WHERE deviceId = ?',
-        [local_ip, req.user.deviceId]
+        'UPDATE devices SET local_ip = COALESCE(?, local_ip), last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
+        [local_ip || null, req.user.deviceId]
       );
     }
 
@@ -1518,6 +1525,11 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       memory: health.memory_usage + '%',
       uptime: health.uptime + 's',
     });
+
+    await pool.query(
+      'UPDATE devices SET last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
+      [deviceId]
+    );
 
     await pool.query(
       `INSERT INTO device_health
