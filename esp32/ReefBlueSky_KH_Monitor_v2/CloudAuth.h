@@ -59,7 +59,7 @@ struct Command {
     StaticJsonDocument<256> paramsDoc;
     JsonObject params;
 
-    Command() : paramsDoc(), params(paramsDoc.to<JsonObject>()) {}
+    Command() : paramsDoc(), params() {}   // só zera, sem mexer no doc
 };
 
 
@@ -120,9 +120,18 @@ private:
         "restart",      
         "factoryreset", 
         "manualpump",     
-        "khcorrection" 
+        "khcorrection",
+        "setkhreference",
+        "setintervalminutes",  
+        "testmode",
+        "testnow", 
+        "abort",
+        "pump4calibrate",
+        "setpump4mlpersec"
     };
-    static constexpr int ALLOWED_COUNT = 14;
+    static constexpr int ALLOWED_COUNT = 
+        sizeof(ALLOWED_COMMANDS) / sizeof(ALLOWED_COMMANDS[0]);
+
     
 public:
     bool isCommandAllowed(const String& command) {
@@ -280,6 +289,9 @@ public:
     // [SEGURANÇA] Obter token válido para requisições
     String getAuthToken();
     
+    // obter KH de referência do servidor, se existir
+    bool fetchReferenceKH(float& outKhRef);
+
     // [FUNCIONALIDADE] Armazenar dados offline (se sem WiFi)
     void queueMeasurement(const Measurement& m);
     

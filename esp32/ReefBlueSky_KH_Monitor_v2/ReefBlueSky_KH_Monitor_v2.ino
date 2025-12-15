@@ -35,17 +35,23 @@ extern CloudAuth cloudAuth;
 
 void debugForceSync() {
   Measurement m;
-  m.timestamp   = getCurrentEpochMs(); 
-  m.kh          = 7.0; // resultado da conta
-  m.ph_reference= 8.2; //puxar do sistema
-  m.ph_sample   = 8.0; // puxar da sonda de ph
-  m.temperature = 24.0; // puxar do termometro
-  m.is_valid    = true; // criar validação
-  m.confidence  = 0.9; // criar desvio esperado
+  m.timestamp    = getCurrentEpochMs();
+  m.kh           = 7.0;   // resultado da conta
+  m.ph_reference = 8.2;   // puxar do sistema depois
+  m.ph_sample    = 8.0;   // puxar da sonda de pH depois
+  m.temperature  = 24.0;  // puxar do termômetro depois
+  m.is_valid     = true;
+  m.confidence   = 0.9;
 
   cloudAuth.queueMeasurement(m);
+  Serial.printf("[DEBUG] Medição fake enfileirada. Fila: %d\n",
+                cloudAuth.getQueueSize());
+
+  // Forçar envio imediato para o backend
   cloudAuth.syncOfflineMeasurements();
+  Serial.println("[DEBUG] Sync manual disparado.");
 }
+
 // fim do teste
 
 
@@ -64,8 +70,6 @@ void debugForceSync() {
 // =================================================================================
 // Configurações de Comunicação
 // =================================================================================
-const unsigned long SYNC_INTERVAL_MS = 60UL * 1000UL; // 1 minuto
-unsigned long lastSyncAttempt = 0;                    // global
 
 const char* ssid = "CRB_Engenharia_2G";
 const char* password = "crbengenharia2022";
@@ -87,6 +91,8 @@ const char* mqtt_topic_reset_kh = "reefbluesky/kh_monitor/reset_kh";
 // Vazão calibrada da bomba 1 (mL/s). Ajuste após teste real.
 const float PUMP1MLPERSEC = 0.8f;
 const int   MAX_CORRECTION_SECONDS = 120;  // safety
+// Vazão da bomba 4 (correção de KH) em mL/s, calibrável
+float pump4MlPerSec = 0.8f;   // valor default até calibrar
 
 //NTP
 
@@ -94,6 +100,13 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = -3 * 3600;  // fuso -03
 const int   daylightOffset_sec = 0;
 
+//
+
+const unsigned long CMD_INTERVAL_MS  = 3000;   // 3 s
+const unsigned long SYNC_INTERVAL_MS = 60000;  // 60 s
+
+static unsigned long lastCmdPoll  = 0;
+static unsigned long lastSyncTry  = 0;
 
 // =================================================================================
 // Objetos Globais
@@ -104,7 +117,9 @@ SensorManager sensorManager(PH_PIN, ONE_WIRE_BUS);
 KH_Analyzer khAnalyzer(&pumpControl, &sensorManager);
 WiFi_MQTT wifiMqtt(ssid, password, mqtt_server, 1883);
 MeasurementHistory history;
-WebServer webServer(80);  // [RESET] Servidor web na porta 80
+WebServer webServer(80); 
+
+
 WiFiSetup wifiSetup;
 
 
@@ -157,6 +172,10 @@ void setup() {
   khAnalyzer.begin();
   history.begin();
 
+    // carregar calibração da bomba 4
+  loadPump4CalibrationFromSPIFFS();
+
+
   // Iniciar sistema de configuração WiFi (STA ou AP)
   Serial.println("[Main] Iniciando WiFiSetup...");
   bool wifiOk = wifiSetup.begin();   // conecta com config salva ou cria AP
@@ -186,17 +205,46 @@ void setup() {
 //  } else {
 //    systemState = IDLE;
   
+
+  khAnalyzer.begin();
+
+  Serial.printf("[BOOT] kh_configured=%s, kh_reference=%.2f\n",
+                khAnalyzer.isReferenceKHConfigured() ? "true" : "false",
+                khAnalyzer.getReferenceKH());
+
+  // Se vier false mas o valor for > 0, assume que está configurado
+  if (!khAnalyzer.isReferenceKHConfigured() && khAnalyzer.getReferenceKH() > 0.0f) {
+    Serial.println("[BOOT] Ajustando flag de KH configurado (valor > 0 detectado).");
+    khAnalyzer.setReferenceKH(khAnalyzer.getReferenceKH());
+  }
+
+
     // Permitir iniciar mesmo sem KH, só logando
-    if (!khAnalyzer.isReferenceKHConfigured()) {
-      Serial.println("[BOOT] KH de referência ainda não configurado (servidor vai enviar depois).");
+  if (!khAnalyzer.isReferenceKHConfigured()) {
+    Serial.println("[BOOT] KH ref não encontrado em SPIFFS. Tentando buscar do servidor...");
+
+    float serverKh = 0.0f;
+    if (cloudAuth.fetchReferenceKH(serverKh)) {
+      Serial.printf("[BOOT] KH referência obtido da nuvem: %.2f dKH\n", serverKh);
+      khAnalyzer.setReferenceKH(serverKh);
+      systemState = IDLE;
+    } else {
+      Serial.println("[BOOT] KH referência indisponível. Aguardando configuração inicial.");
+      systemState = WAITING_CALIBRATION;
     }
+  } else {
+    Serial.println("[BOOT] KH referência já configurado em SPIFFS.");
     systemState = IDLE;
+  }
 
   // [RESET] Configurar endpoints web
   setupWebServer();
 
   // [RESET] Configurar callbacks MQTT para reset
   //setupMQTTCallbacks();
+  Serial.printf("[BOOT] kh_configured=%s, kh_reference=%.2f\n",
+              khAnalyzer.isReferenceKHConfigured() ? "true" : "false",
+              khAnalyzer.getReferenceKH());
 
 }
 
@@ -205,6 +253,21 @@ void setup() {
 // =================================================================================
 
 void loop() {
+  unsigned long now = millis();
+
+  // polling de comandos
+  if (now - lastCmdPoll >= CMD_INTERVAL_MS) {
+
+    lastCmdPoll = now;
+    processCloudCommand();   // deixa essa função decidir se há comando
+  }
+
+
+  // sync de medições (só se tiver fila)
+  if (now - lastSyncTry >= SYNC_INTERVAL_MS) {
+    lastSyncTry = now;
+    cloudAuth.syncOfflineMeasurements();
+  }
 
   if (Serial.available()) {
       char c = Serial.read();
@@ -236,18 +299,16 @@ void loop() {
       systemState = IDLE;
       break;
 
-    case WAITING_CALIBRATION:
-    
-      // Se durante o runtime o KH passar a estar configurado, sai desse estado
-      //if (khAnalyzer.isReferenceKHConfigured()) {
-      //  Serial.println("[Main] KH configurado durante o runtime. Indo para IDLE.");
-        systemState = IDLE;
+      case WAITING_CALIBRATION:
+        // Se durante o runtime o KH passar a estar configurado, sai desse estado
+        if (khAnalyzer.isReferenceKHConfigured()) {
+          Serial.println("[Main] KH configurado durante o runtime. Indo para IDLE.");
+          systemState = IDLE;
+        } else {
+          delay(1000);
+          Serial.println("[Main] Aguardando calibração... Configure KH via web");
+        }
         break;
-
-      // [BOOT] Aguardar configuração de KH
-      delay(1000);
-      Serial.println("[Main] Aguardando calibração... Configure KH via web");
-      break;
 
     case IDLE:
       if (forceImmediateMeasurement) {
@@ -275,19 +336,9 @@ void loop() {
       break;
   }
 
-  unsigned long now = millis();
   if (now - lastHealthSent >= HEALTH_INTERVAL_MS) {
     sendHealthToCloud();
     lastHealthSent = now;
-  }
-
-  // processar comandos da nuvem
-  processCloudCommand();
-  if (now - lastSyncAttempt >= SYNC_INTERVAL_MS) {
-    lastSyncAttempt = now;
-    if (cloudAuth.getQueueSize() > 0) {
-      cloudAuth.syncOfflineMeasurements();
-    }
   }
 
 }
@@ -553,7 +604,7 @@ void performMeasurement() {
 
       if (deviceToken.length() > 0) {
         cloudAuth.queueMeasurement(mc);
-        cloudAuth.syncOfflineMeasurements();
+        //cloudAuth.syncOfflineMeasurements();
         sendHealthToCloud(); 
       }
 
@@ -568,6 +619,69 @@ void performMeasurement() {
     }
   }
 }
+
+// =================================================================================
+// Calibração da bomba 4 (correção de KH)
+// =================================================================================
+
+void savePump4CalibrationToSPIFFS() {
+  if (!SPIFFS.begin(true)) {
+    Serial.println("[Pump4] Erro ao montar SPIFFS para salvar calibração");
+    return;
+  }
+
+  File f = SPIFFS.open("/pump4_calib.json", FILE_WRITE);
+  if (!f) {
+    Serial.println("[Pump4] Erro ao abrir /pump4_calib.json para escrita");
+    return;
+  }
+
+  StaticJsonDocument<128> doc;
+  doc["ml_per_sec"] = pump4MlPerSec;
+
+  if (serializeJson(doc, f) == 0) {
+    Serial.println("[Pump4] Erro ao serializar JSON de calibração");
+  } else {
+    Serial.printf("[Pump4] Calibração salva: %.4f mL/s\n", pump4MlPerSec);
+  }
+  f.close();
+}
+
+void loadPump4CalibrationFromSPIFFS() {
+  if (!SPIFFS.begin(true)) {
+    Serial.println("[Pump4] Erro ao montar SPIFFS para ler calibração");
+    return;
+  }
+
+  if (!SPIFFS.exists("/pump4_calib.json")) {
+    Serial.println("[Pump4] Sem calibração de bomba 4, usando default");
+    return;
+  }
+
+  File f = SPIFFS.open("/pump4_calib.json", FILE_READ);
+  if (!f) {
+    Serial.println("[Pump4] Erro ao abrir /pump4_calib.json para leitura");
+    return;
+  }
+
+  StaticJsonDocument<128> doc;
+  DeserializationError err = deserializeJson(doc, f);
+  f.close();
+
+  if (err) {
+    Serial.printf("[Pump4] Erro JSON calibração: %s\n", err.c_str());
+    return;
+  }
+
+  float v = doc["ml_per_sec"] | 0.0f;
+  if (v > 0.0f && v < 10.0f) {
+    pump4MlPerSec = v;
+    Serial.printf("[Pump4] Calibração carregada: %.4f mL/s\n", pump4MlPerSec);
+  } else {
+    Serial.println("[Pump4] Calibração inválida em arquivo, mantendo default");
+  }
+}
+
 
 void sendHealthToCloud() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -621,6 +735,7 @@ void processCloudCommand() {
   if (deviceToken.length() == 0) return;
 
   Command cmd;
+  // nada aqui ainda, só pra garantir
   if (!cloudAuth.pullCommandFromServer(cmd)) {
     return; // sem comando ou erro
   }
@@ -696,6 +811,43 @@ void processCloudCommand() {
         else if (pumpId == 3) pumpControl.pumpC_stop();
       }
     }
+  } else if (cmd.action == "pump4calibrate") {
+    // Espera payload opcional: { "seconds": 60 }
+    int seconds = 60;
+    if (!cmd.params.isNull()) {
+      seconds = cmd.params["seconds"] | 60;
+    }
+
+    if (seconds <= 0 || seconds > 300) {
+      ok = false;
+      errorMsg = "invalid seconds";
+    } else {
+      Serial.printf("[CMD] pump4calibrate: %d s\n", seconds);
+
+      // aqui assume que bomba 4 == pump A; se for outra, ajuste
+      pumpControl.pumpA_fill();
+      unsigned long endTime = millis() + (unsigned long)seconds * 1000UL;
+      while (millis() < endTime) {
+        delay(10);
+      }
+      pumpControl.pumpA_stop();
+    }
+
+  } else if (cmd.action == "setpump4mlpersec") {
+    if (cmd.params.isNull()) {
+      ok = false;
+      errorMsg = "missing payload";
+    } else {
+      float v = cmd.params["ml_per_sec"] | 0.0f;
+      if (v <= 0.0f || v > 10.0f) {
+        ok = false;
+        errorMsg = "invalid ml_per_sec";
+      } else {
+        pump4MlPerSec = v;
+        Serial.printf("[CMD] setpump4mlpersec: %.4f mL/s\n", pump4MlPerSec);
+        savePump4CalibrationToSPIFFS();
+      }
+    }
 
   } else if (cmd.action == "khcorrection") {
     if (cmd.params.isNull()) {
@@ -707,7 +859,7 @@ void processCloudCommand() {
         ok = false;
         errorMsg = "invalid volume";
       } else {
-        float secondsF = volume / PUMP1MLPERSEC;
+        float secondsF = volume / pump4MlPerSec;
         int seconds = (int)roundf(secondsF);
 
         if (seconds <= 0) {
@@ -746,19 +898,35 @@ void processCloudCommand() {
         systemState = IDLE;
       }
     }
-  } else if (cmd.action == "setintervalminutes") {      // <<< AQUI
+  } else if (cmd.action == "setintervalminutes") {
+    Serial.println("[CMD] setintervalminutes handler entrou");
+
     if (cmd.params.isNull()) {
+      Serial.println("[CMD] setintervalminutes: params NULL");
       ok = false;
       errorMsg = "missing payload";
     } else {
-      int minutes = cmd.params["minutes"] | 0;
-      if (minutes <= 0 || minutes > 24 * 60) {
+      // debug bruto do JSON
+      Serial.print("[CMD] raw params: ");
+      serializeJson(cmd.params, Serial);
+      Serial.println();
+
+      if (!cmd.params.containsKey("minutes")) {
+        Serial.println("[CMD] setintervalminutes: key 'minutes' ausente");
         ok = false;
-        errorMsg = "invalid minutes";
+        errorMsg = "missing minutes";
       } else {
-        unsigned long ms = (unsigned long)minutes * 60UL * 1000UL;
-        measurementInterval = ms;
-        Serial.printf("[CMD] setintervalminutes: %d min (interval=%lu ms)\n", minutes, ms);
+        int minutes = cmd.params["minutes"] | 0;
+        Serial.printf("[CMD] minutes lido=%d\n", minutes);
+
+        if (minutes <= 0 || minutes > 24 * 60) {
+          ok = false;
+          errorMsg = "invalid minutes";
+        } else {
+          unsigned long ms = (unsigned long)minutes * 60UL * 1000UL;
+          measurementInterval = ms;
+          Serial.printf("[CMD] setintervalminutes: %d min (interval=%lu ms)\n", minutes, ms);
+        }
       }
     }
   } else if (cmd.action == "testmode") {
@@ -781,5 +949,3 @@ void processCloudCommand() {
   String statusStr = ok ? "done" : "error";
   cloudAuth.confirmCommandExecution(cmd.command_id, statusStr, errorMsg);
 }
-
-

@@ -514,6 +514,59 @@ bool CloudAuth::sendHealthMetrics(const SystemHealth& health) {
 }
 
 // ============================================================================
+// Obter KH de referência do servidor (se existir)
+// ============================================================================
+
+bool CloudAuth::fetchReferenceKH(float& outKhRef) {
+    if (!rateLimiter.canMakeRequest()) {
+        return false;
+    }
+
+    WiFiClient client;
+    HTTPClient http;
+    String url = String(serverUrl) + "/device/kh-reference";
+
+    http.begin(client, url);
+    http.addHeader("Authorization", "Bearer " + deviceToken);
+
+    int httpCode = http.GET();
+    if (httpCode != 200) {
+        Serial.printf("[CloudAuth::fetchReferenceKH] HTTP %d\n", httpCode);
+        http.end();
+        return false;
+    }
+
+    String response = http.getString();
+    StaticJsonDocument<256> doc;
+    DeserializationError err = deserializeJson(doc, response);
+    if (err) {
+        Serial.printf("[CloudAuth::fetchReferenceKH] JSON inválido: %s\n", err.c_str());
+        http.end();
+        return false;
+    }
+
+    bool success = doc["success"] | false;
+    if (!success || doc["data"].isNull()) {
+        Serial.println("[CloudAuth::fetchReferenceKH] Sem KH referência no servidor");
+        http.end();
+        return false;
+    }
+
+    float v = doc["data"]["khreference"] | 0.0f;
+    if (v <= 0.0f || v > 25.0f) {
+        Serial.println("[CloudAuth::fetchReferenceKH] KH inválido no servidor");
+        http.end();
+        return false;
+    }
+
+    outKhRef = v;
+    http.end();
+    return true;
+}
+
+
+
+// ============================================================================
 // [SEGURANÇA] Obter Comandos do Servidor com Validação
 // ============================================================================
 
@@ -574,21 +627,14 @@ bool CloudAuth::pullCommandFromServer(Command& command) {
 
         // aqui você limpa o documento antes de reutilizar
         command.paramsDoc.clear();
-
+        JsonObject dst = command.paramsDoc.to<JsonObject>();
         JsonVariant payloadVar = cmdObj["payload"];
-        Serial.printf("[CloudAuth] payload isNull=%d isObject=%d\n",
-                    payloadVar.isNull(), payloadVar.is<JsonObject>());
-
-        if (!payloadVar.isNull() && payloadVar.is<JsonObject>()) {
+        if (payloadVar.is<JsonObject>()) {
             JsonObject src = payloadVar.as<JsonObject>();
-            JsonObject dst = command.paramsDoc.to<JsonObject>();
             for (JsonPair kv : src) {
                 dst[kv.key()] = kv.value();
             }
-        } else {
-            command.paramsDoc.to<JsonObject>(); // deixa vazio
         }
-
         // reata params ao paramsDoc
         command.params = command.paramsDoc.as<JsonObject>();
 
