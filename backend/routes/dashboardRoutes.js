@@ -7,6 +7,6 @@ const userController = require('../controllers/userController');
 
 // Endpoint usado pelo dashboard-common.js
 // GET /api/v1/user/devices
-router.get('/user/devices', authUserMiddleware, userController.getUserDevices);
+router.get('/user/devices', authUserMiddleware, userController.listUserDevices);
 
 module.exports = router;
