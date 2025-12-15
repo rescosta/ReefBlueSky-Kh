@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { authUserMiddleware } = require('../middlewares/auth');
+const { authUserMiddleware } = require('../middlewares/authMiddleware');
 const userController = require('../controllers/userController');
 
 // Endpoint usado pelo dashboard-common.js
