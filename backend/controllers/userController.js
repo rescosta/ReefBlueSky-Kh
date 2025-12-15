@@ -115,5 +115,6 @@ const getDeviceEvents = async (req, res) => {
 module.exports = { 
   getUserProfile, 
   listUserDevices, 
-  getDeviceMeasurements 
+  getDeviceMeasurements,
+  getDeviceEvents
 };
