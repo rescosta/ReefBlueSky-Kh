@@ -4,7 +4,7 @@
  */
 const nodemailer = require('nodemailer');
 
-const mailTransporter = nodemailer.createTransporter({
+const mailTransporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: Number(process.env.EMAIL_PORT),
   secure: false,
