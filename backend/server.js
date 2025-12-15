@@ -20,6 +20,8 @@ const deviceRoutes = require('./routes/deviceRoutes');
 const devRoutes = require('./routes/devRoutes');
 const statusRoutes = require('./routes/statusRoutes');
 
+const dashboardRoutes = require('./routes/dashboardRoutes');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -52,6 +54,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/device', deviceRoutes);
 app.use('/api/v1/dev', devRoutes);
 app.use('/api/v1', statusRoutes); // /status e /health
+app.use('/api/v1', dashboardRoutes);   // /user/devices
 
 // 404 - Rota não encontrada (equivalente ao server antigo)
 app.use((req, res) => {
