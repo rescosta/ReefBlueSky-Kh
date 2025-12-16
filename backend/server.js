@@ -154,13 +154,29 @@ async function checkDevicesOffline() {
       }
 
       // Voltou a ficar online → limpa flag
-      if (!isOffline && row.offline_alert_sent) {
-        console.log(`[ALERT] Device ${row.deviceId} voltou, limpando flag offline_alert_sent`);
-        await conn.query(
-          'UPDATE devices SET offline_alert_sent = 0 WHERE id = ?',
-          [row.id]
-        );
+      if (!isOffline && d.offlinealertsent) {
+        // Device voltou a ficar online: envia e-mail de ONLINE e limpa flag
+        try {
+          await conn.query('UPDATE devices SET offlinealertsent = 0 WHERE id = ?', [d.id]);
+
+          const subject = `ReefBlueSky KH - Device ${d.deviceId} voltou ONLINE`;
+          const text =
+            `Seu dispositivo ${d.deviceId} voltou a se comunicar com o servidor.\n` +
+            `Último sinal recebido agora em ${new Date().toISOString()} (horário do servidor).`;
+
+          await mailTransporter.sendMail({
+            from: ALERT_FROM,
+            to: d.email,
+            subject,
+            text,
+          });
+
+          console.log('ALERT Device voltou online, e-mail enviado para', d.email, 'device', d.deviceId);
+        } catch (err) {
+          console.error('ALERT Erro ao tratar retorno online para device', d.deviceId, err.message);
+        }
       }
+
     }
   } catch (err) {
     console.error('Erro no monitor de devices offline:', err.message);
@@ -2118,7 +2134,8 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         kh_reference,
         kh_tolerance_daily,
         kh_alert_enabled,
-        kh_alert_channel
+        kh_alert_channel,
+        pump4_ml_per_sec
       FROM devices
       WHERE deviceId = ? AND userId = ?
       LIMIT 1
@@ -2138,6 +2155,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         khToleranceDaily: cfg.kh_tolerance_daily,
         khAlertEnabled: cfg.kh_alert_enabled,
         khAlertChannel: cfg.kh_alert_channel,
+        pump4MlPerSec: cfg.pump4_ml_per_sec,
       },
     });
   } catch (err) {
@@ -2609,19 +2627,20 @@ app.get('/api/v1/health', (req, res) => {
  * - Um device é considerado OFFLINE se lastseen < now - 5min.
  * - A cada 30s, verificamos devices e geramos alertas 1x por “queda”:
  *   - Quando mudar de online -> offline, envia e-mail para o dono.
+ *   - Quando mudar de offline -> online, envia e-mail de retorno.
  *   - Não repete o alerta enquanto o device continuar offline.
  *
  * Tabela devices:
- *   - lastseen (DATETIME ou TIMESTAMP)
- *   - offline_alert_sent TINYINT(1) DEFAULT 0  (precisa existir)
+ *   - last_seen (DATETIME ou TIMESTAMP)
+ *   - offline_alert_sent TINYINT(1) DEFAULT 0
  */
 const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutos
 const MONITOR_INTERVAL_MS  = 30 * 1000;     // 30 segundos
 
 async function checkDevicesOnlineStatus() {
   const now = Date.now();
-
   let conn;
+
   try {
     conn = await pool.getConnection();
 
@@ -2644,6 +2663,7 @@ async function checkDevicesOnlineStatus() {
       const lastSeenMs = new Date(d.last_seen).getTime();
       const isOffline = (now - lastSeenMs) > OFFLINE_THRESHOLD_MS;
 
+      // Ficou offline e ainda não mandou alerta
       if (isOffline && !d.offline_alert_sent) {
         try {
           await conn.query(
@@ -2670,31 +2690,48 @@ async function checkDevicesOnlineStatus() {
         }
       }
 
+      // Voltou a ficar online → envia e-mail e limpa flag
       if (!isOffline && d.offline_alert_sent) {
         try {
           await conn.query(
             'UPDATE devices SET offline_alert_sent = 0 WHERE id = ?',
             [d.id]
           );
-          console.log('[ALERT] Device voltou online, resetando flag de alerta:', d.deviceId);
+
+          const subject = `ReefBlueSky KH - Device ${d.deviceId} voltou ONLINE`;
+          const text =
+            `Seu dispositivo ${d.deviceId} voltou a se comunicar com o servidor.\n` +
+            `Último sinal recebido agora em ${new Date().toISOString()} (horário do servidor).`;
+
+          await mailTransporter.sendMail({
+            from: ALERT_FROM,
+            to: d.email,
+            subject,
+            text,
+          });
+
+          console.log(
+            '[ALERT] Device voltou online, e-mail enviado para',
+            d.email,
+            'device',
+            d.deviceId
+          );
         } catch (err) {
-          console.error('[ALERT] Erro ao resetar flag offline_alert_sent para', d.deviceId, err.message);
+          console.error(
+            '[ALERT] Erro ao tratar retorno online para device',
+            d.deviceId,
+            err.message
+          );
         }
       }
     }
   } catch (err) {
-    console.error('[ALERT] Erro em checkDevicesOnlineStatus:', err.message);
+    console.error('[ALERT] Erro no monitor de devices online/offline:', err.message);
   } finally {
-    if (conn) {
-      try { conn.release(); } catch (e) {
-        console.error('[ALERT] Erro ao liberar conexão em checkDevicesOnlineStatus:', e.message);
-      }
-    }
+    if (conn) conn.release();
   }
 }
 
-
-// Inicia o monitor a cada 30 segundos
 setInterval(checkDevicesOnlineStatus, MONITOR_INTERVAL_MS);
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
 
