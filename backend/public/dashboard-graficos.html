@@ -222,36 +222,23 @@
       </div>
 
       <div class="filters">
-        <div>
-          <label for="periodSelect">Período rápido:</label>
-          <select id="periodSelect">
-            <option value="1h">Última 1h</option>
-            <option value="24h" selected>Últimas 24h</option>
-            <option value="7d">Últimos 7 dias</option>
-          </select>
-        </div>
-        <div>
-          <label for="fromInput">De:</label>
-          <input id="fromInput" type="datetime-local" />
-        </div>
-        <div>
-          <label for="toInput">Até:</label>
-          <input id="toInput" type="datetime-local" />
-        </div>
-        <button id="loadChartBtn">Carregar</button>
-        <span id="chartInfo" class="muted">Nenhum dado carregado ainda.</span>
+        <span id="chartInfo" class="muted">
+          Carregando dados de KH diário, semanal e mensal...
+        </span>
       </div>
 
-      <!-- Área do gráfico real -->
       <div class="chart-placeholder">
-        <canvas id="khChart"></canvas>
+        <canvas id="khDailyChart"></canvas>
       </div>
 
-      <!-- Texto de debug / fallback -->
-      <div id="chartPlaceholder" class="chart-placeholder" style="margin-top:8px;">
-        Gráfico ainda em modo placeholder.
-        Assim que os dados forem carregados, esta área pode ser ligada ao Chart.js.
+      <div class="chart-placeholder" style="margin-top:8px;">
+        <canvas id="khWeeklyChart"></canvas>
       </div>
+
+      <div class="chart-placeholder" style="margin-top:8px;">
+        <canvas id="khMonthlyChart"></canvas>
+      </div>
+
 
     </div>
   </div>
