@@ -59,7 +59,6 @@ let pump4CalibTimerId = null;
 const PUMP4_CALIB_SECONDS = 60;
 
 const khCorrectionVolumeInput = document.getElementById('khCorrectionVolume');
-const khCorrectionBtn = document.getElementById('khCorrectionBtn');
 const khCorrectionStatus = document.getElementById('khCorrectionStatus');
 const startCalibrationBtn = document.getElementById('startCalibrationBtn');
 const calibrationStatus = document.getElementById('calibrationStatus');
