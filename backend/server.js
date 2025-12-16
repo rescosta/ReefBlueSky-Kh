@@ -2276,11 +2276,13 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
       console.log('[CMD] setkhreference enfileirado', deviceId, khReference);
     }
 
-    return res.json({ success: true, message: 'KH config atualizada.' });
-  } catch (err) {
-    console.error('Error updating KH config', err);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
-  }
+    if (khTarget != null) {
+      await enqueueDbCommand(deviceId, 'setkhtarget', { value: khTarget });
+      console.log('[CMD] setkhtarget enfileirado', deviceId, khTarget);
+    }
+
+    return res.json({ success: true, message: 'KH config atualizada.' 
+
 });
 
 
