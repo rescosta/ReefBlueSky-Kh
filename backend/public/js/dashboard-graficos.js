@@ -81,7 +81,7 @@ function renderSeries(measures) {
   const points = measures
     .filter((m) => typeof m.kh === 'number' && m.timestamp)
     .map((m) => ({
-      x: new Date(m.timestamp),
+      x: m.timestamp, 
       y: m.kh,
     }));
 
@@ -90,7 +90,7 @@ function renderSeries(measures) {
     'Primeiros pontos de KH (x=Data/hora, y=KH):\n\n' +
     points
       .slice(0, 10)
-      .map((p) => `${formatDateTime(p.x.getTime())}  →  ${p.y.toFixed(2)} dKH`)
+      .map((p) => `${formatDateTime(p.x)}  →  ${p.y.toFixed(2)} dKH`)
       .join('\n');
 
   // Destroi gráfico anterior se existir
@@ -123,12 +123,13 @@ function renderSeries(measures) {
       parsing: false, // usa x/y direto
       scales: {
         x: {
-          type: 'time',
-          time: {
-            unit: 'hour',
-          },
+          type: 'linear',
           ticks: {
             color: '#9ca3af',
+            callback: (value) => {
+              // value vem em ms (timestamp)
+              return formatDateTime(value);
+            },
           },
           grid: {
             color: '#1f2937',
@@ -147,6 +148,7 @@ function renderSeries(measures) {
           },
         },
       },
+
       plugins: {
         legend: {
           labels: {
