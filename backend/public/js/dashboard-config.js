@@ -65,6 +65,10 @@ const calibrationStatus = document.getElementById('calibrationStatus');
 const abortBtn = document.getElementById('abortBtn');
 let isRunningCycle = false;
 
+const deviceNameInput  = document.getElementById('deviceNameInput');
+const saveDeviceNameBtn = document.getElementById('saveDeviceNameBtn');
+const deviceNameStatus  = document.getElementById('deviceNameStatus');
+
 
 
 async function sendDeviceCommand(deviceId, type, value = null) {
@@ -355,6 +359,52 @@ async function loadConfigForSelected() {
     });
   }
 }
+
+
+async function apiSetDeviceName(deviceId, name) {
+  try {
+    const res = await fetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/name`,
+      {
+        method: 'PUT',
+        headers: headersAuthCfg,
+        body: JSON.stringify({ name }),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      console.error(json.message || 'Erro ao salvar nome do device');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('apiSetDeviceName error', err);
+    return false;
+  }
+}
+
+if (saveDeviceNameBtn) {
+  saveDeviceNameBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    const name = (deviceNameInput.value || '').trim();
+    if (!name) {
+      alert('Informe um nome para o dispositivo.');
+      return;
+    }
+
+    const ok = await apiSetDeviceName(deviceId, name);
+    if (ok) {
+      deviceNameStatus.textContent = 'Nome atualizado.';
+      // dispara refresh da lista/topbar
+      window.dispatchEvent(new CustomEvent('deviceChanged'));
+    } else {
+      deviceNameStatus.textContent = 'Erro ao atualizar nome.';
+    }
+  });
+}
+
 
 async function apiSetKhConfig(deviceId, khReference, khTarget) {
   try {
