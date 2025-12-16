@@ -1,6 +1,6 @@
 /**
  * Controlador de Usuários - Dashboard e listagem de dispositivos
- * Lógica para /auth/me, /user/devices, histórico de medições
+ * Perfil, /user/devices, histórico, eventos e config KH/status
  */
 
 const Device = require('../models/Device');
@@ -124,9 +124,132 @@ const getDeviceEvents = async (req, res) => {
   }
 };
 
+/**
+ * KH config de um device (rota usada pelo dashboard-config.js)
+ * GET /api/v1/user/devices/:deviceId/kh-config
+ */
+const getDeviceKhConfig = async (req, res) => {
+  const userId = req.user.userId;
+  const { deviceId } = req.params;
+
+  try {
+    const devices = await Device.findByUserId(userId);
+    const dev = devices.find((d) => d.deviceId === deviceId);
+
+    if (!dev) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device não encontrado para este usuário',
+      });
+    }
+
+    // OBS: Device.findByUserId hoje não traz khreference/khtarget/interval,
+    // então aqui devolvemos apenas o que está disponível;
+    // se esses campos existirem na tabela, depois ajusta o SELECT do modelo.
+    return res.json({
+      success: true,
+      data: {
+        deviceId: dev.deviceId,
+        name: dev.name,
+        localIp: dev.localIp || null,
+        lastSeen: dev.lastSeen || null,
+        khReference: dev.khreference ?? null,
+        khTarget: dev.khtarget ?? null,
+        intervalMinutes: dev.interval_minutes ?? null,
+      },
+    });
+  } catch (err) {
+    console.error('KH CONFIG GET ERROR:', err);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro ao carregar KH config' });
+  }
+};
+
+/**
+ * Atualiza KH config do device
+ * PUT /api/v1/user/devices/:deviceId/kh-config
+ */
+const updateDeviceKhConfig = async (req, res) => {
+  const userId = req.user.userId;
+  const { deviceId } = req.params;
+  const { khReference, khTarget, intervalMinutes } = req.body;
+
+  try {
+    const devices = await Device.findByUserId(userId);
+    const dev = devices.find((d) => d.deviceId === deviceId);
+
+    if (!dev) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device não encontrado para este usuário',
+      });
+    }
+
+    // Aqui ainda não existe Device.updateKhConfig no modelo.
+    // No mínimo, você tem o deviceId e pode implementar depois
+    // algo como UPDATE devices SET khreference=?, khtarget=?, interval_minutes=?.
+    console.log('[KH CONFIG] update requested', {
+      deviceId,
+      khReference,
+      khTarget,
+      intervalMinutes,
+    });
+
+    // TODO: implementar de fato o update no modelo Device
+    // await Device.updateKhConfig(deviceId, { khReference, khTarget, intervalMinutes });
+
+    return res.json({ success: true, message: 'KH config recebida (TODO persistir)' });
+  } catch (err) {
+    console.error('KH CONFIG UPDATE ERROR:', err);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro ao salvar KH config' });
+  }
+};
+
+/**
+ * Status do device para tela de config
+ * GET /api/v1/user/devices/:deviceId/status
+ */
+const getDeviceStatusForUser = async (req, res) => {
+  const userId = req.user.userId;
+  const { deviceId } = req.params;
+
+  try {
+    const devices = await Device.findByUserId(userId);
+    const dev = devices.find((d) => d.deviceId === deviceId);
+
+    if (!dev) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device não encontrado para este usuário',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        deviceId: dev.deviceId,
+        name: dev.name,
+        localIp: dev.localIp || null,
+        lastSeen: dev.lastSeen || null,
+      },
+    });
+  } catch (err) {
+    console.error('DEVICE STATUS ERROR:', err);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro ao carregar status do device' });
+  }
+};
+
 module.exports = {
   getUserProfile,
   listUserDevices,
   getDeviceMeasurements,
   getDeviceEvents,
+  getDeviceKhConfig,
+  updateDeviceKhConfig,
+  getDeviceStatusForUser,
 };
