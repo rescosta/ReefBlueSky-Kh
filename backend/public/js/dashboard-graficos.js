@@ -236,6 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-window.addEventListener('deviceChanged', () => {
-  loadSeriesForSelected();
-});
+//window.addEventListener('deviceChanged', () => {
+//  loadSeriesForSelected();
+//});
