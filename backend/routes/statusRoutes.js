@@ -1,4 +1,5 @@
 // routes/statusRoutes.js
+
 const express = require('express');
 const { getStatus, getHealth } = require('../controllers/statusController');
 

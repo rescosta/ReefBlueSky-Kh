@@ -1,4 +1,5 @@
 // controllers/statusController.js
+
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
 
 const getStatus = (req, res) => {
@@ -11,25 +12,28 @@ const getStatus = (req, res) => {
       mqtt: {
         enabled: false,
         connected: false,
-        broker: MQTT_BROKER
+        broker: MQTT_BROKER,
       },
-      uptime: process.uptime()
-    }
+      uptime: process.uptime(),
+    },
   });
 };
 
 const getHealth = (req, res) => {
   const memUsage = process.memoryUsage();
+
   res.json({
     success: true,
     data: {
       memory: {
-        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
-        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
+        heapUsed:
+          Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+        heapTotal:
+          Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB',
       },
       uptime: process.uptime() + ' segundos',
-      timestamp: new Date().toISOString()
-    }
+      timestamp: new Date().toISOString(),
+    },
   });
 };
 

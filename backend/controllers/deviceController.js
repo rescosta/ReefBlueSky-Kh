@@ -2,12 +2,13 @@
  * Controlador de Dispositivos - Lógica de sync, health, comandos e registro
  * Centraliza toda interação com devices e measurements
  */
-/**
- */
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+
 const Device = require('../models/Device');
 const Measurement = require('../models/Measurement');
+
 const { enqueueCommand, pollCommands: pollDbCommands } = require('../helpers/mqttHelper');
 const pool = require('../config/database');
 const { generateToken, generateRefreshToken } = require('../config/jwt');
@@ -24,7 +25,7 @@ const registerDevice = async (req, res) => {
   if (!deviceId || !username || !password) {
     return res.status(400).json({
       success: false,
-      message: 'Campos obrigatórios: deviceId, username, password'
+      message: 'Campos obrigatórios: deviceId, username, password',
     });
   }
 
@@ -32,7 +33,7 @@ const registerDevice = async (req, res) => {
   if (!/^[a-zA-Z0-9-]{10,50}$/.test(deviceId)) {
     return res.status(400).json({
       success: false,
-      message: 'deviceId inválido'
+      message: 'deviceId inválido',
     });
   }
 
@@ -45,18 +46,20 @@ const registerDevice = async (req, res) => {
       'SELECT id, email, passwordHash, isVerified FROM users WHERE email = ? LIMIT 1',
       [username]
     );
+
     if (!userRows || userRows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Usuário não encontrado para este username'
+        message: 'Usuário não encontrado para este username',
       });
     }
 
     const user = userRows[0];
+
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
-        message: 'Usuário ainda não verificado'
+        message: 'Usuário ainda não verificado',
       });
     }
 
@@ -65,7 +68,7 @@ const registerDevice = async (req, res) => {
     if (!ok) {
       return res.status(401).json({
         success: false,
-        message: 'Credenciais inválidas para este usuário'
+        message: 'Credenciais inválidas para este usuário',
       });
     }
 
@@ -76,8 +79,8 @@ const registerDevice = async (req, res) => {
       `INSERT INTO devices (deviceId, userId, name, local_ip, last_seen, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
-         userId = VALUES(userId),
-         name = VALUES(name),
+         userId   = VALUES(userId),
+         name     = VALUES(name),
          local_ip = VALUES(local_ip),
          last_seen = VALUES(last_seen),
          updatedAt = VALUES(updatedAt)`,
@@ -89,6 +92,7 @@ const registerDevice = async (req, res) => {
     const refreshToken = generateRefreshToken(user.id, deviceId);
 
     console.log('[API] Dispositivo registrado com sucesso:', deviceId, user.id);
+
     return res.status(201).json({
       success: true,
       message: 'Dispositivo registrado com sucesso',
@@ -97,15 +101,15 @@ const registerDevice = async (req, res) => {
         userId: user.id,
         token,
         refreshToken,
-        expiresIn: 3600 // 1 hora em segundos
-      }
+        expiresIn: 3600, // 1 hora em segundos
+      },
     });
   } catch (err) {
     console.error('DEVICE ERROR /device/register:', err.message);
     return res.status(500).json({
       success: false,
       message: 'Erro interno ao registrar dispositivo',
-      error: err.message
+      error: err.message,
     });
   } finally {
     if (conn) {
@@ -124,12 +128,12 @@ const registerDevice = async (req, res) => {
  */
 const refreshDeviceToken = (req, res) => {
   console.log('[API] POST /api/v1/device/refresh-token');
-  const { refreshToken } = req.body;
 
+  const { refreshToken } = req.body;
   if (!refreshToken) {
     return res.status(400).json({
       success: false,
-      message: 'Refresh token não fornecido'
+      message: 'Refresh token não fornecido',
     });
   }
 
@@ -137,7 +141,7 @@ const refreshDeviceToken = (req, res) => {
     if (err) {
       return res.status(403).json({
         success: false,
-        message: 'Refresh token inválido ou expirado'
+        message: 'Refresh token inválido ou expirado',
       });
     }
 
@@ -146,8 +150,8 @@ const refreshDeviceToken = (req, res) => {
       success: true,
       data: {
         token: newToken,
-        expiresIn: 3600
-      }
+        expiresIn: 3600,
+      },
     });
   });
 };
@@ -168,20 +172,22 @@ const syncMeasurements = async (req, res) => {
   if (!Array.isArray(measurements)) {
     return res.status(400).json({
       success: false,
-      message: 'Medições devem ser um array'
+      message: 'Medições devem ser um array',
     });
   }
+
   if (measurements.length === 0) {
     return res.status(400).json({
       success: false,
-      message: 'Array de medições vazio'
+      message: 'Array de medições vazio',
     });
   }
+
   for (const m of measurements) {
     if (!m.timestamp || typeof m.kh !== 'number') {
       return res.status(400).json({
         success: false,
-        message: 'Medição inválida: faltam timestamp ou kh'
+        message: 'Medição inválida: faltam timestamp ou kh',
       });
     }
   }
@@ -208,7 +214,6 @@ const syncMeasurements = async (req, res) => {
 
     // 3) Gravar medições
     const insertedCount = await Measurement.bulkInsert(deviceId, measurements);
-
     console.log(`[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`);
 
     return res.json({
@@ -217,11 +222,12 @@ const syncMeasurements = async (req, res) => {
       data: {
         synced: insertedCount,
         failed: measurements.length - insertedCount,
-        nextSyncTime: Date.now() + 300000
-      }
+        nextSyncTime: Date.now() + 300000,
+      },
     });
   } catch (err) {
     console.error('[DB] Erro crítico ao sincronizar:', err.message, err.code);
+
     let statusCode = 503;
     let errorMsg = 'Erro ao conectar ao banco de dados';
 
@@ -236,7 +242,7 @@ const syncMeasurements = async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       message: errorMsg,
-      error: err.message
+      error: err.message,
     });
   } finally {
     if (conn) {
@@ -261,6 +267,7 @@ const deviceHealth = async (req, res) => {
     console.log('[API] POST /api/v1/device/health - Device:', deviceId);
 
     const health = req.body || {};
+
     if (
       typeof health.cpu_usage !== 'number' ||
       typeof health.memory_usage !== 'number' ||
@@ -268,14 +275,14 @@ const deviceHealth = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Métricas de saúde inválidas'
+        message: 'Métricas de saúde inválidas',
       });
     }
 
     console.log('[API] Health metrics:', {
       cpu: health.cpu_usage + '%',
       memory: health.memory_usage + '%',
-      uptime: health.uptime + 's'
+      uptime: health.uptime + 's',
     });
 
     await pool.query(
@@ -293,19 +300,19 @@ const deviceHealth = async (req, res) => {
         health.memory_usage,
         health.storage_usage ?? null,
         health.wifi_rssi ?? null,
-        health.uptime
+        health.uptime,
       ]
     );
 
     return res.json({
       success: true,
-      message: 'Métricas de saúde recebidas'
+      message: 'Métricas de saúde recebidas',
     });
   } catch (err) {
     console.error('Error saving device health', err);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error',
     });
   }
 };
@@ -318,17 +325,20 @@ const getKhReference = async (req, res) => {
   try {
     const deviceId = req.user.deviceId;
     const conn = await pool.getConnection();
+
     try {
       const rows = await conn.query(
         'SELECT khreference FROM devices WHERE deviceId = ? LIMIT 1',
         [deviceId]
       );
+
       if (!rows.length || rows[0].khreference == null) {
         return res.json({ success: true, data: null });
       }
+
       return res.json({
         success: true,
-        data: { khreference: rows[0].khreference }
+        data: { khreference: rows[0].khreference },
       });
     } finally {
       conn.release();
@@ -337,7 +347,7 @@ const getKhReference = async (req, res) => {
     console.error('GET /api/v1/device/kh-reference error', err.message);
     return res.status(500).json({
       success: false,
-      error: 'servererror'
+      error: 'servererror',
     });
   }
 };
@@ -348,6 +358,7 @@ const getKhReference = async (req, res) => {
  */
 const pollCommands = async (req, res) => {
   const deviceId = req.user.deviceId;
+
   try {
     const commands = await pollDbCommands(deviceId);
     return res.json({ success: true, data: commands });
@@ -355,7 +366,7 @@ const pollCommands = async (req, res) => {
     console.error('POST /device/commands/poll error', err);
     return res.status(500).json({
       success: false,
-      message: 'Erro ao buscar comandos'
+      message: 'Erro ao buscar comandos',
     });
   }
 };
@@ -373,7 +384,7 @@ const enqueuePumpCommand = async (req, res) => {
     if (!pumpId || !seconds || seconds <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'pumpId/seconds inválidos'
+        message: 'pumpId/seconds inválidos',
       });
     }
 
@@ -381,30 +392,33 @@ const enqueuePumpCommand = async (req, res) => {
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
+
     if (!chk.length) {
       return res.status(404).json({
         success: false,
-        message: 'Device não encontrado para este usuário'
+        message: 'Device não encontrado para este usuário',
       });
     }
 
     const dir = direction === 'reverse' ? 'reverse' : 'forward';
+
     const cmd = await enqueueCommand(deviceId, 'manualpump', {
       pumpId,
       direction: dir,
-      seconds
+      seconds,
     });
 
     console.log('[CMD] manualpump enfileirado', deviceId, cmd);
+
     return res.json({
       success: true,
-      data: { commandId: cmd.id }
+      data: { commandId: cmd.id },
     });
   } catch (err) {
     console.error('POST /command/pump error', err);
     return res.status(500).json({
       success: false,
-      message: 'Erro ao enviar comando de bomba'
+      message: 'Erro ao enviar comando de bomba',
     });
   }
 };
@@ -422,7 +436,7 @@ const enqueueKhCorrection = async (req, res) => {
     if (typeof volume !== 'number' || volume <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'volume inválido'
+        message: 'volume inválido',
       });
     }
 
@@ -430,25 +444,27 @@ const enqueueKhCorrection = async (req, res) => {
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
+
     if (!chk.length) {
       return res.status(404).json({
         success: false,
-        message: 'Device não encontrado para este usuário'
+        message: 'Device não encontrado para este usuário',
       });
     }
 
     const cmd = await enqueueCommand(deviceId, 'khcorrection', { volume });
+
     console.log('[CMD] khcorrection enfileirado', deviceId, cmd);
 
     return res.json({
       success: true,
-      data: { commandId: cmd.id }
+      data: { commandId: cmd.id },
     });
   } catch (err) {
     console.error('POST /command/kh-correction error', err);
     return res.status(500).json({
       success: false,
-      message: 'Erro ao enviar correção de KH'
+      message: 'Erro ao enviar correção de KH',
     });
   }
 };
@@ -465,7 +481,7 @@ const enqueueGenericCommand = async (req, res) => {
   if (!type) {
     return res.status(400).json({
       success: false,
-      message: 'type obrigatório'
+      message: 'type obrigatório',
     });
   }
 
@@ -474,10 +490,11 @@ const enqueueGenericCommand = async (req, res) => {
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
+
     if (!chk.length) {
       return res.status(404).json({
         success: false,
-        message: 'Device não encontrado para este usuário'
+        message: 'Device não encontrado para este usuário',
       });
     }
 
@@ -491,22 +508,27 @@ const enqueueGenericCommand = async (req, res) => {
       case 'abort':
         dbType = type;
         break;
+
       case 'setkhreference':
         dbType = 'setkhreference';
         payload = value;
         break;
+
       case 'setkhtarget':
         dbType = 'setkhtarget';
         payload = value;
         break;
+
       case 'setintervalminutes':
         dbType = 'setintervalminutes';
         payload = { minutes: value };
         break;
+
       case 'khcorrection':
         dbType = 'khcorrection';
         payload = { volume: value };
         break;
+
       default:
         dbType = type;
         payload = value ?? null;
@@ -514,17 +536,26 @@ const enqueueGenericCommand = async (req, res) => {
     }
 
     const cmd = await enqueueCommand(deviceId, dbType, payload);
-    console.log('[CMD] comando enfileirado', deviceId, type, dbType, payload, 'commandId', cmd.id);
+
+    console.log(
+      '[CMD] comando enfileirado',
+      deviceId,
+      type,
+      dbType,
+      payload,
+      'commandId',
+      cmd.id
+    );
 
     return res.json({
       success: true,
-      data: { commandId: cmd.id, type, dbType }
+      data: { commandId: cmd.id, type, dbType },
     });
   } catch (err) {
     console.error('POST /user/devices/:deviceId/commands error', err);
     return res.status(500).json({
       success: false,
-      message: 'Erro ao enfileirar comando'
+      message: 'Erro ao enfileirar comando',
     });
   }
 };
@@ -538,5 +569,5 @@ module.exports = {
   pollCommands,
   enqueuePumpCommand,
   enqueueKhCorrection,
-  enqueueGenericCommand
+  enqueueGenericCommand,
 };

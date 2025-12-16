@@ -1,6 +1,7 @@
 /**
  * Controlador de Autenticação - registro, login, verificação, recuperação de senha
  */
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { generateToken, generateRefreshToken } = require('../config/jwt');
@@ -14,10 +15,16 @@ const { sendVerificationEmail } = require('../helpers/emailHelper');
 const registerUser = async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password || typeof password !== 'string' || password.length < 6 || !email.includes('@')) {
+  if (
+    !email ||
+    !password ||
+    typeof password !== 'string' ||
+    password.length < 6 ||
+    !email.includes('@')
+  ) {
     return res.status(400).json({
       success: false,
-      message: 'Email e senha (mín. 6 caracteres) são obrigatórios'
+      message: 'Email e senha (mín. 6 caracteres) são obrigatórios',
     });
   }
 
@@ -28,7 +35,7 @@ const registerUser = async (req, res) => {
       if (existingUser.isVerified) {
         return res.status(409).json({
           success: false,
-          message: 'Já existe um usuário verificado com este email'
+          message: 'Já existe um usuário verificado com este email',
         });
       }
 
@@ -41,7 +48,7 @@ const registerUser = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: 'Já existe um cadastro pendente. Novo código enviado.',
-        data: { userId: existingUser.id, email, requiresVerification: true }
+        data: { userId: existingUser.id, email, requiresVerification: true },
       });
     }
 
@@ -55,11 +62,13 @@ const registerUser = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Usuário criado. Enviamos um código de verificação para seu email.',
-      data: { userId, email, requiresVerification: true }
+      data: { userId, email, requiresVerification: true },
     });
   } catch (err) {
     console.error('AUTH REGISTER ERROR:', err.message);
-    return res.status(500).json({ success: false, message: 'Erro interno ao registrar usuário' });
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro interno ao registrar usuário' });
   }
 };
 
@@ -71,11 +80,14 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'Email e senha são obrigatórios' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Email e senha são obrigatórios' });
   }
 
   try {
     const user = await User.findByEmail(email);
+
     if (!user) {
       return res.status(401).json({ success: false, message: 'Credenciais inválidas' });
     }
@@ -83,7 +95,7 @@ const loginUser = async (req, res) => {
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
-        message: 'Conta ainda não verificada. Verifique o código enviado para seu email.'
+        message: 'Conta ainda não verificada. Verifique o código enviado para seu email.',
       });
     }
 
@@ -99,13 +111,15 @@ const loginUser = async (req, res) => {
     return res.json({
       success: true,
       message: 'Login bem-sucedido',
-      data: { token, refreshToken, userId: user.id, email: user.email, role: payload.role }
+      data: { token, refreshToken, userId: user.id, email: user.email, role: payload.role },
     });
   } catch (err) {
     console.error('AUTH LOGIN ERROR:', err.message);
-    return res.status(500).json({ success: false, message: 'Erro interno ao fazer login' });
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro interno ao fazer login' });
   }
-};
+}
 
 /**
  * POST /api/v1/auth/forgot-password
@@ -113,16 +127,20 @@ const loginUser = async (req, res) => {
  */
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
+
   if (!email) {
-    return res.status(400).json({ success: false, message: 'Email é obrigatório' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Email é obrigatório' });
   }
 
   try {
     const user = await User.findByEmail(email);
+
     if (!user) {
       return res.json({
         success: true,
-        message: 'Se o email existir, um código de recuperação foi enviado.'
+        message: 'Se o email existir, um código de recuperação foi enviado.',
       });
     }
 
@@ -134,13 +152,13 @@ const forgotPassword = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Se o email existir, um código de recuperação foi enviado.'
+      message: 'Se o email existir, um código de recuperação foi enviado.',
     });
   } catch (err) {
     console.error('AUTH FORGOT-PASSWORD ERROR:', err.message);
     return res.status(500).json({
       success: false,
-      message: 'Erro interno ao solicitar recuperação de senha'
+      message: 'Erro interno ao solicitar recuperação de senha',
     });
   }
 };
@@ -151,19 +169,21 @@ const forgotPassword = async (req, res) => {
  */
 const verifyCodeController = async (req, res) => {
   const { email, code } = req.body;
+
   if (!email || !code) {
     return res.status(400).json({
       success: false,
-      message: 'Email e código são obrigatórios'
+      message: 'Email e código são obrigatórios',
     });
   }
 
   try {
     const user = await User.verifyCode(email, code);
+
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Código inválido ou expirado'
+        message: 'Código inválido ou expirado',
       });
     }
 
@@ -178,14 +198,14 @@ const verifyCodeController = async (req, res) => {
         userId: userIdNumber,
         email: user.email,
         token,
-        refreshToken
-      }
+        refreshToken,
+      },
     });
   } catch (err) {
     console.error('AUTH VERIFY-CODE ERROR:', err.message);
     return res.status(500).json({
       success: false,
-      message: 'Erro interno ao verificar código'
+      message: 'Erro interno ao verificar código',
     });
   }
 };
@@ -200,22 +220,24 @@ const resetPassword = async (req, res) => {
   if (!email || !code || !newPassword) {
     return res.status(400).json({
       success: false,
-      message: 'Email, código e nova senha são obrigatórios'
+      message: 'Email, código e nova senha são obrigatórios',
     });
   }
+
   if (typeof newPassword !== 'string' || newPassword.length < 6) {
     return res.status(400).json({
       success: false,
-      message: 'Nova senha deve ter pelo menos 6 caracteres'
+      message: 'Nova senha deve ter pelo menos 6 caracteres',
     });
   }
 
   try {
     const user = await User.verifyCode(email, code);
+
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Código inválido ou expirado'
+        message: 'Código inválido ou expirado',
       });
     }
 
@@ -224,13 +246,13 @@ const resetPassword = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Senha redefinida com sucesso. Você já pode entrar com a nova senha.'
+      message: 'Senha redefinida com sucesso. Você já pode entrar com a nova senha.',
     });
   } catch (err) {
     console.error('AUTH RESET-PASSWORD ERROR:', err.message);
     return res.status(500).json({
       success: false,
-      message: 'Erro interno ao redefinir senha'
+      message: 'Erro interno ao redefinir senha',
     });
   }
 };
@@ -245,7 +267,7 @@ const refreshTokenController = (req, res) => {
   if (!refreshToken) {
     return res.status(400).json({
       success: false,
-      message: 'Refresh token não fornecido'
+      message: 'Refresh token não fornecido',
     });
   }
 
@@ -255,21 +277,21 @@ const refreshTokenController = (req, res) => {
     const payload = {
       userId: decoded.userId,
       email: decoded.email,
-      role: decoded.role || 'user'
+      role: decoded.role || 'user',
     };
 
     const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: '1h'
+      expiresIn: '1h',
     });
 
     return res.json({
       success: true,
-      data: { token: newAccessToken }
+      data: { token: newAccessToken },
     });
   } catch (err) {
     return res.status(403).json({
       success: false,
-      message: 'Refresh token inválido ou expirado'
+      message: 'Refresh token inválido ou expirado',
     });
   }
 };
@@ -283,10 +305,11 @@ const meController = async (req, res) => {
 
   try {
     const user = await User.findById(userId);
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Usuário não encontrado'
+        message: 'Usuário não encontrado',
       });
     }
 
@@ -297,14 +320,14 @@ const meController = async (req, res) => {
         email: user.email,
         role: user.role,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt
-      }
+        updatedAt: user.updatedAt,
+      },
     });
   } catch (err) {
     console.error('AUTH ME ERROR:', err.message);
     return res.status(500).json({
       success: false,
-      message: 'Erro interno ao buscar dados do usuário'
+      message: 'Erro interno ao buscar dados do usuário',
     });
   }
 };
@@ -316,5 +339,5 @@ module.exports = {
   verifyCodeController,
   resetPassword,
   refreshTokenController,
-  meController
+  meController,
 };
