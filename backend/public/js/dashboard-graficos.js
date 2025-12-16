@@ -12,6 +12,10 @@ const loadChartBtn = document.getElementById('loadChartBtn');
 const chartInfo = document.getElementById('chartInfo');
 const chartPlaceholder = document.getElementById('chartPlaceholder');
 
+
+let khChart = null;
+
+
 function formatDateTime(ms) {
   if (!ms) return '--';
   const d = new Date(ms);
@@ -51,30 +55,117 @@ function applyQuickPeriod() {
 }
 
 function renderSeries(measures) {
+  const canvas = document.getElementById('khChart');
+  if (!canvas) {
+    console.error('khChart canvas não encontrado');
+    return;
+  }
+  const ctx = canvas.getContext('2d');
+
   if (!measures || !measures.length) {
     chartInfo.textContent = 'Nenhum dado encontrado para o período.';
     chartPlaceholder.textContent =
       'Nenhum ponto no intervalo selecionado.\n\n' +
       'Ajuste o período ou aguarde novas medições.';
+
+    if (khChart) {
+      khChart.destroy();
+      khChart = null;
+    }
     return;
   }
 
   chartInfo.textContent = `${measures.length} medições no intervalo.`;
 
-  // Série simples x=timestamp, y=kh
-  const series = measures
-    .filter((m) => typeof m.kh === 'number')
+  // Converte para pontos { x: Date, y: kh }
+  const points = measures
+    .filter((m) => typeof m.kh === 'number' && m.timestamp)
     .map((m) => ({
-      x: m.timestamp,
+      x: new Date(m.timestamp),
       y: m.kh,
     }));
 
+  // Texto de debug opcional
   chartPlaceholder.textContent =
-    'Dados de KH (x=Data/hora, y=KH):\n\n' +
-    JSON.stringify(series, null, 2) +
-    '\n\n' +
-    'Futuro: plugar esses dados em um gráfico real (Chart.js, ApexCharts, etc).';
+    'Primeiros pontos de KH (x=Data/hora, y=KH):\n\n' +
+    points
+      .slice(0, 10)
+      .map((p) => `${formatDateTime(p.x.getTime())}  →  ${p.y.toFixed(2)} dKH`)
+      .join('\n');
+
+  // Destroi gráfico anterior se existir
+  if (khChart) {
+    khChart.destroy();
+    khChart = null;
+  }
+
+  // Cria novo gráfico de linha com pontos
+  khChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'KH (dKH)',
+          data: points,
+          borderColor: '#60a5fa',
+          backgroundColor: '#60a5fa',
+          tension: 0.2,
+          pointRadius: 3,
+          pointHoverRadius: 4,
+          borderWidth: 2,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      parsing: false, // usa x/y direto
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'hour',
+          },
+          ticks: {
+            color: '#9ca3af',
+          },
+          grid: {
+            color: '#1f2937',
+          },
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'dKH',
+          },
+          ticks: {
+            color: '#9ca3af',
+          },
+          grid: {
+            color: '#1f2937',
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: '#e5e7eb',
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              return `KH: ${v.toFixed(2)} dKH`;
+            },
+          },
+        },
+      },
+    },
+  });
 }
+
 
 async function loadSeriesForSelected() {
   const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
