@@ -2281,7 +2281,9 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
       console.log('[CMD] setkhtarget enfileirado', deviceId, khTarget);
     }
 
-    return res.json({ success: true, message: 'KH config atualizada.' 
+    return res.json({ success: true, message: 'KH config atualizada.' });
+
+  }
 
 });
 
