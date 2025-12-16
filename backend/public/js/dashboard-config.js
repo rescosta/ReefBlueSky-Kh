@@ -419,7 +419,6 @@ saveKhTargetBtn.addEventListener('click', async () => {
 });
 
 
-
 saveIntervalBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   const hours = parseInt(intervalRange.value, 10);
@@ -475,22 +474,6 @@ pumpStartButtons.forEach((btn) => {
   });
 });
 
-// Correção de KH com bomba 4
-khCorrectionBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
-  const volume = parseFloat(khCorrectionVolumeInput.value);
-  if (!deviceId || Number.isNaN(volume) || volume <= 0) return;
-
-  khCorrectionStatus.textContent = 'Enviando comando de correção...';
-  const ok = await apiKhCorrection(deviceId, volume);
-  if (ok) {
-    khCorrectionStatus.textContent =
-      `Correção enviada. Volume: ${volume.toFixed(1)} (aguarde execução no device).`;
-  } else {
-    khCorrectionStatus.textContent =
-      'Erro ao enviar correção. Verifique conexão/API.';
-  }
-});
 
 async function initDashboardConfig() {
   DashboardCommon.initTopbar();
