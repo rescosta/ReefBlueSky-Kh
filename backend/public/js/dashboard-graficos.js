@@ -126,16 +126,15 @@ function renderSeries(measures) {
           grid: { color: '#1f2937' },
         },
         y: {
-          type: 'linear',     // <-- garante escala linear
+          type: 'linear',
           min: 4,
           max: 14,
-          title: {
-            display: true,
-            text: 'dKH',
-          },
+          beginAtZero: false,
+          suggestedMin: 4,
+          suggestedMax: 14,
           ticks: {
             color: '#9ca3af',
-            stepSize: 1,      // opcional: marcações 4,5,6,7...
+            stepSize: 1,
           },
           grid: {
             color: '#1f2937',
