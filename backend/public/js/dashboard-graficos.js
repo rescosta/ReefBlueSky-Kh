@@ -129,12 +129,13 @@ function renderSeries(measures) {
           beginAtZero: false,
           ticks: {
             color: '#9ca3af',
-            stepSize: 1,
+            stepSize: 0.1,   // marcações de 0,1 em 0,1
           },
           grid: {
             color: '#1f2937',
           },
         },
+
 
       },
 
