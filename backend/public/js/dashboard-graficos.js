@@ -14,23 +14,6 @@ const chartPlaceholder = document.getElementById('chartPlaceholder');
 
 let khChart = null;
 
-if (window.Chart) {
-  // zera qualquer configuração global de eixo de tempo
-  if (Chart.defaults && Chart.defaults.scales && Chart.defaults.scales.time) {
-    delete Chart.defaults.scales.time;
-  }
-  if (Chart.defaults && Chart.defaults.scales && Chart.defaults.scales.timeseries) {
-    delete Chart.defaults.scales.timeseries;
-  }
-}
-
-
-// Garante que nenhum default global force 'time'
-if (window.Chart && Chart.defaults && Chart.defaults.scales) {
-  if (Chart.defaults.scales.x && Chart.defaults.scales.x.type) {
-    Chart.defaults.scales.x.type = 'linear';
-  }
-}
 
 function formatDateTime(ms) {
   if (!ms) return '--';
@@ -95,15 +78,18 @@ function renderSeries(measures) {
   const points = measures
     .filter((m) => typeof m.kh === 'number' && m.timestamp)
     .map((m) => ({
-      x: m.timestamp, // ms
+      x: new Date(m.timestamp),
       y: m.kh,
-    }));
+    }))
+    .sort((a, b) => a.x - b.x);  // ordena do mais antigo para o mais novo
+
+
 
   chartPlaceholder.textContent =
     'Primeiros pontos de KH (x=Data/hora, y=KH):\n\n' +
     points
       .slice(0, 10)
-      .map((p) => `${formatDateTime(p.x)}  →  ${p.y.toFixed(2)} dKH`)
+      .map((p) => `${formatDateTime(p.x.getTime())}  →  ${p.y.toFixed(2)} dKH`)
       .join('\n');
 
   if (khChart) {
@@ -134,16 +120,14 @@ function renderSeries(measures) {
       parsing: false,
       scales: {
         x: {
-          type: 'linear',
-          ticks: {
-            color: '#9ca3af',
-            callback: (value) => formatDateTime(value),
-          },
-          grid: {
-            color: '#1f2937',
-          },
+          type: 'time',
+          time: { unit: 'hour' },
+          ticks: { color: '#9ca3af' },
+          grid: { color: '#1f2937' },
         },
         y: {
+          min: 4,          // mínimo
+          max: 14,         // máximo
           title: {
             display: true,
             text: 'dKH',
@@ -156,6 +140,7 @@ function renderSeries(measures) {
           },
         },
       },
+
       plugins: {
         legend: {
           labels: {
