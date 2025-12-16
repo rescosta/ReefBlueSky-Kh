@@ -81,9 +81,6 @@ function renderSeries(measures) {
       x: new Date(m.timestamp),
       y: m.kh,
     }))
-    .sort((a, b) => a.x - b.x);  // ordena do mais antigo para o mais novo
-
-
 
   chartPlaceholder.textContent =
     'Primeiros pontos de KH (x=Data/hora, y=KH):\n\n' +
