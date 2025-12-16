@@ -138,7 +138,7 @@ function renderSeries(measures) {
             color: '#1f2937',
           },
         },
-      }
+      },
 
       plugins: {
         legend: {
