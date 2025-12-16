@@ -424,6 +424,7 @@ function updateMeasurementsView(measures) {
 
 }
 
+
 // Carrega medições para o device atualmente selecionado no topo
 async function loadMeasurementsForSelected() {
   const deviceId = DashboardCommon.getSelectedDeviceId();
@@ -524,7 +525,7 @@ async function loadKhInfo(deviceId) {
       ? data.khReference
       : (data.khReference != null ? parseFloat(data.khReference) : null);
 
-    // >>> NOVO: taxa da bomba 4 se vier da API
+  
     if (typeof data.pump4MlPerSec === 'number') {
       pump4MlPerSec = data.pump4MlPerSec;
     } else if (data.pump4MlPerSec != null) {
@@ -540,7 +541,7 @@ async function loadKhInfo(deviceId) {
           ? `${pump4MlPerSec.toFixed(2)} mL/s`
           : '-- mL/s';
     }
-    // <<< FIM NOVO
+    
 
     currentKhTarget = (khTarget != null && !Number.isNaN(khTarget))
       ? khTarget
