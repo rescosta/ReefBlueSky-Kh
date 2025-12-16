@@ -5,156 +5,92 @@ if (!chartsToken) {
   window.location.href = 'login';
 }
 
-const periodSelect = document.getElementById('periodSelect');
-const fromInput = document.getElementById('fromInput');
-const toInput = document.getElementById('toInput');
-const loadChartBtn = document.getElementById('loadChartBtn');
 const chartInfo = document.getElementById('chartInfo');
-const chartPlaceholder = document.getElementById('chartPlaceholder');
 
-let khChart = null;
+let khDailyChart = null;
+let khWeeklyChart = null;
+let khMonthlyChart = null;
 
-
-function formatDateTime(ms) {
-  if (!ms) return '--';
+function formatDate(ms) {
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return '--';
-  return d.toLocaleString(undefined, {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  return d.toLocaleDateString();
 }
 
-function dateTimeLocalToMs(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.getTime();
-}
+// Agrupa medições por dia (chave yyyy-mm-dd) pegando o último KH do dia
+function groupByDay(measures) {
+  const byDay = new Map();
 
-// Define from/to com base no período rápido
-function applyQuickPeriod() {
-  const now = new Date();
-  let from = new Date(now.getTime());
-
-  const value = periodSelect.value;
-  if (value === '1h') {
-    from.setHours(now.getHours() - 1);
-  } else if (value === '24h') {
-    from.setDate(now.getDate() - 1);
-  } else if (value === '7d') {
-    from.setDate(now.getDate() - 7);
-  }
-
-  const toLocal = now.toISOString().slice(0, 16);
-  const fromLocal = from.toISOString().slice(0, 16);
-  toInput.value = toLocal;
-  fromInput.value = fromLocal;
-}
-
-function renderSeries(measures) {
-  const canvas = document.getElementById('khChart');
-  if (!canvas) {
-    console.error('khChart canvas não encontrado');
-    return;
-  }
-  const ctx = canvas.getContext('2d');
-
-  if (!measures || !measures.length) {
-    chartInfo.textContent = 'Nenhum dado encontrado para o período.';
-    chartPlaceholder.textContent =
-      'Nenhum ponto no intervalo selecionado.\n\n' +
-      'Ajuste o período ou aguarde novas medições.';
-
-    if (khChart) {
-      khChart.destroy();
-      khChart = null;
+  measures.forEach((m) => {
+    if (typeof m.kh !== 'number' || !m.timestamp) return;
+    const d = new Date(m.timestamp);
+    if (Number.isNaN(d.getTime())) return;
+    const key = d.toISOString().slice(0, 10); // yyyy-mm-dd
+    // usa sempre a última medição do dia (maior timestamp)
+    const prev = byDay.get(key);
+    if (!prev || m.timestamp > prev.timestamp) {
+      byDay.set(key, { timestamp: m.timestamp, kh: m.kh });
     }
-    return;
+  });
+
+  // ordena por data crescente
+  const entries = Array.from(byDay.entries()).sort((a, b) =>
+    a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+  );
+
+  return entries.map(([key, v]) => ({
+    dateStr: key,
+    ts: v.timestamp,
+    kh: v.kh,
+  }));
+}
+
+// Cria ou recria um gráfico de barras simples
+function createBarChart(existingChart, ctx, label, labels, data, color) {
+  if (existingChart) {
+    existingChart.destroy();
   }
-
-  chartInfo.textContent = `${measures.length} medições no intervalo.`;
-
-  const points = measures
-    .filter((m) => typeof m.kh === 'number' && m.timestamp)
-    .map((m) => ({
-      x: new Date(m.timestamp),
-      y: m.kh,
-    }))
-
-  chartPlaceholder.textContent =
-    'Primeiros pontos de KH (x=Data/hora, y=KH):\n\n' +
-    points
-      .slice(0, 10)
-      .map((p) => `${formatDateTime(p.x.getTime())}  →  ${p.y.toFixed(2)} dKH`)
-      .join('\n');
-
-  if (khChart) {
-    khChart.destroy();
-    khChart = null;
-  }
-
-  khChart = new Chart(ctx, {
-    type: 'line',
+  return new Chart(ctx, {
+    type: 'bar',
     data: {
+      labels,
       datasets: [
         {
-          label: 'KH (dKH)',
-          data: points,
-          borderColor: '#60a5fa',
-          backgroundColor: '#60a5fa',
-          tension: 0.2,
-          pointRadius: 3,
-          pointHoverRadius: 4,
-          borderWidth: 2,
-          fill: false,
+          label,
+          data,
+          backgroundColor: color,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      parsing: false,
       scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'hour' },
-          ticks: { color: '#9ca3af' },
-          grid: { color: '#1f2937' },
-        },
         y: {
           type: 'linear',
           min: 4,
           max: 14,
-          beginAtZero: false,
           ticks: {
+            stepSize: 0.5,
             color: '#9ca3af',
-            stepSize: 0.1,   // marcações de 0,1 em 0,1
           },
           grid: {
             color: '#1f2937',
           },
         },
-
-
+        x: {
+          ticks: {
+            color: '#9ca3af',
+          },
+          grid: {
+            color: '#1f2937',
+          },
+        },
       },
-
       plugins: {
         legend: {
           labels: {
             color: '#e5e7eb',
-          },
-        },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const v = items[0].parsed.x;
-              return formatDateTime(v);
-            },
-            label: (ctx) => {
-              const v = ctx.parsed.y;
-              return `KH: ${v.toFixed(2)} dKH`;
-            },
           },
         },
       },
@@ -165,23 +101,18 @@ function renderSeries(measures) {
 async function loadSeriesForSelected() {
   const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
   if (!deviceId) {
-    chartInfo.textContent = 'Nenhum dispositivo associado.';
-    chartPlaceholder.textContent =
-      'Nenhum dispositivo selecionado.\nSelecione um device no topo para ver o gráfico.';
+    if (chartInfo) {
+      chartInfo.textContent = 'Nenhum dispositivo associado.';
+    }
     return;
   }
 
-  const fromMs = dateTimeLocalToMs(fromInput.value);
-  const toMs = dateTimeLocalToMs(toInput.value);
+  const now = Date.now();
+  const from30d = now - 30 * 24 * 60 * 60 * 1000;
 
-  const params = new URLSearchParams();
-  if (fromMs) params.append('from', String(fromMs));
-  if (toMs) params.append('to', String(toMs));
-
-  const qs = params.toString();
-  const url = qs
-    ? `/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements?${qs}`
-    : `/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`;
+  const url = `/api/v1/user/devices/${encodeURIComponent(
+    deviceId,
+  )}/measurements?from=${from30d}&to=${now}`;
 
   try {
     const res = await fetch(url, {
@@ -190,19 +121,79 @@ async function loadSeriesForSelected() {
     const json = await res.json();
     if (!json.success) {
       console.error(json.message || 'Erro ao buscar dados de gráfico');
-      chartInfo.textContent = 'Erro ao carregar dados.';
-      chartPlaceholder.textContent =
-        'Erro ao carregar dados de gráfico.\nVerifique a API ou tente novamente.';
+      if (chartInfo) {
+        chartInfo.textContent = 'Erro ao carregar dados de gráfico.';
+      }
       return;
     }
 
     const measures = json.data || [];
-    renderSeries(measures);
+    if (!measures.length) {
+      if (chartInfo) {
+        chartInfo.textContent = 'Nenhuma medição nos últimos 30 dias.';
+      }
+      return;
+    }
+
+    const byDay = groupByDay(measures);
+
+    // Últimos 1, 7 e 30 dias (limitando pelo que existir)
+    const last30 = byDay.slice(-30);
+    const last7 = byDay.slice(-7);
+    const last1 = byDay.slice(-1);
+
+    const dailyCtx = document.getElementById('khDailyChart')?.getContext('2d');
+    const weeklyCtx = document.getElementById('khWeeklyChart')?.getContext('2d');
+    const monthlyCtx =
+      document.getElementById('khMonthlyChart')?.getContext('2d');
+
+    if (dailyCtx && last1.length) {
+      const labels = last1.map((d) => formatDate(d.ts));
+      const data = last1.map((d) => d.kh);
+      khDailyChart = createBarChart(
+        khDailyChart,
+        dailyCtx,
+        'KH diário (último dia)',
+        labels,
+        data,
+        '#60a5fa',
+      );
+    }
+
+    if (weeklyCtx && last7.length) {
+      const labels = last7.map((d) => formatDate(d.ts));
+      const data = last7.map((d) => d.kh);
+      khWeeklyChart = createBarChart(
+        khWeeklyChart,
+        weeklyCtx,
+        'KH semanal (últimos 7 dias)',
+        labels,
+        data,
+        '#a855f7',
+      );
+    }
+
+    if (monthlyCtx && last30.length) {
+      const labels = last30.map((d) => formatDate(d.ts));
+      const data = last30.map((d) => d.kh);
+      khMonthlyChart = createBarChart(
+        khMonthlyChart,
+        monthlyCtx,
+        'KH mensal (últimos 30 dias)',
+        labels,
+        data,
+        '#22c55e',
+      );
+    }
+
+    if (chartInfo) {
+      chartInfo.textContent = `Total de ${byDay.length} dias com medições nos últimos 30 dias.`;
+    }
   } catch (err) {
     console.error('loadSeriesForSelected error', err);
-    chartInfo.textContent = 'Erro de comunicação ao carregar dados.';
-    chartPlaceholder.textContent =
-      'Erro de comunicação com o servidor.\nVerifique conexão e API.';
+    if (chartInfo) {
+      chartInfo.textContent = 'Erro de comunicação ao carregar dados.';
+    }
   }
 }
 
@@ -211,13 +202,12 @@ async function initDashboardGraficos() {
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
-    chartInfo.textContent = 'Nenhum dispositivo associado.';
-    chartPlaceholder.textContent =
-      'Nenhum dispositivo associado à sua conta.\nRegistre um device para ver os gráficos.';
+    if (chartInfo) {
+      chartInfo.textContent = 'Nenhum dispositivo associado.';
+    }
     return;
   }
 
-  applyQuickPeriod();
   await loadSeriesForSelected();
 }
 
@@ -225,17 +215,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboardGraficos().catch((err) =>
     console.error('initDashboardGraficos error', err),
   );
-
-  periodSelect.addEventListener('change', () => {
-    applyQuickPeriod();
-  });
-
-  loadChartBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    loadSeriesForSelected();
-  });
 });
 
-//window.addEventListener('deviceChanged', () => {
-//  loadSeriesForSelected();
-//});
+// Se quiser atualizar ao trocar de device, descomente:
+/*
+window.addEventListener('deviceChanged', () => {
+  loadSeriesForSelected();
+});
+*/
