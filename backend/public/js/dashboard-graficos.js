@@ -125,19 +125,14 @@ function renderSeries(measures) {
           ticks: { color: '#9ca3af' },
           grid: { color: '#1f2937' },
         },
-        y: {
-          type: 'linear',
-          min: 4,
-          max: 14,
-          beginAtZero: false,
-          suggestedMin: 4,
-          suggestedMax: 14,
-          ticks: {
-            color: '#9ca3af',
-            stepSize: 1,
-          },
-          grid: {
-            color: '#1f2937',
+          y: {
+            type: 'linear',
+            beginAtZero: false,
+            ticks: {
+              color: '#9ca3af',
+              stepSize: 0.2,
+            },
+            grid: { color: '#1f2937' },
           },
         },
 
