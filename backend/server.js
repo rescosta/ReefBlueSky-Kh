@@ -2282,10 +2282,12 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     }
 
     return res.json({ success: true, message: 'KH config atualizada.' });
-
+  } catch (err) {
+    console.error('Error updating KH config', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
-
 });
+
 
 
 app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (req, res) => {
