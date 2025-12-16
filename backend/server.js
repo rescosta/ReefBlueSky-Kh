@@ -2413,6 +2413,16 @@ return res.json({
   },
 });
 
+  } catch (err) {
+    console.error('Error fetching device status', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: err.message,
+    });
+  }
+});
+
 
 // novo endpoint para ON/OFF via comando
 app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
@@ -2485,6 +2495,7 @@ app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req,
         uptimeSeconds: h.uptime_seconds,
       },
     });
+
   } catch (err) {
     console.error('Error fetching device health', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
