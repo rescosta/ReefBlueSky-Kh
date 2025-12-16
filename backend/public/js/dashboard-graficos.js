@@ -14,6 +14,17 @@ const chartPlaceholder = document.getElementById('chartPlaceholder');
 
 let khChart = null;
 
+if (window.Chart) {
+  // zera qualquer configuração global de eixo de tempo
+  if (Chart.defaults && Chart.defaults.scales && Chart.defaults.scales.time) {
+    delete Chart.defaults.scales.time;
+  }
+  if (Chart.defaults && Chart.defaults.scales && Chart.defaults.scales.timeseries) {
+    delete Chart.defaults.scales.timeseries;
+  }
+}
+
+
 // Garante que nenhum default global force 'time'
 if (window.Chart && Chart.defaults && Chart.defaults.scales) {
   if (Chart.defaults.scales.x && Chart.defaults.scales.x.type) {
