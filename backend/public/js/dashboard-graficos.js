@@ -12,9 +12,14 @@ const loadChartBtn = document.getElementById('loadChartBtn');
 const chartInfo = document.getElementById('chartInfo');
 const chartPlaceholder = document.getElementById('chartPlaceholder');
 
-
 let khChart = null;
 
+// Garante que nenhum default global force 'time'
+if (window.Chart && Chart.defaults && Chart.defaults.scales) {
+  if (Chart.defaults.scales.x && Chart.defaults.scales.x.type) {
+    Chart.defaults.scales.x.type = 'linear';
+  }
+}
 
 function formatDateTime(ms) {
   if (!ms) return '--';
@@ -47,7 +52,6 @@ function applyQuickPeriod() {
     from.setDate(now.getDate() - 7);
   }
 
-  // Preenche os inputs de data/hora
   const toLocal = now.toISOString().slice(0, 16);
   const fromLocal = from.toISOString().slice(0, 16);
   toInput.value = toLocal;
@@ -77,15 +81,13 @@ function renderSeries(measures) {
 
   chartInfo.textContent = `${measures.length} medições no intervalo.`;
 
-  // Converte para pontos { x: Date, y: kh }
   const points = measures
     .filter((m) => typeof m.kh === 'number' && m.timestamp)
     .map((m) => ({
-      x: m.timestamp, 
+      x: m.timestamp, // ms
       y: m.kh,
     }));
 
-  // Texto de debug opcional
   chartPlaceholder.textContent =
     'Primeiros pontos de KH (x=Data/hora, y=KH):\n\n' +
     points
@@ -93,13 +95,11 @@ function renderSeries(measures) {
       .map((p) => `${formatDateTime(p.x)}  →  ${p.y.toFixed(2)} dKH`)
       .join('\n');
 
-  // Destroi gráfico anterior se existir
   if (khChart) {
     khChart.destroy();
     khChart = null;
   }
 
-  // Cria novo gráfico de linha com pontos
   khChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -120,16 +120,13 @@ function renderSeries(measures) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      parsing: false, // usa x/y direto
+      parsing: false,
       scales: {
         x: {
           type: 'linear',
           ticks: {
             color: '#9ca3af',
-            callback: (value) => {
-              // value vem em ms (timestamp)
-              return formatDateTime(value);
-            },
+            callback: (value) => formatDateTime(value),
           },
           grid: {
             color: '#1f2937',
@@ -148,7 +145,6 @@ function renderSeries(measures) {
           },
         },
       },
-
       plugins: {
         legend: {
           labels: {
@@ -157,6 +153,10 @@ function renderSeries(measures) {
         },
         tooltip: {
           callbacks: {
+            title: (items) => {
+              const v = items[0].parsed.x;
+              return formatDateTime(v);
+            },
             label: (ctx) => {
               const v = ctx.parsed.y;
               return `KH: ${v.toFixed(2)} dKH`;
@@ -167,7 +167,6 @@ function renderSeries(measures) {
     },
   });
 }
-
 
 async function loadSeriesForSelected() {
   const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
@@ -224,7 +223,6 @@ async function initDashboardGraficos() {
     return;
   }
 
-  // Período padrão: últimas 24h
   applyQuickPeriod();
   await loadSeriesForSelected();
 }
@@ -244,7 +242,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Reage à troca de device no topo
 window.addEventListener('deviceChanged', () => {
   loadSeriesForSelected();
 });
