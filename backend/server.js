@@ -2030,11 +2030,12 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
     if (ids.length > 0) {
       await conn.query(
         `UPDATE device_commands
-            SET status = 'in_progress', updatedAt = NOW()
+            SET status = 'inprogress', updatedAt = NOW()
           WHERE id IN (${ids.map(() => '?').join(',')})`,
         ids
       );
     }
+
 
     const commands = rows.map((r) => {
 
