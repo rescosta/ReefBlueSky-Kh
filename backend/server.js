@@ -2124,7 +2124,6 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     `;
     const rows = await pool.query(sql, [deviceId, userId]);
 
-
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Device not found' });
     }
@@ -2378,46 +2377,42 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
       ORDER BY updatedAt DESC
       LIMIT 1
     `;
-    const rows = await pool.query(sql, [deviceId, userId]);
-    if (!rows.length) {
-      // Sem status ainda: devolve valores padrão em vez de 404
-      return res.json({
-        success: true,
-        data: {
-          intervalHours: s.interval_hours != null ? Number(s.interval_hours) : null,
-          levels: { A: false, B: false, C: false },
-          pumps: {
-            1: { running: false, direction: 'forward' },
-            2: { running: false, direction: 'forward' },
-            3: { running: false, direction: 'forward' },
-          },
-        },
-      });
-    }
+const rows = await pool.query(sql, [deviceId, userId]);
 
-    const s = rows[0];
-    return res.json({
-      success: true,
-      data: {
-        intervalHours: s.interval_hours,
-        levels: {
-          A: !!s.level_a,
-          B: !!s.level_b,
-          C: !!s.level_c,
-        },
-        pumps: {
-          1: { running: !!s.pump1_running, direction: s.pump1_direction || 'forward' },
-          2: { running: !!s.pump2_running, direction: s.pump2_direction || 'forward' },
-          3: { running: !!s.pump3_running, direction: s.pump3_direction || 'forward' },
-        },
+if (!rows.length) {
+  // Sem status ainda: devolve valores padrão em vez de 404
+  return res.json({
+    success: true,
+    data: {
+      intervalHours: null,
+      levels: { A: false, B: false, C: false },
+      pumps: {
+        1: { running: false, direction: 'forward' },
+        2: { running: false, direction: 'forward' },
+        3: { running: false, direction: 'forward' },
       },
-    });
+    },
+  });
+}
 
-  } catch (err) {
-    console.error('Error fetching device status', err);
-    return res.status(500).json({ success: false, message: 'Internal server error', error: err.message, });
-  }
+const s = rows[0];
+return res.json({
+  success: true,
+  data: {
+    intervalHours: s.interval_hours,
+    levels: {
+      A: !!s.level_a,
+      B: !!s.level_b,
+      C: !!s.level_c,
+    },
+    pumps: {
+      1: { running: !!s.pump1_running, direction: s.pump1_direction || 'forward' },
+      2: { running: !!s.pump2_running, direction: s.pump2_direction || 'forward' },
+      3: { running: !!s.pump3_running, direction: s.pump3_direction || 'forward' },
+    },
+  },
 });
+
 
 // novo endpoint para ON/OFF via comando
 app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
