@@ -1601,14 +1601,21 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
 app.post('/api/v1/device/health', verifyToken, async (req, res) => {
   try {
     const deviceId = req.user.deviceId;
-    const userId = req.user.userId; // assumindo que o token já carrega userId
+    const userId = req.user.userId;
     console.log('[API] POST /api/v1/device/health - Device:', deviceId);
 
     const health = req.body || {};
 
-    if (typeof health.cpu_usage !== 'number' ||
-        typeof health.memory_usage !== 'number' ||
-        typeof health.uptime !== 'number') {
+    // Normaliza para os nomes esperados (com underscore)
+    const cpu = health.cpu_usage ?? health.cpuusage ?? 0;
+    const mem = health.memory_usage ?? health.memoryusage ?? 0;
+    const storage = health.storage_usage ?? health.storageusage ?? null;
+    const wifi = health.wifi_rssi ?? health.wifirssi ?? null;
+    const uptime = health.uptime ?? 0;
+
+    // Valida
+    if (typeof cpu !== 'number' || typeof mem !== 'number' || typeof uptime !== 'number') {
+      console.log('[API] Health validation failed:', { cpu, mem, uptime });
       return res.status(400).json({
         success: false,
         message: 'Métricas de saúde inválidas',
@@ -1616,9 +1623,10 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
     }
 
     console.log('[API] Health metrics:', {
-      cpu: health.cpu_usage + '%',
-      memory: health.memory_usage + '%',
-      uptime: health.uptime + 's',
+      cpu: cpu + '%',
+      memory: mem + '%',
+      uptime: uptime + 's',
+      wifi: wifi,
     });
 
     await pool.query(
@@ -1630,17 +1638,8 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       `INSERT INTO device_health
          (deviceId, userId, cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        deviceId,
-        userId,
-        health.cpuusage,
-        health.memoryusage,
-        health.storageusage ?? null,
-        health.wifirssi ?? null,
-        health.uptime,
-      ]
+      [deviceId, userId, cpu, mem, storage, wifi, uptime]
     );
-
 
     return res.json({
       success: true,
@@ -1651,6 +1650,7 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 // GET /api/v1/device/kh-reference
 app.get('/api/v1/device/kh-reference', verifyToken, async (req, res) => {
