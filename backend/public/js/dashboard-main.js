@@ -345,7 +345,6 @@ function formatMetricWindow(labelEl, metric, khTarget) {
 }
 
 
-// Score simples de “saúde do KH” baseado no último valor
 function updateStatusFromKh(kh, khTarget) {
   if (typeof kh !== 'number' || typeof khTarget !== 'number') {
     statusPhEl.textContent = '--';
@@ -353,14 +352,66 @@ function updateStatusFromKh(kh, khTarget) {
     return;
   }
 
-  // 100 quando KH == khTarget, cai linearmente com o desvio
-  let score = 100 - Math.abs(kh - khTarget) * 40;
+  const delta = Math.abs(kh - khTarget);
+
+  const greenMax = (typeof khHealthGreenMaxDev === 'number' && khHealthGreenMaxDev >= 0)
+    ? khHealthGreenMaxDev
+    : 0.2;
+  const yellowMax = (typeof khHealthYellowMaxDev === 'number' && khHealthYellowMaxDev > 0)
+    ? khHealthYellowMaxDev
+    : 0.5;
+
+  const limit = yellowMax;
+  let score = 100 * (1 - delta / limit);
   if (score < 0) score = 0;
   if (score > 100) score = 100;
 
-  statusPhEl.textContent = Math.round(score);
-  statusPhEl.className = 'status-badge';
+  const intScore = Math.round(score);
+  statusPhEl.textContent = intScore;
+
+  if (delta <= greenMax) {
+    statusPhEl.className = 'status-badge good';
+  } else if (delta <= yellowMax) {
+    statusPhEl.className = 'status-badge warn';
+  } else {
+    statusPhEl.className = 'status-badge bad';
+  }
 }
+
+
+const khBufferCard = document.getElementById('khBufferCard'); // div do card
+
+if (khBufferCard) {
+  khBufferCard.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    const newState = !khAutoEnabled;
+    try {
+      const res = await fetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+        {
+          method: 'PUT',
+          headers: headersAuth,
+          body: JSON.stringify({ khAutoEnabled: newState }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) return;
+
+      khAutoEnabled = newState;
+      if (statusBufferEl) {
+        statusBufferEl.textContent = khAutoEnabled ? 'ON' : 'OFF';
+        statusBufferEl.className = khAutoEnabled
+          ? 'status-badge on'
+          : 'status-badge off';
+      }
+    } catch (err) {
+      console.error('toggle khAutoEnabled error', err);
+    }
+  });
+}
+
 
 // Popular tabela de medições e campos de horário
 function updateMeasurementsView(measures) {
@@ -504,6 +555,11 @@ async function loadKhMetrics(deviceId) {
 }
 
 
+let khHealthGreenMaxDev = null;
+let khHealthYellowMaxDev = null;
+let khAutoEnabled = false;
+
+
 async function loadKhInfo(deviceId) {
   try {
     const resp = await fetch(
@@ -525,7 +581,24 @@ async function loadKhInfo(deviceId) {
       ? data.khReference
       : (data.khReference != null ? parseFloat(data.khReference) : null);
 
-  
+    khHealthGreenMaxDev = typeof data.khHealthGreenMaxDev === 'number'
+      ? data.khHealthGreenMaxDev
+      : (data.khHealthGreenMaxDev != null ? parseFloat(data.khHealthGreenMaxDev) : null);
+
+    khHealthYellowMaxDev = typeof data.khHealthYellowMaxDev === 'number'
+      ? data.khHealthYellowMaxDev
+      : (data.khHealthYellowMaxDev != null ? parseFloat(data.khHealthYellowMaxDev) : null);
+
+    khAutoEnabled = !!data.khAutoEnabled;
+
+    // atualizar visual do card KH Buffer
+    if (statusBufferEl) {
+      statusBufferEl.textContent = khAutoEnabled ? 'ON' : 'OFF';
+      statusBufferEl.className = khAutoEnabled
+        ? 'status-badge on'
+        : 'status-badge off';
+    }
+
     if (typeof data.pump4MlPerSec === 'number') {
       pump4MlPerSec = data.pump4MlPerSec;
     } else if (data.pump4MlPerSec != null) {

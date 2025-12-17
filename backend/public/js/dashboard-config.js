@@ -69,6 +69,10 @@ const deviceNameInput  = document.getElementById('deviceNameInput');
 const saveDeviceNameBtn = document.getElementById('saveDeviceNameBtn');
 const deviceNameStatus  = document.getElementById('deviceNameStatus');
 
+const khHealthGreenMaxDevInput = document.getElementById('khHealthGreenMaxDev');
+const khHealthYellowMaxDevInput = document.getElementById('khHealthYellowMaxDev');
+const khAutoEnabledInput = document.getElementById('khAutoEnabled');
+
 
 
 async function sendDeviceCommand(deviceId, type, value = null) {
@@ -152,9 +156,13 @@ async function apiLoadDeviceConfig(deviceId) {
     return {
       khReference: d.khReference,
       khTarget: d.khTarget,
+      khHealthGreenMaxDev: d.khHealthGreenMaxDev,
+      khHealthYellowMaxDev: d.khHealthYellowMaxDev,
+      khAutoEnabled: d.khAutoEnabled,
       intervalHours: s.intervalHours,
       levels: s.levels || {},
       pumps: s.pumps || {},
+
     };
   } catch (err) {
     console.error('apiLoadDeviceConfig error', err);
@@ -341,6 +349,16 @@ async function loadConfigForSelected() {
     khTargetInput.value = '';
   }
 
+  if (typeof cfg.khHealthGreenMaxDev === 'number') {
+    khHealthGreenMaxDevInput.value = cfg.khHealthGreenMaxDev.toFixed(2);
+  }
+  if (typeof cfg.khHealthYellowMaxDev === 'number') {
+    khHealthYellowMaxDevInput.value = cfg.khHealthYellowMaxDev.toFixed(2);
+  }
+  if (typeof cfg.khAutoEnabled === 'boolean') {
+    khAutoEnabledInput.checked = cfg.khAutoEnabled;
+  }
+
   if (typeof cfg.intervalHours === 'number') {
     intervalRange.value = cfg.intervalHours;
     updateIntervalLabel(cfg.intervalHours);
@@ -411,6 +429,13 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
     const body = {
       khReference,
       khTarget,
+      khHealthGreenMaxDev: khHealthGreenMaxDevInput.value
+        ? Number(khHealthGreenMaxDevInput.value)
+        : null,
+      khHealthYellowMaxDev: khHealthYellowMaxDevInput.value
+        ? Number(khHealthYellowMaxDevInput.value)
+        : null,
+      khAutoEnabled: khAutoEnabledInput.checked,
     };
 
     const res = await fetch(
