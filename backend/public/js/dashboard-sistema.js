@@ -321,7 +321,7 @@ function renderEvents(events) {
 }
 
 async function loadSystemForSelected() {
-  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+  const deviceId = DashboardCommon.getSelectedDeviceId();
   if (!deviceId) {
     infoDeviceIdEl.textContent = '--';
     infoDeviceNameEl.textContent = '--';
