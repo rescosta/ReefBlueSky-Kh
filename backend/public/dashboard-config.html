@@ -306,27 +306,29 @@
           <div id="khTargetStatus" class="hint">Alvo atual --</div>
         </div>
 
-        <div class="field">
-          <label for="khHealthGreenMaxDev">
-            Desvio máximo para verde (dKH)
-          </label>
-          <input id="khHealthGreenMaxDev" type="number" step="0.1" min="0">
+        <div class="card-subtitle" style="margin-top:8px;">
+          Faixa de desvio (dKH) para cálculo das cores (verde, amarelo, vermelho).
         </div>
 
-        <div class="field">
-          <label for="khHealthYellowMaxDev">
-            Desvio máximo para amarelo (dKH)
-          </label>
-          <input id="khHealthYellowMaxDev" type="number" step="0.1" min="0">
+        <div class="field-row">
+          <label for="khHealthGreenMaxDev">Verde (≤ desvio em dKH)</label>
+          <input id="khHealthGreenMaxDev" type="number" step="0.1" min="0" />
+        </div>
+
+        <div class="field-row">
+          <label for="khHealthYellowMaxDev">Amarelo (≤ desvio em dKH)</label>
+          <input id="khHealthYellowMaxDev" type="number" step="0.1" min="0" />
+          <div class="hint">
+            Vermelho: acima do valor amarelo.
+          </div>
+        </div>
+
+        <div class="field-row">
+          <button id="saveKhHealthBtn" class="btn-small">Salvar desvios</button>
         </div>
 
         <!-- Toggle de automação -->
-        <div class="field">
-          <label>
-            <input id="khAutoEnabled" type="checkbox">
-            Ativar correção automática de KH (KH Buffer)
-          </label>
-        </div>
+      
 
         <div class="field-row">
           <label for="deviceNameInput">Nome do dispositivo (fake ID)</label>
