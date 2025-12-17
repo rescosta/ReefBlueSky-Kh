@@ -127,6 +127,7 @@ const MONITOR_INTERVAL_MS  = 30 * 1000;                              // 30 s
 
 async function checkDevicesOnlineStatus() {
   const now = Date.now();
+  console.log('[ALERT DEBUG] checkDevicesOnlineStatus rodou no horário:', new Date().toISOString());
   let conn;
 
   try {
@@ -189,12 +190,17 @@ async function checkDevicesOnlineStatus() {
 
       // Voltou a ficar online → tenta limpar flag e só manda e-mail se de fato mudou
       if (!isOffline && row.offline_alert_sent) {
+        
+        console.log('[ALERT DEBUG] Device %s: isOffline=%s, offline_alert_sent=%s → tentando enviar ONLINE',
+              row.deviceId, isOffline, row.offline_alert_sent);
+
         try {
           const [result] = await conn.query(
             'UPDATE devices SET offline_alert_sent = 0 WHERE id = ? AND offline_alert_sent = 1',
             [row.id]
           );
 
+            console.log('[ALERT DEBUG] UPDATE result.affectedRows=', result.affectedRows);
           if (result.affectedRows > 0) {
             const subject = `ReefBlueSky KH - Device ${row.deviceId} voltou ONLINE`;
             const nowBr = new Date().toLocaleString('pt-BR', {
@@ -1497,12 +1503,10 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     );
 
     // 2) Atualizar IP local se veio no body
-    if (local_ip) {
-      await conn.query(
-        'UPDATE devices SET local_ip = COALESCE(?, local_ip), last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
-        [local_ip || null, req.user.deviceId]
-      );
-    }
+    await conn.query(
+      'UPDATE devices SET localip = COALESCE(?, localip), last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
+      [localip || null, req.user.deviceId]
+    );
 
     // 3) Gravar medições
     let insertedCount = 0;
