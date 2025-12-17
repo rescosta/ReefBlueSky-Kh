@@ -73,8 +73,6 @@ const khHealthGreenMaxDevInput = document.getElementById('khHealthGreenMaxDev');
 const khHealthYellowMaxDevInput = document.getElementById('khHealthYellowMaxDev');
 
 
-
-
 async function sendDeviceCommand(deviceId, type, value = null) {
   const payload = value != null ? { type, value } : { type };
 
@@ -92,7 +90,6 @@ async function sendDeviceCommand(deviceId, type, value = null) {
   }
   return json;
 }
-
 
 
 function updateAbortVisibility() {
@@ -504,11 +501,20 @@ if (saveKhHealthBtn) {
     if (!deviceId) return;
 
     const green = khHealthGreenMaxDevInput.value
-      ? Number(khHealthGreenMaxDevInput.value)
+      ? Number(khHealthGreenMaxDevInput.value.replace(',', '.'))
       : null;
     const yellow = khHealthYellowMaxDevInput.value
-      ? Number(khHealthYellowMaxDevInput.value)
+      ? Number(khHealthYellowMaxDevInput.value.replace(',', '.'))
       : null;
+
+    if (green != null && Number.isNaN(green)) {
+      alert('Valor de desvio verde inválido. Use números como 0,3 ou 0.3');
+      return;
+    }
+    if (yellow != null && Number.isNaN(yellow)) {
+      alert('Valor de desvio amarelo inválido. Use números como 0,5 ou 0.5');
+      return;
+    }
 
     try {
       const res = await fetch(
