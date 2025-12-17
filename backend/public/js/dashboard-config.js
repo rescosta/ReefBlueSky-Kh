@@ -71,7 +71,7 @@ const deviceNameStatus  = document.getElementById('deviceNameStatus');
 
 const khHealthGreenMaxDevInput = document.getElementById('khHealthGreenMaxDev');
 const khHealthYellowMaxDevInput = document.getElementById('khHealthYellowMaxDev');
-const khAutoEnabledInput = document.getElementById('khAutoEnabled');
+
 
 
 
@@ -355,9 +355,6 @@ async function loadConfigForSelected() {
   if (typeof cfg.khHealthYellowMaxDev === 'number') {
     khHealthYellowMaxDevInput.value = cfg.khHealthYellowMaxDev.toFixed(2);
   }
-  if (typeof cfg.khAutoEnabled === 'boolean') {
-    khAutoEnabledInput.checked = cfg.khAutoEnabled;
-  }
 
   if (typeof cfg.intervalHours === 'number') {
     intervalRange.value = cfg.intervalHours;
@@ -426,17 +423,7 @@ if (saveDeviceNameBtn) {
 
 async function apiSetKhConfig(deviceId, khReference, khTarget) {
   try {
-    const body = {
-      khReference,
-      khTarget,
-      khHealthGreenMaxDev: khHealthGreenMaxDevInput.value
-        ? Number(khHealthGreenMaxDevInput.value)
-        : null,
-      khHealthYellowMaxDev: khHealthYellowMaxDevInput.value
-        ? Number(khHealthYellowMaxDevInput.value)
-        : null,
-      khAutoEnabled: khAutoEnabledInput.checked,
-    };
+    const body = { khReference, khTarget};
 
     const res = await fetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
@@ -457,6 +444,7 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
     return false;
   }
 }
+
 
 
 saveKhRefBtn.addEventListener('click', async () => {
@@ -506,6 +494,47 @@ saveIntervalBtn.addEventListener('click', async () => {
     alert('Erro ao salvar intervalo.');
   }
 });
+
+
+const saveKhHealthBtn = document.getElementById('saveKhHealthBtn');
+
+if (saveKhHealthBtn) {
+  saveKhHealthBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    const green = khHealthGreenMaxDevInput.value
+      ? Number(khHealthGreenMaxDevInput.value)
+      : null;
+    const yellow = khHealthYellowMaxDevInput.value
+      ? Number(khHealthYellowMaxDevInput.value)
+      : null;
+
+    try {
+      const res = await fetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+        {
+          method: 'PUT',
+          headers: headersAuthCfg,
+          body: JSON.stringify({
+            khHealthGreenMaxDev: green,
+            khHealthYellowMaxDev: yellow,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        alert(json.message || 'Erro ao salvar desvios de KH.');
+        return;
+      }
+      // inputs já ficam com os valores digitados (número “fixo”)
+    } catch (err) {
+      console.error('saveKhHealth error', err);
+      alert('Erro de comunicação ao salvar desvios de KH.');
+    }
+  });
+}
+
 
 // Controle manual das bombas 1–3 com barra regressiva
 const pumpStartButtons = document.querySelectorAll('.pumpStartBtn');
