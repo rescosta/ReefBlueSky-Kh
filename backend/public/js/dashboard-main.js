@@ -354,21 +354,24 @@ function updateStatusFromKh(kh, khTarget) {
 
   const delta = Math.abs(kh - khTarget);
 
-  const greenMax = (typeof khHealthGreenMaxDev === 'number' && khHealthGreenMaxDev >= 0)
+  const greenMax  = typeof khHealthGreenMaxDev  === 'number' && khHealthGreenMaxDev  > 0
     ? khHealthGreenMaxDev
     : 0.2;
-  const yellowMax = (typeof khHealthYellowMaxDev === 'number' && khHealthYellowMaxDev > 0)
+  const yellowMax = typeof khHealthYellowMaxDev === 'number' && khHealthYellowMaxDev > 0
     ? khHealthYellowMaxDev
     : 0.5;
 
-  const limit = yellowMax;
-  let score = 100 * (1 - delta / limit);
-  if (score < 0) score = 0;
-  if (score > 100) score = 100;
+  // 1) Número de saúde: 0–100%, simétrico
+  let pct;
+  if (delta >= yellowMax) {
+    pct = 0;
+  } else {
+    pct = 100 - (delta / yellowMax) * 100;
+  }
+  const intPct = Math.round(pct);
+  statusPhEl.textContent = `${intPct}%`;
 
-  const intScore = Math.round(score);
-  statusPhEl.textContent = intScore;
-
+  // 2) Cor: continua baseada em green/yellow
   if (delta <= greenMax) {
     statusPhEl.className = 'status-badge good';
   } else if (delta <= yellowMax) {
@@ -377,6 +380,8 @@ function updateStatusFromKh(kh, khTarget) {
     statusPhEl.className = 'status-badge bad';
   }
 }
+
+
 
 
 const khBufferCard = document.getElementById('khBufferCard'); // div do card
