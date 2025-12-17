@@ -2601,50 +2601,54 @@ app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req,
   }
 });
 
-// Eventos recentes do device (stub funcional)
-app.get('/api/v1/user/devices/:deviceId/events', authUserMiddleware, async (req, res) => {
+// GET última saúde do device para o usuário logado
+app.get('/api/v1/user/devices/:deviceId/health', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const deviceId = req.params.deviceId;
 
-    const sql = `
-      SELECT
-        timestamp,
-        level,
-        type,
-        message
-      FROM device_events
-      WHERE deviceId = ? AND userId = ?
-      ORDER BY timestamp DESC
-      LIMIT 50
-    `;
-    const rows = await pool.query(sql, [deviceId, userId]);
-
-    if (!rows.length) {
-      // Sem eventos ainda
-      return res.json({
-        success: true,
-        data: [],
+    // Garante que o device pertence ao usuário
+    const [devRows] = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!devRows.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device não encontrado para este usuário',
       });
     }
 
-    const events = rows.map((r) => ({
-      timestamp: r.timestamp,
-      level: r.level,
-      type: r.type,
-      message: r.message,
-    }));
+    const [rows] = await pool.query(
+      `SELECT cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds
+         FROM device_health
+        WHERE deviceId = ?
+        ORDER BY updatedAt DESC
+        LIMIT 1`,
+      [deviceId],
+    );
+
+    if (!rows.length) {
+      return res.json({ success: true, data: null });
+    }
+
+    const h = rows[0];
 
     return res.json({
       success: true,
-      data: events,
+      data: {
+        cpuUsage: h.cpu_usage,
+        memoryUsage: h.mem_usage,
+        storageUsage: h.storage_usage,
+        wifiRssi: h.wifi_rssi,
+        uptimeSeconds: h.uptime_seconds,
+      },
     });
   } catch (err) {
-    console.error('Error fetching device events', err);
+    console.error('Error loading device health', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
 
 
 // ============================================================================
