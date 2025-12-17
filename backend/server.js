@@ -2673,8 +2673,10 @@ app.get('/api/v1/health', (req, res) => {
  *   - last_seen (DATETIME ou TIMESTAMP)
  *   - offline_alert_sent TINYINT(1) DEFAULT 0
  */
-const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutos
-const MONITOR_INTERVAL_MS  = 30 * 1000;     // 30 segundos
+
+const OFFLINE_THRESHOLD_MINUTES = 5;
+const OFFLINE_THRESHOLD_MS = OFFLINE_THRESHOLD_MINUTES * 60 * 1000; // 5 min
+const MONITOR_INTERVAL_MS  = 30 * 1000;                              // 30 s
 
 async function checkDevicesOnlineStatus() {
   const now = Date.now();
@@ -2691,74 +2693,95 @@ async function checkDevicesOnlineStatus() {
               d.offline_alert_sent,
               u.email
          FROM devices d
-         JOIN users u ON u.id = d.userId`
+         JOIN users u ON u.id = d.userId
+        WHERE d.last_seen IS NOT NULL`
     );
 
-    for (const d of rows) {
-      if (!d.last_seen) {
-        continue; // nunca viu esse device ainda
-      }
-
-      const lastSeenMs = new Date(d.last_seen).getTime();
+    for (const row of rows) {
+      const lastSeenMs = new Date(row.last_seen).getTime();
       const isOffline = (now - lastSeenMs) > OFFLINE_THRESHOLD_MS;
 
-      // Ficou offline e ainda não mandou alerta
-      if (isOffline && !d.offline_alert_sent) {
+      // OFFLINE e ainda não mandou alerta
+      if (isOffline && !row.offline_alert_sent) {
         try {
-          await conn.query(
-            'UPDATE devices SET offline_alert_sent = 1 WHERE id = ?',
-            [d.id]
-          );
-
-          const subject = `ReefBlueSky KH - Device ${d.deviceId} offline`;
-          const text =
-            `Seu dispositivo ${d.deviceId} parece estar offline há mais de 5 minutos.\n` +
-            `Último sinal recebido em: ${d.last_seen} (horário do servidor).\n\n` +
-            `Verifique a alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
-
-          await mailTransporter.sendMail({
-            from: ALERT_FROM,
-            to: d.email,
-            subject,
-            text,
+          const lastSeenDate = new Date(row.last_seen);
+          const lastSeenBr = lastSeenDate.toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
           });
 
-          console.log('[ALERT] E-mail de offline enviado para', d.email, 'device', d.deviceId);
+          const text =
+            `Seu dispositivo ${row.deviceId} parece estar offline há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+            `Último sinal recebido em: ${lastSeenBr} (horário de Brasília).\n\n` +
+            `Verifique alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
+
+          // Atualiza flag apenas se ainda estava 0; evita race com outro loop
+          const [result] = await conn.query(
+            'UPDATE devices SET offline_alert_sent = 1 WHERE id = ? AND offline_alert_sent = 0',
+            [row.id]
+          );
+
+          if (result.affectedRows > 0) {
+            await mailTransporter.sendMail({
+              from: ALERT_FROM,
+              to: row.email,
+              subject: `ReefBlueSky KH - Device ${row.deviceId} offline`,
+              text,
+            });
+            console.log('[ALERT] E-mail de offline enviado para', row.email, 'device', row.deviceId);
+          }
         } catch (err) {
-          console.error('[ALERT] Erro ao enviar alerta offline para device', d.deviceId, err.message);
+          console.error('[ALERT] Erro ao enviar alerta offline para device', row.deviceId, err.message);
         }
       }
 
-      // Voltou a ficar online → envia e-mail e limpa flag
-      if (!isOffline && d.offline_alert_sent) {
+      // Voltou a ficar online → tenta limpar flag e só manda e-mail se de fato mudou
+      if (!isOffline && row.offline_alert_sent) {
         try {
-          await conn.query(
-            'UPDATE devices SET offline_alert_sent = 0 WHERE id = ?',
-            [d.id]
+          const [result] = await conn.query(
+            'UPDATE devices SET offline_alert_sent = 0 WHERE id = ? AND offline_alert_sent = 1',
+            [row.id]
           );
 
-          const subject = `ReefBlueSky KH - Device ${d.deviceId} voltou ONLINE`;
-          const text =
-            `Seu dispositivo ${d.deviceId} voltou a se comunicar com o servidor.\n` +
-            `Último sinal recebido agora em ${new Date().toISOString()} (horário do servidor).`;
+          if (result.affectedRows > 0) {
+            const subject = `ReefBlueSky KH - Device ${row.deviceId} voltou ONLINE`;
+            const nowBr = new Date().toLocaleString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
 
-          await mailTransporter.sendMail({
-            from: ALERT_FROM,
-            to: d.email,
-            subject,
-            text,
-          });
+            const text =
+              `Seu dispositivo ${row.deviceId} voltou a se comunicar com o servidor.\n` +
+              `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
 
-          console.log(
-            '[ALERT] Device voltou online, e-mail enviado para',
-            d.email,
-            'device',
-            d.deviceId
-          );
+            await mailTransporter.sendMail({
+              from: ALERT_FROM,
+              to: row.email,
+              subject,
+              text,
+            });
+
+            console.log(
+              '[ALERT] Device voltou online, e-mail enviado para',
+              row.email,
+              'device',
+              row.deviceId
+            );
+          }
         } catch (err) {
           console.error(
             '[ALERT] Erro ao tratar retorno online para device',
-            d.deviceId,
+            row.deviceId,
             err.message
           );
         }
@@ -2771,6 +2794,7 @@ async function checkDevicesOnlineStatus() {
   }
 }
 
+// apenas ESTE setInterval deve existir
 setInterval(checkDevicesOnlineStatus, MONITOR_INTERVAL_MS);
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
 
