@@ -346,7 +346,7 @@ function formatMetricWindow(labelEl, metric, khTarget) {
 
 
 function updateStatusFromKh(kh, khTarget) {
-  if (typeof kh !== 'number' || typeof khTarget !== 'number') {
+  if (typeof kh !== 'number' || typeof khTarget !== 'number' || khTarget <= 0) {
     statusPhEl.textContent = '--';
     statusPhEl.className = 'status-badge off';
     return;
@@ -361,17 +361,14 @@ function updateStatusFromKh(kh, khTarget) {
     ? khHealthYellowMaxDev
     : 0.5;
 
-  // 1) Número de saúde: 0–100%, simétrico
-  let pct;
-  if (delta >= yellowMax) {
-    pct = 0;
-  } else {
-    pct = 100 - (delta / yellowMax) * 100;
-  }
+  // 1) Número de saúde: % do alvo, simétrico
+  let pct = 100 - (Math.abs(kh - khTarget) / khTarget) * 100;
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
   const intPct = Math.round(pct);
   statusPhEl.textContent = `${intPct}%`;
 
-  // 2) Cor: continua baseada em green/yellow
+  // 2) Cor continua baseada no desvio absoluto
   if (delta <= greenMax) {
     statusPhEl.className = 'status-badge good';
   } else if (delta <= yellowMax) {
