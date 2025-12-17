@@ -127,7 +127,17 @@ const MONITOR_INTERVAL_MS  = 30 * 1000;                              // 30 s
 
 async function checkDevicesOnlineStatus() {
   const now = Date.now();
-  console.log('[ALERT DEBUG] checkDevicesOnlineStatus rodou no horário:', new Date().toISOString());
+  console.log('[ALERT DEBUG] checkDevicesOnlineStatus rodou no horário:', 
+    new Date().toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    );
   let conn;
 
   try {
@@ -151,6 +161,9 @@ async function checkDevicesOnlineStatus() {
 
       // OFFLINE e ainda não mandou alerta
       if (isOffline && !row.offline_alert_sent) {
+        console.log('[ALERT DEBUG] Device %s: isOffline=%s, offline_alert_sent=%s → tentando enviar OFFLINE',
+              row.deviceId, isOffline, row.offline_alert_sent);
+
         try {
           const lastSeenDate = new Date(row.last_seen);
           const lastSeenBr = lastSeenDate.toLocaleString('pt-BR', {
@@ -174,7 +187,9 @@ async function checkDevicesOnlineStatus() {
             [row.id]
           );
 
+          console.log('[ALERT DEBUG] UPDATE result.affectedRows=', result.affectedRows);
           if (result.affectedRows > 0) {
+            console.log('[ALERT DEBUG] Enviando email de OFFLINE para', row.email);
             await mailTransporter.sendMail({
               from: ALERT_FROM,
               to: row.email,
@@ -187,6 +202,7 @@ async function checkDevicesOnlineStatus() {
           console.error('[ALERT] Erro ao enviar alerta offline para device', row.deviceId, err.message);
         }
       }
+
 
       // Voltou a ficar online → tenta limpar flag e só manda e-mail se de fato mudou
       if (!isOffline && row.offline_alert_sent) {
