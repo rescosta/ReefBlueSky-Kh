@@ -347,6 +347,24 @@
       justify-content: space-between;
     }
 
+
+    .status-badge.good {
+      background: #022c22;
+      border-color: #16a34a;
+      color: #bbf7d0;
+    }
+    .status-badge.warn {
+      background: #451a03;
+      border-color: #f59e0b;
+      color: #fed7aa;
+    }
+    .status-badge.bad {
+      background: #450a0a;
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+
+
   </style>
 </head>
 <body>
@@ -467,10 +485,10 @@
             <div id="statusPh" class="status-badge">--</div>
             <div class="status-label">Saúde do KH</div>
           </div>
-          <div class="status-circle">
-            <div id="statusBuffer" class="status-badge off">0</div>
-            <div class="status-label">KH Buffer</div>
-          </div>
+            <div class="status-circle" id="khBufferCard">
+              <div id="statusBuffer" class="status-badge off">0</div>
+              <div class="status-label">KH Buffer</div>
+            </div>
           <div class="status-circle">
             <div id="statusReactor" class="status-badge off">OFF</div>
             <div class="status-label">Reator CA</div>
