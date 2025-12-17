@@ -2214,7 +2214,10 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         kh_tolerance_daily,
         kh_alert_enabled,
         kh_alert_channel,
-        pump4_ml_per_sec
+        pump4_ml_per_sec,
+        kh_health_green_max_dev,
+        kh_health_yellow_max_dev,
+        kh_auto_enabled
       FROM devices
       WHERE deviceId = ? AND userId = ?
       LIMIT 1
@@ -2235,6 +2238,9 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         khAlertEnabled: cfg.kh_alert_enabled,
         khAlertChannel: cfg.kh_alert_channel,
         pump4MlPerSec: cfg.pump4_ml_per_sec,
+        khHealthGreenMaxDev: cfg.kh_health_green_max_dev,
+        khHealthYellowMaxDev: cfg.kh_health_yellow_max_dev,
+        khAutoEnabled: !!cfg.kh_auto_enabled,
       },
     });
   } catch (err) {
@@ -2331,6 +2337,9 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
       khToleranceDaily,
       khAlertEnabled,
       khAlertChannel,
+      khHealthGreenMaxDev,
+      khHealthYellowMaxDev,
+      khAutoEnabled  
     } = req.body || {};
 
     if (khTarget != null && (isNaN(khTarget) || khTarget < 4 || khTarget > 15)) {
@@ -2342,6 +2351,12 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     if (khToleranceDaily != null && (isNaN(khToleranceDaily) || khToleranceDaily < 0 || khToleranceDaily > 3)) {
       return res.status(400).json({ success: false, message: 'khToleranceDaily inválido' });
     }
+    if (khHealthGreenMaxDev != null && (isNaN(khHealthGreenMaxDev) || khHealthGreenMaxDev < 0)) {
+      return res.status(400).json({ success: false, message: 'khHealthGreenMaxDev inválido' });
+    }
+    if (khHealthYellowMaxDev != null && (isNaN(khHealthYellowMaxDev) || khHealthYellowMaxDev <= 0)) {
+      return res.status(400).json({ success: false, message: 'khHealthYellowMaxDev inválido' });
+    }
 
     const sql = `
       UPDATE devices
@@ -2350,7 +2365,10 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         kh_reference = COALESCE(?, kh_reference),
         kh_tolerance_daily = COALESCE(?, kh_tolerance_daily),
         kh_alert_enabled = COALESCE(?, kh_alert_enabled),
-        kh_alert_channel = COALESCE(?, kh_alert_channel)
+        kh_alert_channel = COALESCE(?, kh_alert_channel),
+        kh_health_green_max_dev  = COALESCE(?, kh_health_green_max_dev),
+        kh_health_yellow_max_dev = COALESCE(?, kh_health_yellow_max_dev),
+        kh_auto_enabled        = COALESCE(?, kh_auto_enabled)
       WHERE deviceId = ? AND userId = ?
     `;
     const params = [
@@ -2359,6 +2377,9 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
       khToleranceDaily,
       khAlertEnabled,
       khAlertChannel,
+      khHealthGreenMaxDev,
+      khHealthYellowMaxDev,
+      khAutoEnabled != null ? !!khAutoEnabled : null,
       deviceId,
       userId,
     ];
@@ -2384,7 +2405,6 @@ app.put('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
 
 
 app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (req, res) => {
@@ -2527,31 +2547,6 @@ return res.json({
   }
 });
 
-
-// novo endpoint para ON/OFF via comando
-app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (req, res) => {
-  const { deviceId } = req.params;
-  const userId = req.user.userId;
-  const { enabled } = req.body;
-
-  try {
-    const devRows = await pool.query(
-      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
-      [deviceId, userId]
-    );
-    if (!devRows.length) {
-      return res.status(404).json({ success: false, message: 'Device not found' });
-    }
-
-    const cmd = await enqueueDbCommand(deviceId, 'testmode', { enabled: !!enabled });
-    console.log('[CMD] testmode enfileirado', deviceId, enabled);
-
-    return res.json({ success: true, data: { commandId: cmd.id } });
-  } catch (err) {
-    console.error('Erro em /test-mode', err.message);
-    return res.status(500).json({ success: false, message: 'Falha ao acionar testmode no device' });
-  }
-});
 
 
 // Saúde do device (stub funcional)
