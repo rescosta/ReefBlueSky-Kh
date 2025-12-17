@@ -1603,21 +1603,22 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       'UPDATE devices SET last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
       [deviceId]
     );
-
+      
     await pool.query(
       `INSERT INTO device_health
-         (userId, deviceId, cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds)
+         (deviceId, userId, cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        userId,
         deviceId,
-        health.cpu_usage,
-        health.memory_usage,
-        health.storage_usage ?? null,
-        health.wifi_rssi ?? null,
+        userId,
+        health.cpuusage,
+        health.memoryusage,
+        health.storageusage ?? null,
+        health.wifirssi ?? null,
         health.uptime,
       ]
     );
+
 
     return res.json({
       success: true,
@@ -2538,12 +2539,7 @@ app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req,
     const deviceId = req.params.deviceId;
 
     const sql = `
-      SELECT
-        cpu_usage,
-        mem_usage,
-        storage_usage,
-        wifi_rssi,
-        uptime_seconds
+      SELECT cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds
       FROM device_health
       WHERE deviceId = ? AND userId = ?
       ORDER BY updatedAt DESC
@@ -2552,7 +2548,6 @@ app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req,
     const rows = await pool.query(sql, [deviceId, userId]);
 
     if (!rows.length) {
-      // Sem métricas ainda → neutro
       return res.json({
         success: true,
         data: {
@@ -2566,13 +2561,14 @@ app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req,
     }
 
     const h = rows[0];
+
     return res.json({
       success: true,
       data: {
-        cpuUsage: h.cpu_usage,
-        memoryUsage: h.mem_usage,
-        storageUsage: h.storage_usage,
-        wifiRssi: h.wifi_rssi,
+        cpuUsage:      h.cpu_usage,
+        memoryUsage:   h.mem_usage,
+        storageUsage:  h.storage_usage,
+        wifiRssi:      h.wifi_rssi,
         uptimeSeconds: h.uptime_seconds,
       },
     });
