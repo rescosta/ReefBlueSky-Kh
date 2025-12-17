@@ -286,8 +286,9 @@ function renderHealth(health) {
   healthStorageEl.className = `health-value ${classifyPercent(storage)}`;
 
   healthWifiEl.textContent =
-    Number.isFinite(wifi) ? `${wifi} dBm` : '--';
+    Number.isFinite(wifi) ? `${wifi.toFixed(0)}%` : '--';
   healthWifiEl.className = `health-value ${classifyWifi(wifi)}`;
+
 
   healthUptimeEl.textContent = formatUptime(uptime);
 
