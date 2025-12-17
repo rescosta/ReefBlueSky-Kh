@@ -262,26 +262,31 @@ function renderHealth(health) {
     return;
   }
 
-  const cpu = health.cpuUsage ?? health.cpu ?? null;
-  const mem = health.memoryUsage ?? health.mem ?? null;
-  const storage = health.storageUsage ?? health.storage ?? null;
-  const wifi = health.wifiRssi ?? health.rssi ?? null;
+  const cpuRaw = health.cpuUsage ?? health.cpu ?? null;
+  const memRaw = health.memoryUsage ?? health.mem ?? null;
+  const storageRaw = health.storageUsage ?? health.storage ?? null;
+  const wifiRaw = health.wifiRssi ?? health.rssi ?? null;
   const uptime = health.uptimeSeconds ?? health.uptime ?? null;
 
+  const cpu = Number.isFinite(cpuRaw) ? cpuRaw : Number(cpuRaw);
+  const mem = Number.isFinite(memRaw) ? memRaw : Number(memRaw);
+  const storage = Number.isFinite(storageRaw) ? storageRaw : Number(storageRaw);
+  const wifi = Number.isFinite(wifiRaw) ? wifiRaw : Number(wifiRaw);
+
   healthCpuEl.textContent =
-    cpu != null ? `${cpu.toFixed(0)}%` : '--';
+    Number.isFinite(cpu) ? `${cpu.toFixed(0)}%` : '--';
   healthCpuEl.className = `health-value ${classifyPercent(cpu)}`;
 
   healthMemEl.textContent =
-    mem != null ? `${mem.toFixed(0)}%` : '--';
+    Number.isFinite(mem) ? `${mem.toFixed(0)}%` : '--';
   healthMemEl.className = `health-value ${classifyPercent(mem)}`;
 
   healthStorageEl.textContent =
-    storage != null ? `${storage.toFixed(0)}%` : '--';
+    Number.isFinite(storage) ? `${storage.toFixed(0)}%` : '--';
   healthStorageEl.className = `health-value ${classifyPercent(storage)}`;
 
   healthWifiEl.textContent =
-    wifi != null ? `${wifi} dBm` : '--';
+    Number.isFinite(wifi) ? `${wifi} dBm` : '--';
   healthWifiEl.className = `health-value ${classifyWifi(wifi)}`;
 
   healthUptimeEl.textContent = formatUptime(uptime);
@@ -289,6 +294,7 @@ function renderHealth(health) {
   healthStatusTextEl.textContent =
     'Métricas carregadas. Valores altos de CPU/memória/armazenamento ou sinal Wi-Fi fraco podem indicar problemas.';
 }
+
 
 function renderEvents(events) {
   eventsListEl.innerHTML = '';
