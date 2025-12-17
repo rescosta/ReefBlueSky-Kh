@@ -131,6 +131,7 @@ async function checkDevicesOffline() {
 
       // OFFLINE e ainda não mandou alerta
       if (isOffline && !row.offline_alert_sent) {
+        
         console.log(`[ALERT] Device ${row.deviceId} OFFLINE, enviando e-mail para ${row.email}`);
 
         try {
@@ -167,42 +168,45 @@ async function checkDevicesOffline() {
       }
 
 
-      // Voltou a ficar online → limpa flag
+      // Voltou a ficar online → tentar limpar flag apenas se ainda estiver 1
       if (!isOffline && row.offline_alert_sent) {
         try {
-          await conn.query(
-            'UPDATE devices SET offline_alert_sent = 0 WHERE id = ?',
+          const [result] = await conn.query(
+            'UPDATE devices SET offline_alert_sent = 0 WHERE id = ? AND offline_alert_sent = 1',
             [row.id]
           );
 
-          const subject = `ReefBlueSky KH - Device ${row.deviceId} voltou ONLINE`;
-          const nowBr = new Date().toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
+          // Só manda e-mail se atualizou pelo menos 1 linha
+          if (result.affectedRows > 0) {
+            const subject = `ReefBlueSky KH - Device ${row.deviceId} voltou ONLINE`;
+            const nowBr = new Date().toLocaleString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
 
-          const text =
-            `Seu dispositivo ${row.deviceId} voltou a se comunicar com o servidor.\n` +
-            `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
+            const text =
+              `Seu dispositivo ${row.deviceId} voltou a se comunicar com o servidor.\n` +
+              `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
 
-          await mailTransporter.sendMail({
-            from: ALERT_FROM,
-            to: row.email,
-            subject,
-            text,
-          });
+            await mailTransporter.sendMail({
+              from: ALERT_FROM,
+              to: row.email,
+              subject,
+              text,
+            });
 
-          console.log(
-            'ALERT Device voltou online, e-mail enviado para',
-            row.email,
-            'device',
-            row.deviceId
-          );
+            console.log(
+              'ALERT Device voltou online, e-mail enviado para',
+              row.email,
+              'device',
+              row.deviceId
+            );
+          }
         } catch (err) {
           console.error(
             'ALERT Erro ao tratar retorno online para device',
@@ -211,6 +215,7 @@ async function checkDevicesOffline() {
           );
         }
       }
+
     }
   } catch (err) {
     console.error('Erro no monitor de devices offline:', err.message);
