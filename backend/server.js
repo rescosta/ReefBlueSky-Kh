@@ -169,7 +169,7 @@ async function checkDevicesOnlineStatus() {
             `Verifique alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
 
           // Atualiza flag apenas se ainda estava 0; evita race com outro loop
-          const [result] = await conn.query(
+          const result = await conn.query(
             'UPDATE devices SET offline_alert_sent = 1 WHERE id = ? AND offline_alert_sent = 0',
             [row.id]
           );
@@ -195,12 +195,12 @@ async function checkDevicesOnlineStatus() {
               row.deviceId, isOffline, row.offline_alert_sent);
 
         try {
-          const [result] = await conn.query(
+          const result = await conn.query(
             'UPDATE devices SET offline_alert_sent = 0 WHERE id = ? AND offline_alert_sent = 1',
             [row.id]
           );
 
-            console.log('[ALERT DEBUG] UPDATE result.affectedRows=', result.affectedRows);
+          console.log('[ALERT DEBUG] UPDATE result.affectedRows=', result.affectedRows);
           if (result.affectedRows > 0) {
             const subject = `ReefBlueSky KH - Device ${row.deviceId} voltou ONLINE`;
             const nowBr = new Date().toLocaleString('pt-BR', {
@@ -217,6 +217,7 @@ async function checkDevicesOnlineStatus() {
               `Seu dispositivo ${row.deviceId} voltou a se comunicar com o servidor.\n` +
               `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
 
+            console.log('[ALERT DEBUG] Enviando email de ONLINE para', row.email);
             await mailTransporter.sendMail({
               from: ALERT_FROM,
               to: row.email,
@@ -239,6 +240,7 @@ async function checkDevicesOnlineStatus() {
           );
         }
       }
+
     }
   } catch (err) {
     console.error('[ALERT] Erro no monitor de devices online/offline:', err.message);
