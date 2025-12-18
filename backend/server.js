@@ -2590,6 +2590,99 @@ app.get('/api/v1/user/devices/:deviceId/health', authUserMiddleware, async (req,
 });
 
 
+
+// ============================================================================
+// [API] DISPLAY
+// ============================================================================
+
+
+// GET /api/v1/user/devices/:deviceId/display/kh-summary
+app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware, async (req, res) => {
+  try {
+    const userId   = req.user.userId;
+    const deviceId = req.params.deviceId;
+
+    // 1) garantir que o device é do usuário
+    const devRows = await pool.query(
+      'SELECT deviceId, kh_target FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!devRows.length) {
+      return res.status(404).json({ success:false, message:'Device not found' });
+    }
+    const khTarget = devRows[0].kh_target;
+
+    // 2) última medição de KH
+    const lastRows = await pool.query(
+      `SELECT kh, timestamp
+         FROM measurements
+        WHERE deviceId = ?
+        ORDER BY timestamp DESC
+        LIMIT 1`,
+      [deviceId]
+    );
+    if (!lastRows.length) {
+      return res.json({ success:true, data:null });
+    }
+    const last = lastRows[0];
+
+    const nowMs   = Date.now();
+    const from24h = nowMs - 24*3600*1000;
+
+    // 3) min/max em 24h
+    const mmRows = await pool.query(
+      `SELECT MIN(kh) AS minKh, MAX(kh) AS maxKh
+         FROM measurements
+        WHERE deviceId = ? AND timestamp >= ?`,
+      [deviceId, from24h]
+    );
+    const mm = mmRows[0] || {};
+    const khMin = mm.minKh != null ? parseFloat(mm.minKh) : last.kh;
+    const khMax = mm.maxKh != null ? parseFloat(mm.maxKh) : last.kh;
+
+    // 4) variação em 24h (diferença entre KH atual e KH de ~24h atrás)
+    const firstRows = await pool.query(
+      `SELECT kh
+         FROM measurements
+        WHERE deviceId = ? AND timestamp >= ?
+        ORDER BY timestamp ASC
+        LIMIT 1`,
+      [deviceId, from24h]
+    );
+    let khVar = 0;
+    if (firstRows.length) {
+      khVar = parseFloat(last.kh) - parseFloat(firstRows[0].kh);
+    }
+
+    // 5) saúde simples de KH (0..1) baseada na distância do alvo
+    let health = null;
+    if (khTarget != null) {
+      const dev = Math.abs(last.kh - khTarget);
+      // exemplo: 0 desvio => 1.0, desvio >= 1.5 => 0
+      const h = 1 - (dev / 1.5);
+      health = Math.max(0, Math.min(1, h));
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        nowIso:     new Date(last.timestamp).toISOString(),
+        kh:         parseFloat(last.kh),
+        khMin24h:   khMin,
+        khMax24h:   khMax,
+        khVar24h:   khVar,
+        khTarget:   khTarget,
+        health:     health
+      }
+    });
+  } catch (err) {
+    console.error('Error kh-summary', err);
+    return res.status(500).json({ success:false, message:'Internal server error' });
+  }
+});
+
+
+
 // ============================================================================
 // [API] Endpoints de Status (v1)
 // ============================================================================
