@@ -142,17 +142,24 @@
       margin-bottom: 8px;
     }
 
+    /* linhas divisórias internas do card */
     .field-row {
       margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #111827;
       display: flex;
       flex-direction: column;
       gap: 4px;
       font-size: 13px;
     }
+    .field-row:last-of-type {
+      border-bottom: none;
+    }
     .field-row label {
       font-size: 13px;
       color: #e5e7eb;
     }
+
     .inline {
       display: flex;
       align-items: center;
@@ -291,13 +298,9 @@
     .form-hint {
       display: block;
       font-size: 11px;
-      color: #6b7280; /* igual .hint */
+      color: #6b7280;
       margin-top: 0.25rem;
     }
-
-
-
-
   </style>
 </head>
 <body>
@@ -315,25 +318,26 @@
         </div>
 
         <!-- KH de referência (câmara C) -->
-
-        <div class="form-row">
+        <div class="field-row">
           <label for="khRefInput">KH de referência (câmara C)</label>
-          <div class="input-with-button">
+          <div class="inline">
             <input id="khRefInput" type="number" step="0.01" placeholder="Ex: 7.50" />
             <button id="saveKhRefBtn" class="btn-primary">Salvar KH ref</button>
           </div>
           <div id="khRefStatus" class="hint">Referência atual --</div>
         </div>
 
-        <div class="form-row">
+        <!-- KH alvo do aquário -->
+        <div class="field-row">
           <label for="khTargetInput">KH alvo do aquário</label>
-          <div class="input-with-button">
+          <div class="inline">
             <input id="khTargetInput" type="number" step="0.01" placeholder="Ex: 8.00" />
             <button id="saveKhTargetBtn" class="btn-primary">Salvar KH</button>
           </div>
           <div id="khTargetStatus" class="hint">Alvo atual --</div>
         </div>
 
+        <!-- Faixa de desvio (com linhas acima/abaixo) -->
         <div class="field-row">
           <label>Faixa de desvio (dKH)</label>
           <div class="hint">
@@ -375,10 +379,7 @@
           </button>
         </div>
 
-
-        <!-- Toggle de automação -->
-      
-
+        <!-- Nome do dispositivo -->
         <div class="field-row">
           <label for="deviceNameInput">Nome do dispositivo (fake ID)</label>
           <div class="inline">
@@ -392,18 +393,20 @@
           </div>
         </div>
 
+        <!-- Intervalo entre medições -->
         <div class="field-row">
           <label for="intervalRange">Intervalo entre medições (horas)</label>
           <input id="intervalRange" type="range" min="1" max="24" value="1" />
           <div class="inline">
             <span id="intervalLabel">1 hora</span>
-            <button id="saveIntervalBtn" class="btn-primary">  Salvar agendamento  </button>
+            <button id="saveIntervalBtn" class="btn-primary">Salvar agendamento</button>
           </div>
           <div class="hint">
             As medições são agendadas para a próxima hora redonda a partir do momento do salvamento.
           </div>
         </div>
 
+        <!-- Calibração de KH -->
         <div class="field-row">
           <label>Calibração de KH</label>
           <div class="inline">
@@ -565,9 +568,8 @@
           </div>
         </div>
       </div>
-
-      </div>
     </div>
+  </div>
 
   <div class="footer">
     <div id="userInfo">Usuário --</div>
@@ -575,9 +577,8 @@
   </div>
 
   <button id="abortBtn" class="btn-abort" style="display:none;">
-  &#9888; ABORTAR
+    ⚠ ABORTAR
   </button>
-
 
   <script src="js/dashboard-common.js"></script>
   <script src="js/dashboard-config.js"></script>
