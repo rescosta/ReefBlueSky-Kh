@@ -278,7 +278,7 @@ function renderHealth(health) {
   const cpu = Number.isFinite(cpuRaw) ? cpuRaw : Number(cpuRaw);
   const mem = Number.isFinite(memRaw) ? memRaw : Number(memRaw);
   const storage = Number.isFinite(storageRaw) ? storageRaw : Number(storageRaw);
-  const wifi = Number.isFinite(wifiRaw) ? wifiRaw : Number(wifiRaw);
+
 
   healthCpuEl.textContent =
     Number.isFinite(cpu) ? `${cpu.toFixed(0)}%` : '--';
