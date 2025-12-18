@@ -265,7 +265,14 @@ function renderHealth(health) {
   const cpuRaw = health.cpuUsage ?? health.cpu ?? null;
   const memRaw = health.memoryUsage ?? health.mem ?? null;
   const storageRaw = health.storageUsage ?? health.storage ?? null;
+
   const wifiRaw = health.wifiRssi ?? health.rssi ?? null;
+  const wifi = Number.isFinite(wifiRaw) ? wifiRaw : Number(wifiRaw);
+  healthWifiEl.textContent =
+    Number.isFinite(wifi) ? `${wifi.toFixed(0)}%` : '--';
+  healthWifiEl.className = `health-value ${classifyWifi(wifi)}`;
+
+
   const uptime = health.uptimeSeconds ?? health.uptime ?? null;
 
   const cpu = Number.isFinite(cpuRaw) ? cpuRaw : Number(cpuRaw);
