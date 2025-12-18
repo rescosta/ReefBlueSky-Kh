@@ -279,7 +279,6 @@ function renderHealth(health) {
   const mem = Number.isFinite(memRaw) ? memRaw : Number(memRaw);
   const storage = Number.isFinite(storageRaw) ? storageRaw : Number(storageRaw);
 
-
   healthCpuEl.textContent =
     Number.isFinite(cpu) ? `${cpu.toFixed(0)}%` : '--';
   healthCpuEl.className = `health-value ${classifyPercent(cpu)}`;
