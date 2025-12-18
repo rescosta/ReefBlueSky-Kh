@@ -1523,7 +1523,7 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     // 2) Atualizar IP local se veio no body
     await conn.query(
       'UPDATE devices SET local_ip = COALESCE(?, local_ip), last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
-      [loca_lip || null, req.user.deviceId]
+      [local_ip || null, req.user.deviceId]
     );
 
     // 3) Gravar medições
