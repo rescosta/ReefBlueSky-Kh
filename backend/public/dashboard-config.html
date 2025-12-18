@@ -270,6 +270,32 @@
       display: flex;
       justify-content: space-between;
     }
+
+    .form-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .form-field.half {
+      flex: 1 1 0;
+    }
+
+    .form-hint {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .form-hint {
+      display: block;
+      font-size: 11px;
+      color: #6b7280; /* igual .hint */
+      margin-top: 0.25rem;
+    }
+
+    
   </style>
 </head>
 <body>
@@ -314,7 +340,7 @@
           </p>
 
           <div class="form-row">
-            <div class="form-field">
+            <div class="form-field half">
               <label for="khHealthGreenMaxDev">Verde (≤ desvio em dKH)</label>
               <input
                 type="number"
@@ -329,7 +355,7 @@
               </small>
             </div>
 
-            <div class="form-field">
+            <div class="form-field half">
               <label for="khHealthYellowMaxDev">Amarelo (≤ desvio em dKH)</label>
               <input
                 type="number"
@@ -340,7 +366,7 @@
                 placeholder="ex.: 0.5"
               />
               <small class="form-hint">
-                Acima do valor verde e até aqui fica amarelo. Valores maiores serão vermelhos.
+                Acima do valor verde e até aqui fica amarelo; valores maiores serão vermelhos.
               </small>
             </div>
           </div>
@@ -349,6 +375,7 @@
             Salvar desvios
           </button>
         </div>
+
 
 
         <!-- Toggle de automação -->
