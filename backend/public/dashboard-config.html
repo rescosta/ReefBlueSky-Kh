@@ -277,15 +277,15 @@
       flex-wrap: wrap;
     }
 
-    .form-field.half {
-      flex: 1 1 0;
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 13px;
     }
 
-    .form-hint {
-      display: block;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
+    .form-field.half {
+      flex: 1 1 0;
     }
 
     .form-hint {
@@ -295,7 +295,9 @@
       margin-top: 0.25rem;
     }
 
-    
+
+
+
   </style>
 </head>
 <body>
@@ -332,12 +334,11 @@
           <div id="khTargetStatus" class="hint">Alvo atual --</div>
         </div>
 
-        <div class="form-section">
-          <h3>Faixa de desvio (dKH)</h3>
-          <p class="form-help">
-            Usado para colorir os cards de KH (verde, amarelo, vermelho) com base no desvio
-            em relação ao alvo.
-          </p>
+        <div class="field-row">
+          <label>Faixa de desvio (dKH)</label>
+          <div class="hint">
+            Usado para colorir os cards de KH (verde, amarelo, vermelho) com base no desvio em relação ao alvo.
+          </div>
 
           <div class="form-row">
             <div class="form-field half">
@@ -347,7 +348,6 @@
                 step="0.1"
                 min="0"
                 id="khHealthGreenMaxDev"
-                class="input-text"
                 placeholder="ex.: 0.2"
               />
               <small class="form-hint">
@@ -362,7 +362,6 @@
                 step="0.1"
                 min="0"
                 id="khHealthYellowMaxDev"
-                class="input-text"
                 placeholder="ex.: 0.5"
               />
               <small class="form-hint">
@@ -371,11 +370,10 @@
             </div>
           </div>
 
-          <button id="btnSaveKhHealthRanges" class="btn-primary">
+          <button id="btnSaveKhHealthRanges" class="btn-primary" style="margin-top:8px;">
             Salvar desvios
           </button>
         </div>
-
 
 
         <!-- Toggle de automação -->
