@@ -11,6 +11,7 @@
  */
 class SensorManager {
 public:
+    void setSimulatePH(bool enabled, float refValue, float sampleValue);
     /**
      * Construtor
      * @param ph_pin Pino analógico do sensor de pH
@@ -84,10 +85,21 @@ public:
      */
     bool isTemperatureSensorOK();
 
+    void setLevelAEnabled(bool enabled);
+    void setLevelBEnabled(bool enabled);
+    void setLevelCEnabled(bool enabled);
+
+    bool isLevelAEnabled() const;
+    bool isLevelBEnabled() const;
+    bool isLevelCEnabled() const;
+
+
+
 private:
     // Pinos
     int _ph_pin;
     int _temp_pin;
+    
 
     // Sensores
     OneWire* _oneWire;
@@ -102,7 +114,7 @@ private:
     float _last_temperature;
 
     // Configurações
-    static constexpr int PH_SAMPLES = 10;
+    static constexpr int PH_SAMPLES = 8;
     static constexpr int TEMP_SAMPLES = 5;
     static constexpr float VOLTAGE_REF = 3.3f;
     static constexpr int ADC_RESOLUTION = 4096;  // 12-bit para ESP32
@@ -112,6 +124,16 @@ private:
     float readTemperatureRaw();
     float voltageToPhValue(float voltage);
     float averageAnalogRead(int pin, int samples);
+
+    // sensor PH fake
+    bool  _simulatePH = false;
+    float _simPHRef   = 8.2f;
+    float _simPHSample= 8.0f;
+
+    bool _levelAEnabled = true;
+    bool _levelBEnabled = true;
+    bool _levelCEnabled = true;
+
 };
 
 #endif // SENSOR_MANAGER_H

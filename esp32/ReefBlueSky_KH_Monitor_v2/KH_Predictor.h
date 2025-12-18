@@ -6,6 +6,8 @@
 #include <numeric>
 #include <cstdio>
 #include <cmath>
+#include <stdint.h>
+
 
 /**
  * @class KHPredictor
@@ -23,7 +25,7 @@ public:
     // Estrutura para armazenar ponto de dados
     struct DataPoint {
         float kh;
-        unsigned long timestamp;
+        uint64_t timestamp;
         float temperature;
     };
 
@@ -62,7 +64,7 @@ public:
      * @param timestamp Timestamp em milissegundos
      * @param temperature Temperatura em Celsius
      */
-    void addMeasurement(float kh, unsigned long timestamp, float temperature);
+    void addMeasurement(float kh, uint64_t timestamp, float temperature);
 
     /**
      * Obter predição de KH para N horas no futuro

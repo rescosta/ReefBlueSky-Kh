@@ -1,5 +1,6 @@
 #include "KH_Analyzer.h"
 #include <ArduinoJson.h>
+#include "TimeProvider.h"  // ou o arquivo correto onde getCurrentEpochMs está
 
 KH_Analyzer::KH_Analyzer(PumpControl* pc, SensorManager* sm)
     : _pc(pc), _sm(sm), _current_state(IDLE), _reference_kh(DEFAULT_REFERENCE_KH),
@@ -234,12 +235,13 @@ String KH_Analyzer::configToJSON() {
     DynamicJsonDocument doc(256);
     doc["reference_kh"] = serialized(String(_reference_kh, 2));
     doc["configured"] = _reference_kh_configured;
-    doc["timestamp"] = millis();
+    doc["timestamp"] = getCurrentEpochMs();  // epoch em ms, não uptime
     
     String json;
     serializeJson(doc, json);
     return json;
 }
+
 
 // [PERSISTÊNCIA] Desserializar configuração de JSON
 bool KH_Analyzer::configFromJSON(const String& json) {
@@ -273,10 +275,11 @@ bool KH_Analyzer::phase1_discard(int level_a, int level_b) {
 
 bool KH_Analyzer::phase2_calibrate_reference(int level_c, int level_a) {
     logPhaseInfo("FASE 2 - Calibração");
-    // Implementação da fase 2
-    _ph_ref = _sm->getPH();
+    // Simulação: pH de referência fixo
+    _ph_ref = 8.2f;
     return true;
 }
+
 
 bool KH_Analyzer::phase3_collect_sample(int level_a, int level_b) {
     logPhaseInfo("FASE 3 - Coleta");
@@ -286,11 +289,23 @@ bool KH_Analyzer::phase3_collect_sample(int level_a, int level_b) {
 
 bool KH_Analyzer::phase4_measure_saturation(int level_a, int level_b) {
     logPhaseInfo("FASE 4 - Medição");
-    // Implementação da fase 4
-    _ph_sample = _sm->getPH();
+
+    // Simulação: pH da amostra levemente diferente
+    _ph_sample   = 8.0f;
     _temperature = _sm->getTemperature();
-    _result.kh_value = calculateKH();
-    _result.is_valid = validateMeasurement();
+
+    _result.ph_reference = _ph_ref;
+    _result.ph_sample    = _ph_sample;
+    _result.temperature  = _temperature;
+
+    _result.kh_value     = calculateKH();
+    _result.is_valid     = validateMeasurement();
+    _result.error_message = _error_message;
+
+    Serial.printf("[KH_Analyzer] DEBUG F4: ph_ref=%.2f ph_sample=%.2f temp=%.2f kh=%.2f valid=%d msg=%s\n",
+                  _ph_ref, _ph_sample, _temperature,
+                  _result.kh_value, _result.is_valid, _error_message.c_str());
+
     return true;
 }
 
@@ -302,28 +317,34 @@ bool KH_Analyzer::phase5_maintenance(int level_a, int level_b) {
 
 float KH_Analyzer::calculateKH() {
     if (_ph_ref <= 0 || _ph_sample <= 0) {
+        Serial.printf("[KH_Analyzer] calcKH inválido: ph_ref=%.2f ph_sample=%.2f\n", _ph_ref, _ph_sample);
         return 0;
     }
-    
     float delta_ph = _ph_ref - _ph_sample;
-    float kh = delta_ph * 50.0;  // Fórmula simplificada
-    
+    float kh = delta_ph * 50.0;
+    Serial.printf("[KH_Analyzer] calcKH: ph_ref=%.2f ph_sample=%.2f delta=%.2f kh_raw=%.2f\n",
+                  _ph_ref, _ph_sample, delta_ph, kh);
     return constrain(kh, 1.0, 20.0);
 }
 
 bool KH_Analyzer::validateMeasurement() {
     if (_result.kh_value < 1.0 || _result.kh_value > 20.0) {
         _error_message = "KH fora do intervalo válido";
+        Serial.println("[KH_Analyzer] INVALID: " + _error_message);
         return false;
     }
-    
-    if (abs(_ph_ref - _ph_sample) < 0.1 || abs(_ph_ref - _ph_sample) > 4.0) {
-        _error_message = "Diferença de pH inválida";
+
+    float delta = fabs(_ph_ref - _ph_sample);
+    if (delta < 0.1 || delta > 4.0) {
+        _error_message = "Diferença de pH inválida (delta=" + String(delta, 2) + ")";
+        Serial.println("[KH_Analyzer] INVALID: " + _error_message);
         return false;
     }
-    
+
+    _error_message = "";
     return true;
 }
+
 
 void KH_Analyzer::logPhaseInfo(const char* phase_name) {
     Serial.printf("[KH_Analyzer] %s\n", phase_name);

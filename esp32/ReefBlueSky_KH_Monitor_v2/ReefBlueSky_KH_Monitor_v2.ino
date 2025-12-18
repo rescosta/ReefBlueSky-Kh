@@ -16,6 +16,7 @@
 #include <ArduinoJson.h>
 #include "TimeProvider.h"
 #include <time.h>
+#include "NTP_DEBUG_HELPERS.h"  // ← Adicionar APÓS os outros includes
 
 // Incluir módulos de controle
 #include "PumpControl.h"
@@ -27,6 +28,7 @@
 #include "MultiDeviceAuth.h"
 #include "WiFiSetup.h"
 #include "CloudAuth.h"
+
 
 
 // teste forçando mediçao fake
@@ -95,10 +97,9 @@ const int   MAX_CORRECTION_SECONDS = 120;  // safety
 float pump4MlPerSec = 0.8f;   // valor default até calibrar
 
 //NTP
-
 const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = -3 * 3600;  // fuso -03
-const int   daylightOffset_sec = 0;
+const long  gmtOffset_sec = -3 * 3600;  // -03:00 Brasil (Brasília)
+const int   daylightOffset_sec = 0;     // sem horário de verão
 
 //
 
@@ -107,6 +108,27 @@ const unsigned long SYNC_INTERVAL_MS = 60000;  // 60 s
 
 static unsigned long lastCmdPoll  = 0;
 static unsigned long lastSyncTry  = 0;
+
+float khTarget = 8.0f;  // default
+
+float getHeapUsagePercent() {
+  size_t total = ESP.getHeapSize();
+  size_t free  = ESP.getFreeHeap();
+  if (total == 0) return 0.0f;
+  float used = (float)(total - free);
+  return (used / (float)total) * 100.0f;
+}
+
+float getSpiffsUsagePercent() {
+  if (!SPIFFS.begin(true)) {
+    return 0.0f;
+  }
+  size_t total = SPIFFS.totalBytes();
+  size_t used  = SPIFFS.usedBytes();
+  if (total == 0) return 0.0f;
+  return ((float)used / (float)total) * 100.0f;
+}
+
 
 // =================================================================================
 // Objetos Globais
@@ -140,13 +162,56 @@ SystemState systemState = STARTUP;
 unsigned long lastMeasurementTime = 0;
 unsigned long measurementInterval = 3600000;  // 1 hora em ms
 unsigned long lastResetButtonCheck = 0;
-const unsigned long HEALTH_INTERVAL_MS = 5UL * 60UL * 1000UL; // 5 minutos
+const unsigned long HEALTH_INTERVAL_MS = 60UL * 1000UL; // 60 segundos
 unsigned long lastHealthSent = 0;
 
 bool resetButtonPressed = false;
 
 bool testModeEnabled = true;        // ou false por padrão
 bool forceImmediateMeasurement = false;
+
+// Estado da conexão com a nuvem
+bool cloudConnected = true;
+unsigned long lastReconnectAttemptMs = 0;
+String accessToken;  
+String refreshToken; 
+
+const unsigned long RECONNECT_INTERVAL_MS = 30UL * 1000UL; // ex: 30s
+
+void handleCloudReconnect(unsigned long now) {
+  // Se já estamos conectados à nuvem, nada a fazer
+  if (cloudAuth.isConnected()) {
+    cloudConnected = true;
+    return;
+  }
+
+  // Sem WiFi, nem tenta
+  if (!WiFi.isConnected()) {
+    cloudConnected = false;
+    return;
+  }
+
+
+
+
+
+  // Respeita intervalo mínimo entre tentativas
+  if (now - lastReconnectAttemptMs < RECONNECT_INTERVAL_MS) {
+    return;
+  }
+  lastReconnectAttemptMs = now;
+
+  Serial.println("[Cloud] Tentando (re)autenticar device via CloudAuth::init()...");
+
+  // init() tenta: loadTokenSecurely -> checa expiração -> refreshTokenIfNeeded
+  if (cloudAuth.init()) {
+    Serial.println("[Cloud] Device autenticado, token disponível.");
+    cloudConnected = true;
+  } else {
+    Serial.println("[Cloud] Ainda sem token válido (aguardando registro ou erro).");
+    cloudConnected = false;
+  }
+}
 
 
 // =================================================================================
@@ -157,6 +222,8 @@ void setup() {
   // Inicializar Serial
   Serial.begin(115200);
   delay(1000);
+
+  lastHealthSent = millis() - HEALTH_INTERVAL_MS;
 
   Serial.println("\n\n========================================");
   Serial.println("ReefBlueSky KH Monitor - Inicializando");
@@ -246,6 +313,10 @@ void setup() {
               khAnalyzer.isReferenceKHConfigured() ? "true" : "false",
               khAnalyzer.getReferenceKH());
 
+    // por enquanto, simular pH
+    sensorManager.setSimulatePH(true, 8.2f, 8.0f);
+
+
 }
 
 // =================================================================================
@@ -254,6 +325,43 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
+
+if (Serial.available()) {
+    char c = Serial.read();
+    if (c == 's') {          // digitar s + Enter
+      Serial.println("[DEBUG] Forçando sync manual...");
+      debugForceSync();
+    }
+    if (c == 't') {          // digitar t + Enter para testar horário
+      Serial.println("[DEBUG] Testando sincronização de horário...");
+    debugForceSync();
+    }
+
+    // Toggle sensores de nível
+    else if (c == 'a') {
+      sensorManager.setLevelAEnabled(true);
+      Serial.println("[DEBUG] Sensor de nível A ATIVADO");
+    } else if (c == 'A') {
+      sensorManager.setLevelAEnabled(false);
+      Serial.println("[DEBUG] Sensor de nível A DESATIVADO");
+    } else if (c == 'b') {
+      sensorManager.setLevelBEnabled(true);
+      Serial.println("[DEBUG] Sensor de nível B ATIVADO");
+    } else if (c == 'B') {
+      sensorManager.setLevelBEnabled(false);
+      Serial.println("[DEBUG] Sensor de nível B DESATIVADO");
+    } else if (c == 'c') {
+      sensorManager.setLevelCEnabled(true);
+      Serial.println("[DEBUG] Sensor de nível C ATIVADO");
+    } else if (c == 'C') {
+      sensorManager.setLevelCEnabled(false);
+      Serial.println("[DEBUG] Sensor de nível C DESATIVADO");
+    }
+
+}
+
+
+  handleCloudReconnect(now);
 
   // polling de comandos
   if (now - lastCmdPoll >= CMD_INTERVAL_MS) {
@@ -292,6 +400,7 @@ void loop() {
 
   // Menu/configuração de autenticação via Serial
   //handleSerialInput();
+
 
   // Máquina de estados
   switch (systemState) {
@@ -335,6 +444,16 @@ void loop() {
       delay(5000);
       break;
   }
+
+// sensor PH FAKE
+  static unsigned long lastDebug = 0;
+  if (now - lastDebug > 2000) {
+    lastDebug = now;
+    float ph   = sensorManager.getPH();
+    float temp = sensorManager.getTemperature();
+    Serial.printf("[DEBUG] Idle PH=%.2f Temp=%.2f\n", ph, temp);
+  }
+// sensor PH FAKE
 
   if (now - lastHealthSent >= HEALTH_INTERVAL_MS) {
     sendHealthToCloud();
@@ -380,7 +499,7 @@ void factoryReset() {
   Serial.println("[RESET] ===================================\n");
 
   // Publicar no MQTT
-  wifiMqtt.publish(mqtt_topic_status, "FACTORY_RESET_COMPLETE");
+  //wifiMqtt.publish(mqtt_topic_status, "FACTORY_RESET_COMPLETE");
 }
 
 /**
@@ -409,7 +528,7 @@ void resetKHReference() {
   Serial.println("[RESET] ===================================\n");
 
   // Publicar no MQTT
-  wifiMqtt.publish(mqtt_topic_status, "KH_RESET_COMPLETE");
+  //wifiMqtt.publish(mqtt_topic_status, "KH_RESET_COMPLETE");
 }
 
 // =================================================================================
@@ -573,24 +692,36 @@ void performMeasurement() {
 
     // Obter resultado
     KH_Analyzer::MeasurementResult result = khAnalyzer.getMeasurementResult();
+    Serial.printf("[DEBUG] result.is_valid=%d kh=%.2f ph_ref=%.2f ph_sample=%.2f temp=%.2f\n",
+                  result.is_valid, result.kh_value,
+                  result.ph_reference, result.ph_sample, result.temperature);
 
     if (result.is_valid) {
       Serial.printf("[Main] Medição concluída: KH=%.2f dKH\n", result.kh_value);
 
-      // 1) Medição para histórico
-      MeasurementHistory::Measurement mh;
-      mh.kh         = result.kh_value;
-      mh.ph_ref     = result.ph_reference;
-      mh.ph_sample  = result.ph_sample;
-      mh.temperature= result.temperature;
-      mh.timestamp = getCurrentEpochMs();
-      mh.is_valid   = true;
-      history.addMeasurement(mh);
+    // 1) Medição para histórico
+    MeasurementHistory::Measurement mh;
+    mh.kh         = result.kh_value;
+    mh.ph_ref     = result.ph_reference;
+    mh.ph_sample  = result.ph_sample;
+    mh.temperature= result.temperature;
+
+    // pega o timestamp “seguro”
+    unsigned long long ts = getCurrentEpochMs();
+    if (ts == 0) {
+      Serial.println("[Main] Timestamp inválido (NTP não sincronizado), não vou salvar/enfileirar");
+      return;  // sai da função sem salvar / enviar para a nuvem
+    }
+    mh.timestamp = ts;
+
+    mh.is_valid   = true;
+    history.addMeasurement(mh);
+
 
       // Publicar no MQTT
-      wifiMqtt.publish(mqtt_topic_kh, String(result.kh_value, 2).c_str());
-      wifiMqtt.publish(mqtt_topic_ph, String(result.ph_reference, 2).c_str());
-      wifiMqtt.publish(mqtt_topic_temp, String(result.temperature, 1).c_str());
+      //wifiMqtt.publish(mqtt_topic_kh, String(result.kh_value, 2).c_str());
+      //wifiMqtt.publish(mqtt_topic_ph, String(result.ph_reference, 2).c_str());
+      //wifiMqtt.publish(mqtt_topic_temp, String(result.temperature, 1).c_str());
    
       // 2) Medição para CloudAuth (struct diferente)
       Measurement mc;
@@ -610,7 +741,7 @@ void performMeasurement() {
 
     } else {
       Serial.println("[Main] ERRO: Medição inválida");
-      wifiMqtt.publish(mqtt_topic_status, "MEASUREMENT_FAILED");
+      //wifiMqtt.publish(mqtt_topic_status, "MEASUREMENT_FAILED");
     }
   } else {
     Serial.println("[Main] ERRO: Falha ao iniciar ciclo de medição");
@@ -682,7 +813,14 @@ void loadPump4CalibrationFromSPIFFS() {
   }
 }
 
+int rssiToPercent(int rssi) {
+  if (rssi >= -50) return 100;
+  if (rssi <= -100) return 0;
+  return 2 * (rssi + 100);
+}
 
+
+// Usa CloudAuth::sendHealthMetrics
 void sendHealthToCloud() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[Health] WiFi não conectado, pulando envio.");
@@ -693,42 +831,56 @@ void sendHealthToCloud() {
     return;
   }
 
-  // Coleta de métricas
-  float cpuUsage     = 0.0f;                 // placeholder, se tiver cálculo de CPU coloca aqui
-  float memUsage     = 0.0f;                 // idem
-  float storageUsage = 0.0f;                 // idem
-  int   wifiRssi     = WiFi.RSSI();
-  unsigned long uptime = millis() / 1000;    // segundos
+  float heapPercent = getHeapUsagePercent();
+  float spiffsPercent = getSpiffsUsagePercent();
+  int rssi = WiFi.RSSI();
+  int wifiPercent = rssiToPercent(rssi); 
+  unsigned long uptime = millis() / 1000;
 
-  StaticJsonDocument<256> doc;
-  doc["cpu_usage"]     = cpuUsage;
-  doc["memory_usage"]  = memUsage;
-  doc["storage_usage"] = storageUsage;
-  doc["wifi_rssi"]     = wifiRssi;
-  doc["uptime"]        = uptime;
+  Serial.printf("[Health] Métricas coletadas: CPU=0.0%% MEM=%.2f%% SPIFFS=%.2f%% WiFi=%d%% RSSI=%d dBm UPTIME=%lu s\n",
+                heapPercent, spiffsPercent, wifiPercent, rssi, uptime);
 
-  String body;
-  serializeJson(doc, body);
+  SystemHealth h;
+  h.cpu_usage            = 0.0f;
+  h.memory_usage         = heapPercent;
+  h.spiffs_usage         = spiffsPercent;
+  h.wifi_signal_strength = wifiPercent;  // ← agora é % em vez de dBm
+  h.uptime               = uptime;
 
-  HTTPClient http;
-  String url = String(CLOUD_BASE_URL) + "/device/health";  // já inclui /api/v1
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", "Bearer " + deviceToken);
-
-  int code = http.POST(body);
-  Serial.printf("[Health] POST %s -> %d\n", url.c_str(), code);
-  if (code != 200) {
-    String resp = http.getString();
-    Serial.printf("[Health] Resposta: %s\n", resp.c_str());
+  if (!cloudAuth.sendHealthMetrics(h)) {
+    Serial.println("[Health] Falha ao enviar métricas via CloudAuth.");
+  } else {
+    Serial.println("[Health] Métricas enviadas com sucesso.");
   }
-  http.end();
 }
+
+
 
 void performPrediction() {
   Serial.println("[Main] Realizando predição de KH...");
-  // Implementar predição usando KH_Predictor
+  
+  // Obter última medição adicionada ao histórico
+  MeasurementHistory::Measurement lastMeas = history.getLastMeasurement();
+  
+  if (lastMeas.is_valid) {
+    // ✅ USAR O TIMESTAMP EPOCH CORRETO, NÃO MILLIS()
+    Serial.printf("[Main] Adicionando ao preditor: KH=%.2f, Timestamp=%llu (epoch)\n",
+                  lastMeas.kh, lastMeas.timestamp);
+    
+    // ✅ USAR getPredictor() GETTER (não acesso direto a _predictor)
+    khAnalyzer.getPredictor()->addMeasurement(
+        lastMeas.kh,
+        lastMeas.timestamp,           // ← EPOCH EM MS (correto!)
+        lastMeas.temperature
+    );
+    
+    Serial.println("[Main] Medição adicionada ao preditor com sucesso");
+  } else {
+    Serial.println("[Main] Última medição inválida, pulando predição");
+  }
 }
+
+
 
 void processCloudCommand() {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -898,6 +1050,24 @@ void processCloudCommand() {
         systemState = IDLE;
       }
     }
+
+} else if (cmd.action == "setkhtarget") {
+  if (cmd.params.isNull()) {
+    ok = false;
+    errorMsg = "missing payload";
+  } else {
+    float v = cmd.params["value"] | 0.0f;
+    if (v <= 0.0f || v > 25.0f) {
+      ok = false;
+      errorMsg = "invalid value";
+    } else {
+      Serial.printf("[CMD] setkhtarget: %.2f dKH\n", v);
+      khTarget = v;
+      // se tiver criado funções de persistência:
+      // saveKhTargetToSPIFFS();
+    }
+  }
+
   } else if (cmd.action == "setintervalminutes") {
     Serial.println("[CMD] setintervalminutes handler entrou");
 
@@ -929,6 +1099,7 @@ void processCloudCommand() {
         }
       }
     }
+
   } else if (cmd.action == "testmode") {
     if (cmd.params.isNull()) {
       ok = false;

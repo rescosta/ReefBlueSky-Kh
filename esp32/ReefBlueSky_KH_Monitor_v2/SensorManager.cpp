@@ -27,6 +27,10 @@ void SensorManager::begin() {
 }
 
 float SensorManager::getPH() {
+    if (_simulatePH) {
+        // por enquanto, retorna sempre o valor "ref" simulado
+        return _simPHRef;
+    }
     _last_ph = readPHRaw();
     return _last_ph;
 }
@@ -37,16 +41,28 @@ float SensorManager::getTemperature() {
 }
 
 int SensorManager::getLevelA() {
+    if (!_levelAEnabled) {
+        Serial.println("[SensorManager] Level A DESATIVADO (forçado)");
+        return 1; // ou o valor “seguro” que você quer
+    }
     // Ler pino de nível A (GPIO 16)
     return analogRead(16);
 }
 
 int SensorManager::getLevelB() {
+    if (!_levelBEnabled) {
+        Serial.println("[SensorManager] Level B DESATIVADO (forçado)");
+        return 1;
+    }
     // Ler pino de nível B (GPIO 17)
     return analogRead(17);
 }
 
 int SensorManager::getLevelC() {
+    if (!_levelCEnabled) {
+        Serial.println("[SensorManager] Level C DESATIVADO (forçado)");
+        return 1;
+    }
     // Ler pino de nível C (GPIO 5)
     return analogRead(5);
 }
@@ -64,6 +80,14 @@ void SensorManager::calibratePH(float ph_neutral, float ph_acidic) {
     Serial.printf("  Neutral (pH 7): %.2f V\n", _ph_neutral_voltage);
     Serial.printf("  Acidic (pH 4): %.2f V\n", _ph_acidic_voltage);
 }
+
+
+void SensorManager::setSimulatePH(bool enabled, float refValue, float sampleValue) {
+    _simulatePH  = enabled;
+    _simPHRef    = refValue;
+    _simPHSample = sampleValue;
+}
+
 
 float SensorManager::getLastPH() const {
     return _last_ph;
@@ -86,10 +110,13 @@ bool SensorManager::isTemperatureSensorOK() {
 // ===== Métodos Privados =====
 
 float SensorManager::readPHRaw() {
-    float voltage = averageAnalogRead(_ph_pin, PH_SAMPLES);
-    voltage = voltage * VOLTAGE_REF / ADC_RESOLUTION;
-    
-    return voltageToPhValue(voltage);
+    float raw = averageAnalogRead(_ph_pin, PH_SAMPLES);
+    float voltage = raw * VOLTAGE_REF / ADC_RESOLUTION;
+    float ph = voltageToPhValue(voltage);
+
+    Serial.printf("[SensorManager] PH raw=%.1f voltage=%.3fV ph=%.2f\n", raw, voltage, ph);
+
+    return ph;
 }
 
 float SensorManager::readTemperatureRaw() {
@@ -133,3 +160,19 @@ float SensorManager::averageAnalogRead(int pin, int samples) {
     
     return sum / (float)samples;
 }
+
+void SensorManager::setLevelAEnabled(bool enabled) {
+    _levelAEnabled = enabled;
+}
+
+void SensorManager::setLevelBEnabled(bool enabled) {
+    _levelBEnabled = enabled;
+}
+
+void SensorManager::setLevelCEnabled(bool enabled) {
+    _levelCEnabled = enabled;
+}
+
+bool SensorManager::isLevelAEnabled() const { return _levelAEnabled; }
+bool SensorManager::isLevelBEnabled() const { return _levelBEnabled; }
+bool SensorManager::isLevelCEnabled() const { return _levelCEnabled; }

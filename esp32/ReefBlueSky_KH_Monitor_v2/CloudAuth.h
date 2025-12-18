@@ -12,6 +12,7 @@
 #include <queue>
 #include <mbedtls/aes.h>
 #include <mbedtls/base64.h>
+#include <stdint.h>
 
 extern const char* CLOUD_BASE_URL;
 
@@ -21,7 +22,7 @@ extern const char* CLOUD_BASE_URL;
 // ============================================================================
 
 struct Measurement {
-    unsigned long long timestamp;
+    uint64_t timestamp;
     float kh;
     float ph_reference;
     float ph_sample;
@@ -127,7 +128,8 @@ private:
         "testnow", 
         "abort",
         "pump4calibrate",
-        "setpump4mlpersec"
+        "setpump4mlpersec",
+        "setkhtarget" 
     };
     static constexpr int ALLOWED_COUNT = 
         sizeof(ALLOWED_COMMANDS) / sizeof(ALLOWED_COMMANDS[0]);

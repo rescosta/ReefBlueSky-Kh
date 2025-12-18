@@ -4,6 +4,7 @@
 #include <numeric>
 #include <cstdio>
 #include <cmath>
+#include <stdint.h>
 
 KHPredictor::KHPredictor() {
     history.reserve(MAX_HISTORY);
@@ -14,7 +15,7 @@ void KHPredictor::begin() {
     clearHistory();
 }
 
-void KHPredictor::addMeasurement(float kh, unsigned long timestamp, float temperature) {
+void KHPredictor::addMeasurement(float kh, uint64_t timestamp, float temperature) {
     // Validar entrada
     if (!isValidKH(kh)) {
         Serial.println("[KH_Predictor] Valor de KH fora de faixa!");
@@ -245,46 +246,45 @@ float KHPredictor::calculateLinearRegression(float& slope, float& intercept) {
         intercept = 0;
         return 0;
     }
-    
+
     int n = history.size();
     float sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0;
-    
-    unsigned long first_time = history[0].timestamp;
-    
+
+    uint64_t first_time = history[0].timestamp;
+
     for (const auto& point : history) {
-        float x = (point.timestamp - first_time);
+        float x = float(point.timestamp - first_time);  // delta em ms
         float y = point.kh;
-        
-        sum_x += x;
-        sum_y += y;
+        sum_x  += x;
+        sum_y  += y;
         sum_xy += x * y;
         sum_x2 += x * x;
     }
-    
+
     float denominator = (n * sum_x2 - sum_x * sum_x);
     if (fabs(denominator) < 0.0001f) {
-        slope = 0;
+        slope     = 0;
         intercept = sum_y / n;
         return 0;
     }
-    
-    slope = (n * sum_xy - sum_x * sum_y) / denominator;
+
+    slope     = (n * sum_xy - sum_x * sum_y) / denominator;
     intercept = (sum_y - slope * sum_x) / n;
-    
-    // Calcular R²
+
     float ss_res = 0, ss_tot = 0;
     float mean_y = sum_y / n;
-    
+
     for (const auto& point : history) {
-        float x = (point.timestamp - first_time);
+        float x      = float(point.timestamp - first_time);
         float y_pred = intercept + slope * x;
         ss_res += pow(point.kh - y_pred, 2);
         ss_tot += pow(point.kh - mean_y, 2);
     }
-    
+
     float r_squared = (ss_tot > 0) ? (1.0f - ss_res / ss_tot) : 0;
-    return constrain(r_squared, 0, 1);
+    return constrain(r_squared, 0.0f, 1.0f);
 }
+
 
 float KHPredictor::calculateConfidence() {
     if (history.size() < 5) {

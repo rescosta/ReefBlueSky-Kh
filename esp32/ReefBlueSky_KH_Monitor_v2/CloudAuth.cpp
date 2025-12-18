@@ -2,6 +2,7 @@
 #include <ESP32-targz.h>
 #include "MultiDeviceAuth.h"
 #include "TimeProvider.h"
+#include <stdint.h>
 
 extern String deviceToken;
 
@@ -469,46 +470,43 @@ bool CloudAuth::sendHeartbeat(const DeviceStatus& status) {
 // ============================================================================
 // [SEGURANÇA] Enviar Métricas de Saúde do Sistema
 // ============================================================================
-
 bool CloudAuth::sendHealthMetrics(const SystemHealth& health) {
     if (!rateLimiter.canMakeRequest()) {
         return false;
     }
-    
-    //WiFiClientSecure client;
+
     WiFiClient client;
-    //if (ca_cert != nullptr) client.setCACert(ca_cert);
-    
     HTTPClient http;
-    String url = serverUrl + "/device/health";
-    
+    String url = serverUrl + String("/device/health");
+
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("Authorization", "Bearer " + deviceToken);
-    
+
     DynamicJsonDocument doc(512);
-    doc["deviceId"] = deviceId;
-    doc["timestamp"] = getCurrentEpochMs(); 
-    doc["cpuUsage"] = health.cpu_usage;
-    doc["memoryUsage"] = health.memory_usage;
-    doc["spiffsUsage"] = health.spiffs_usage;
-    doc["wifiSignalStrength"] = health.wifi_signal_strength;
-    doc["failedSyncAttempts"] = health.failed_sync_attempts;
-    doc["uptime"] = health.uptime;
-    doc["voltageSupply"] = health.voltage_supply;
-    
+
+    // Força os tipos corretos no JSON
+    doc["cpuusage"]     = health.cpu_usage;
+    doc["memoryusage"]  = health.memory_usage;
+    doc["storageusage"] = health.spiffs_usage;
+    doc["wifirssi"]     = health.wifi_signal_strength;
+    doc["uptime"]       = health.uptime;
+
     String payload;
     serializeJson(doc, payload);
-    
+
+    Serial.printf("[CloudAuth] Payload final: %s\n", payload.c_str());
+
     int httpCode = http.POST(payload);
-    
+    Serial.printf("[CloudAuth::sendHealthMetrics] HTTP Code: %d\n", httpCode);
+
     if (httpCode == 200) {
-        Serial.println("[CloudAuth::sendHealthMetrics] Métricas de saúde enviadas");
+        Serial.println("[CloudAuth::sendHealthMetrics] ✓ Sucesso");
         http.end();
         return true;
     }
-    
-    Serial.printf("[CloudAuth::sendHealthMetrics] Erro ao enviar métricas: %d\n", httpCode);
+
+    Serial.printf("[CloudAuth::sendHealthMetrics] ✗ Erro %d\n", httpCode);
     http.end();
     return false;
 }

@@ -1,11 +1,14 @@
 #ifndef KH_ANALYZER_H
 #define KH_ANALYZER_H
 
+
 #include <Arduino.h>
 #include "PumpControl.h"
 #include "SensorManager.h"
 #include "KH_Predictor.h"
 #include <SPIFFS.h>
+#include "TimeProvider.h"
+
 
 /**
  * @class KH_Analyzer
@@ -148,6 +151,16 @@ public:
      * @return true se reset bem-sucedido
      */
     bool resetReferenceKHOnly();
+
+        /**
+     * Obter ponteiro para o preditor de KH
+     * Usado para adicionar medições ao histórico preditivo
+     * @return Ponteiro para KHPredictor
+     */
+    KHPredictor* getPredictor() {
+        return _predictor;
+    }
+
 
 private:
     // Ponteiros para componentes

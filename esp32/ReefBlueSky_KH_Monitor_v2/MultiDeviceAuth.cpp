@@ -1,4 +1,5 @@
 #include "MultiDeviceAuth.h"
+#include "TimeProvider.h"
 
 
 // ============================================================================
@@ -352,7 +353,7 @@ bool sendMeasurements(float kh, float phRef, float phSample, float temp) {
 
   JsonArray measurements = doc.createNestedArray("measurements");
   JsonObject meas = measurements.createNestedObject();
-  meas["timestamp"]   = millis();   // ideal: Unix time real, se tiver RTC/NTP
+  meas["timestamp"] = getCurrentEpochMs();   // ideal: Unix time real, se tiver RTC/NTP
   meas["kh"]          = kh;
   meas["phref"]       = phRef;
   meas["phsample"]    = phSample;

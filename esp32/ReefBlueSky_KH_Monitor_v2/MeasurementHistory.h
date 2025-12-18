@@ -23,7 +23,7 @@ public:
         float ph_ref;
         float ph_sample;
         float temperature;
-        unsigned long timestamp;
+        uint64_t timestamp;
         bool is_valid;
     };
 
