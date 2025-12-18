@@ -1522,7 +1522,7 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
 
     // 2) Atualizar IP local se veio no body
     await conn.query(
-      'UPDATE devices SET local_lip = COALESCE(?, loca_lip), last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
+      'UPDATE devices SET local_ip = COALESCE(?, local_ip), last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
       [localip || null, req.user.deviceId]
     );
 
