@@ -306,26 +306,50 @@
           <div id="khTargetStatus" class="hint">Alvo atual --</div>
         </div>
 
-        <div class="card-subtitle" style="margin-top:8px;">
-          Faixa de desvio (dKH) para cálculo das cores (verde, amarelo, vermelho).
-        </div>
+        <div class="form-section">
+          <h3>Faixa de desvio (dKH)</h3>
+          <p class="form-help">
+            Usado para colorir os cards de KH (verde, amarelo, vermelho) com base no desvio
+            em relação ao alvo.
+          </p>
 
-        <div class="field-row">
-          <label for="khHealthGreenMaxDev">Verde (≤ desvio em dKH)</label>
-          <input id="khHealthGreenMaxDev" type="number" step="0.1" min="0" />
-        </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="khHealthGreenMaxDev">Verde (≤ desvio em dKH)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                id="khHealthGreenMaxDev"
+                class="input-text"
+                placeholder="ex.: 0.2"
+              />
+              <small class="form-hint">
+                Até este desvio o KH é considerado saudável (verde).
+              </small>
+            </div>
 
-        <div class="field-row">
-          <label for="khHealthYellowMaxDev">Amarelo (≤ desvio em dKH)</label>
-          <input id="khHealthYellowMaxDev" type="number" step="0.1" min="0" />
-          <div class="hint">
-            Vermelho: acima do valor amarelo.
+            <div class="form-field">
+              <label for="khHealthYellowMaxDev">Amarelo (≤ desvio em dKH)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                id="khHealthYellowMaxDev"
+                class="input-text"
+                placeholder="ex.: 0.5"
+              />
+              <small class="form-hint">
+                Acima do valor verde e até aqui fica amarelo. Valores maiores serão vermelhos.
+              </small>
+            </div>
           </div>
+
+          <button id="btnSaveKhHealthRanges" class="btn-primary">
+            Salvar desvios
+          </button>
         </div>
 
-        <div class="field-row">
-          <button id="saveKhHealthBtn" class="btn-small">Salvar desvios</button>
-        </div>
 
         <!-- Toggle de automação -->
       
