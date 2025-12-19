@@ -1394,27 +1394,28 @@ app.post('/api/v1/device/register', authLimiter, async (req, res) => {
       const now = new Date();
 
       // 3) Criar/atualizar device já vinculando userId
-      await conn.query(
-        `INSERT INTO devices (deviceId, userId, type, name, local_ip, last_seen, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           userId = VALUES(userId),
-           type = VALUES(type),
-           name = VALUES(name),
-           local_ip = VALUES(local_ip),
-           last_seen = VALUES(last_seen),
-           updatedAt = VALUES(updatedAt)`,
-        [
-          deviceId,
-          user.id,
-          type,
-          type === 'KH' ? 'RBS-KH' : 'RBS-LCD',
-          local_ip || null,
-          now,
-          now,
-          now
-        ]
-      );
+        await conn.query(
+          `INSERT INTO devices (deviceId, userId, type, name, local_ip, last_seen, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             userId = VALUES(userId),
+             type = VALUES(type),
+             name = VALUES(name),
+             local_ip = VALUES(local_ip),
+             last_seen = VALUES(last_seen),
+             updatedAt = VALUES(updatedAt)`,
+          [
+            deviceId,
+            user.id,
+            type,
+            type === 'KH' ? 'RBS-KH' : 'RBS-LCD',
+            local_ip || null,
+            now,
+            now,
+            now
+          ]
+        );
+
     
     // Gerar tokens
     const token = generateToken(user.id, deviceId);
