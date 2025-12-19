@@ -1181,27 +1181,41 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
 });
 
 
+
 // ===== ENDPOINTS WEB: DISPOSITIVOS DO USUÁRIO =====
-// Lista devices do usuário logado
+// Lista devices do usuário logado (opcional: ?type=KH ou ?type=LCD)
 app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
   console.log('API GET /api/v1/user/devices');
   const userId = req.user.userId;
+  const { type } = req.query;   // ex.: "KH" ou "LCD"
+
   let conn;
   try {
     conn = await pool.getConnection();
-    const rows = await conn.query(
-      `SELECT id,
-              deviceId,
-              name,
-              local_ip AS localIp,
-              last_seen AS lastSeen,
-              createdAt,
-              updatedAt
-         FROM devices
-        WHERE userId = ?
-        ORDER BY createdAt DESC`,
-      [userId]
-    );
+
+    let sql = `
+      SELECT id,
+             deviceId,
+             name,
+             type,
+             local_ip AS localIp,
+             last_seen AS lastSeen,
+             createdAt,
+             updatedAt
+        FROM devices
+       WHERE userId = ?
+    `;
+    const params = [userId];
+
+    // se vier ?type=KH, filtra só monitores KH; ?type=LCD, só displays
+    if (type) {
+      sql += ' AND type = ?';
+      params.push(type);   // deve ser exatamente "KH" ou "LCD"
+    }
+
+    sql += ' ORDER BY createdAt DESC';
+
+    const rows = await conn.query(sql, params);
 
     // normalizar lastSeen para ms desde epoch
     const devices = rows.map((r) => ({
@@ -1316,7 +1330,15 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
 app.post('/api/v1/device/register', authLimiter, async (req, res) => {
     console.log('[API] POST /api/v1/device/register');
     
-    const { deviceId, username, password, local_ip } = req.body;
+    const { deviceId, username, password, local_ip, type } = req.body;
+
+    const allowedTypes = new Set(['KH', 'LCD']);
+    if (!type || !allowedTypes.has(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'type inválido (use KH ou LCD)'
+      });
+    }
     
     // Validar entrada
     if (!deviceId || !username || !password) {
@@ -1373,10 +1395,11 @@ app.post('/api/v1/device/register', authLimiter, async (req, res) => {
 
       // 3) Criar/atualizar device já vinculando userId
       await conn.query(
-        `INSERT INTO devices (deviceId, userId, name, local_ip, last_seen, createdAt, updatedAt)
+        `INSERT INTO devices (deviceId, userId, type, name, local_ip, last_seen, createdAt, updatedAt)
          VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            userId = VALUES(userId),
+           type = VALUES(type),
            name = VALUES(name),
            local_ip = VALUES(local_ip),
            last_seen = VALUES(last_seen),
@@ -1384,7 +1407,8 @@ app.post('/api/v1/device/register', authLimiter, async (req, res) => {
         [
           deviceId,
           user.id,
-          'KH Auto-Register',
+          type,
+          type === 'KH' ? 'RBS-KH' : 'RBS-LCD',
           local_ip || null,
           now,
           now,
@@ -2680,7 +2704,6 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
     return res.status(500).json({ success:false, message:'Internal server error' });
   }
 });
-
 
 
 // ============================================================================
