@@ -265,8 +265,50 @@ async function checkDevicesOnlineStatus() {
   }
 }
 
-// apenas ESTE setInterval deve existir
-setInterval(checkDevicesOnlineStatus, MONITOR_INTERVAL_MS);
+
+async function checkLcdStatus() {
+  const now = Date.now();
+  let conn;
+
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      `SELECT id, deviceId, lcd_last_seen, lcd_status
+         FROM devices
+        WHERE type = 'KH' AND lcd_last_seen IS NOT NULL`
+    );
+
+    for (const row of rows) {
+      const lastMs = typeof row.lcd_last_seen === 'number'
+        ? row.lcd_last_seen
+        : new Date(row.lcd_last_seen).getTime();
+
+      if (!lastMs) continue;
+
+      const isOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
+
+      if (isOffline && row.lcd_status === 'online') {
+        await conn.query(
+          'UPDATE devices SET lcd_status = ? WHERE id = ?',
+          ['offline', row.id]
+        );
+        console.log('[LCD] Marcando LCD como OFFLINE para KH', row.deviceId);
+      }
+    }
+  } catch (err) {
+    console.error('[LCD] Erro no monitor de lcd_status:', err.message);
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+
+setInterval(async () => {
+  await checkDevicesOnlineStatus();
+  await checkLcdStatus();
+}, MONITOR_INTERVAL_MS);
+
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
 
 
@@ -2242,7 +2284,8 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         pump4_ml_per_sec,
         kh_health_green_max_dev,
         kh_health_yellow_max_dev,
-        kh_auto_enabled
+        kh_auto_enabled,
+        lcd_status
       FROM devices
       WHERE deviceId = ? AND userId = ?
       LIMIT 1
@@ -2266,6 +2309,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         khHealthGreenMaxDev: cfg.kh_health_green_max_dev,
         khHealthYellowMaxDev: cfg.kh_health_yellow_max_dev,
         khAutoEnabled: !!cfg.kh_auto_enabled,
+        lcdStatus: cfg.lcd_status || 'never',
       },
     });
   } catch (err) {

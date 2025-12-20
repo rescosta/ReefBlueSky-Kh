@@ -163,6 +163,60 @@ function authDisplayMiddleware(req, res, next) {
 }
 
 /**
+ * POST /api/display/ping
+ * Cabeçalho: Authorization: Bearer <displayToken>
+ * Body: { mainDeviceId }
+ * Marca o LCD como online para o KH associado
+ */
+router.post('/ping', authDisplayMiddleware, async (req, res) => {
+  console.log('[DISPLAY] POST /api/display/ping');
+
+  const { mainDeviceId } = req.body || {};
+  if (!mainDeviceId) {
+    return res.status(400).json({
+      success: false,
+      message: 'mainDeviceId é obrigatório'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const now = Date.now();
+
+    const result = await conn.query(
+      `UPDATE devices
+          SET lcd_status = ?, lcd_last_seen = ?
+        WHERE deviceId = ? AND type = 'KH'`,
+      ['online', now, mainDeviceId]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device principal não encontrado'
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[DISPLAY] ERRO /ping:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao registrar ping do display'
+    });
+  } finally {
+    if (conn) {
+      try { conn.release(); } catch (e) {
+        console.error('[DISPLAY] Erro ao liberar conexão:', e.message);
+      }
+    }
+  }
+});
+
+
+/**
  * GET /api/display/latest?deviceId=...
  * Cabeçalho: Authorization: Bearer <displayToken>
  * Retorna última medição de KH para o deviceId
