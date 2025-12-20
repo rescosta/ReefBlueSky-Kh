@@ -48,6 +48,9 @@ function getTopbarHtml() {
         </nav>
       </div>
       <div class="topbar-right">
+        <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
+          LCD OFF
+        </span>
         <div id="currentTime">--:--</div>
         <div class="device-selector">
           <span>Device:</span>
@@ -59,6 +62,7 @@ function getTopbarHtml() {
     </div>
   `;
 }
+
 
 // Destacar aba ativa
 function highlightActiveNav() {
@@ -267,6 +271,30 @@ function getSelectedDeviceIdOrAlert() {
   return deviceId;
 }
 
+
+function setLcdStatus(status) {
+  const el = document.getElementById('lcdStatusIcon');
+  if (!el) return;
+
+  if (!status || status === 'never') {
+    el.style.display = 'none';
+    return;
+  }
+
+  el.style.display = 'inline-block';
+
+  if (status === 'online') {
+    el.textContent = 'LCD ON';
+    el.className = 'badge-on';
+    el.title = 'Display remoto conectado';
+  } else if (status === 'offline') {
+    el.textContent = 'LCD OFF';
+    el.className = 'badge-off';
+    el.title = 'Display remoto desconectado';
+  }
+}
+
+
 window.DashboardCommon = {
   initTopbar,
   loadUserCommon,
@@ -275,7 +303,9 @@ window.DashboardCommon = {
   getSelectedDeviceId,
   getSelectedDeviceIdOrAlert,
   applyRoleMenuVisibility,
+  setLcdStatus,
   currentUserRole: 'user',
 };
+
 
 

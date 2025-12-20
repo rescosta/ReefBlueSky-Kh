@@ -428,6 +428,18 @@ function updateMeasurementsView(measures) {
     return;
   }
 
+window.DashboardCommon = {
+  initTopbar,
+  loadUserCommon,
+  loadDevicesCommon,
+  updateDeviceStatusBadge,
+  getSelectedDeviceId,
+  getSelectedDeviceIdOrAlert,
+  applyRoleMenuVisibility,
+  setLcdStatus,          // <- novo
+  currentUserRole: 'user',
+};
+
 
 
   lastCountInfo.textContent = `${measures.length} registros recentes`;
@@ -576,6 +588,11 @@ async function loadKhInfo(deviceId) {
     }
 
     const data = json.data || {};
+
+    if (DashboardCommon && typeof DashboardCommon.setLcdStatus === 'function') {
+      DashboardCommon.setLcdStatus(data.lcdStatus);
+    }
+
     const khTarget = typeof data.khTarget === 'number'
       ? data.khTarget
       : (data.khTarget != null ? parseFloat(data.khTarget) : null);
