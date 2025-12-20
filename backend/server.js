@@ -2649,12 +2649,16 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
     if (!lastRows.length) {
       return res.json({ success:true, data:null });
     }
-    const last = lastRows[0];
+    const lastRow = lastRows[0];
 
+    // garante tipos numéricos simples
+    const lastKh   = parseFloat(lastRow.kh);
+    const lastTsMs = Number(lastRow.timestamp.toString());
+
+    // 3) min/max em 24h
     const nowMs   = Date.now();
     const from24h = nowMs - 24*3600*1000;
 
-    // 3) min/max em 24h
     const mmRows = await pool.query(
       `SELECT MIN(kh) AS minKh, MAX(kh) AS maxKh
          FROM measurements
@@ -2662,10 +2666,10 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
       [deviceId, from24h]
     );
     const mm = mmRows[0] || {};
-    const khMin = mm.minKh != null ? parseFloat(mm.minKh) : last.kh;
-    const khMax = mm.maxKh != null ? parseFloat(mm.maxKh) : last.kh;
+    const khMin = mm.minKh != null ? parseFloat(mm.minKh) : lastKh;
+    const khMax = mm.maxKh != null ? parseFloat(mm.maxKh) : lastKh;
 
-    // 4) variação em 24h (diferença entre KH atual e KH de ~24h atrás)
+    // 4) variação em 24h
     const firstRows = await pool.query(
       `SELECT kh
          FROM measurements
@@ -2676,14 +2680,14 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
     );
     let khVar = 0;
     if (firstRows.length) {
-      khVar = parseFloat(last.kh) - parseFloat(firstRows[0].kh);
+      khVar = lastKh - parseFloat(firstRows[0].kh);
     }
 
-    // 5) saúde simples de KH (0..1) baseada na distância do alvo
+    // 5) saúde
     let health = null;
     if (khTarget != null) {
-      const dev = Math.abs(last.kh - khTarget);
-      // exemplo: 0 desvio => 1.0, desvio >= 1.5 => 0
+      const khTargetNum = parseFloat(khTarget);
+      const dev = Math.abs(lastKh - khTargetNum);
       const h = 1 - (dev / 1.5);
       health = Math.max(0, Math.min(1, h));
     }
@@ -2691,15 +2695,16 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
     return res.json({
       success: true,
       data: {
-        nowIso:     new Date(last.timestamp).toISOString(),
-        kh:         parseFloat(last.kh),
-        khMin24h:   khMin,
-        khMax24h:   khMax,
-        khVar24h:   khVar,
-        khTarget:   khTarget,
-        health:     health
+        nowIso:   new Date(lastTsMs).toISOString(),
+        kh:       lastKh,
+        khMin24h: khMin,
+        khMax24h: khMax,
+        khVar24h: khVar,
+        khTarget: khTarget,
+        health:   health
       }
     });
+
   } catch (err) {
     console.error('Error kh-summary', err);
     return res.status(500).json({ success:false, message:'Internal server error' });
