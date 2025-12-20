@@ -1,12 +1,10 @@
 #!/bin/bash
-
-# ============================================================================
-# ReefBlueSky-Kh - Sync da pasta public (dashboard web)
-# Uso: ./download-public.sh
-# Vai baixar/sincronizar todos arquivos da pasta public/ do Git
-# ============================================================================
-
 set -e
+
+# ============================================================================
+# ReefBlueSky-Kh - Sync da pasta public (HTML + JS)
+# Uso: ./download-public.sh
+# ============================================================================
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,15 +16,19 @@ REPO_BASE="https://raw.githubusercontent.com/rescosta/ReefBlueSky-Kh/main/backen
 BACKUP_DIR="backups_public"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# Arquivos que existem hoje na pasta public do backend
-FILES=(
+# HTML na raiz de public (conforme pasta do Git)
+FILES_HTML=(
   "login.html"
   "dashboard.html"
-  "dashboard-main.html"
   "dashboard-config.html"
   "dashboard-graficos.html"
   "dashboard-logs.html"
+  "dashboard-main.html"
   "dashboard-sistema.html"
+)
+
+# JS dentro de public/js (conforme pasta js do Git)
+FILES_JS=(
   "dashboard-main.js"
   "dashboard-config.js"
   "dashboard-graficos.js"
@@ -40,21 +42,33 @@ echo -e "${BLUE}║ ReefBlueSky-Kh - Sync da pasta public                ║${NC
 echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-mkdir -p "$BACKUP_DIR"
-mkdir -p "public"
-
-echo -e "${YELLOW}[INFO]${NC} Fazendo backup dos arquivos atuais em ${BACKUP_DIR}/${TIMESTAMP}"
 mkdir -p "${BACKUP_DIR}/${TIMESTAMP}"
+mkdir -p "public/js"
 
-for f in "${FILES[@]}"; do
+echo -e "${YELLOW}[INFO]${NC} Fazendo backup atual em ${BACKUP_DIR}/${TIMESTAMP}"
+
+# Backup HTML
+for f in "${FILES_HTML[@]}"; do
   if [ -f "public/$f" ]; then
     cp "public/$f" "${BACKUP_DIR}/${TIMESTAMP}/$f"
   fi
 done
+
+# Backup JS
+if [ -d "public/js" ]; then
+  mkdir -p "${BACKUP_DIR}/${TIMESTAMP}/js"
+  for f in "${FILES_JS[@]}"; do
+    if [ -f "public/js/$f" ]; then
+      cp "public/js/$f" "${BACKUP_DIR}/${TIMESTAMP}/js/$f"
+    fi
+  done
+fi
+
 echo -e "${GREEN}[✓]${NC} Backup concluído"
 echo ""
 
-for f in "${FILES[@]}"; do
+# Baixar HTML
+for f in "${FILES_HTML[@]}"; do
   URL="${REPO_BASE}/${f}"
   DEST="public/${f}"
 
@@ -64,13 +78,29 @@ for f in "${FILES[@]}"; do
   if curl -f -o "${DEST}" "${URL}"; then
     echo -e "${GREEN}[✓]${NC} Atualizado: ${DEST}"
   else
-    echo -e "${RED}[✗]${NC} Falha ao baixar ${f}, mantendo backup em ${BACKUP_DIR}/${TIMESTAMP}/${f}"
+    echo -e "${RED}[✗]${NC} Falha ao baixar ${f}, verifique se existe em ${URL}"
   fi
-
   echo ""
 done
 
-echo -e "${BLUE}[INFO]${NC} Conteúdo final da pasta public/:"
-ls -lh public
+# Baixar JS (subpasta js)
+for f in "${FILES_JS[@]}"; do
+  URL="${REPO_BASE}/js/${f}"
+  DEST="public/js/${f}"
+
+  echo -e "${BLUE}[DOWNLOAD]${NC} js/${f}"
+  echo -e "${BLUE}[URL]${NC} ${URL}"
+
+  if curl -f -o "${DEST}" "${URL}"; then
+    echo -e "${GREEN}[✓]${NC} Atualizado: ${DEST}"
+  else
+    echo -e "${RED}[✗]${NC} Falha ao baixar js/${f}, verifique se existe em ${URL}"
+  fi
+  echo ""
+done
+
+echo -e "${BLUE}[INFO]${NC} Conteúdo final de public/:"
+ls -Rlh public
 echo ""
 echo -e "${GREEN}[✓]${NC} Sync da pasta public concluído. Backups em: ${BACKUP_DIR}/${TIMESTAMP}"
+
