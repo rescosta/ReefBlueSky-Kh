@@ -259,8 +259,7 @@ async function checkDevicesOnlineStatus() {
 
     }
 
-
-        // --- NOVO BLOCO: alerta de LCD offline ---
+    // --- NOVO BLOCO: alerta de LCD offline ---
     const lcdRows = await conn.query(
       `SELECT d.id,
               d.deviceId,
@@ -276,12 +275,20 @@ async function checkDevicesOnlineStatus() {
     );
 
     for (const row of lcdRows) {
-      const lastMs = Number(row.lcd_last_seen || 0);
-      if (!lastMs) continue;
+      const raw = String(row.lcd_last_seen || '');
+      if (raw.length !== 14) continue; // formato inválido
 
+      const year   = Number(raw.slice(0, 4));
+      const month  = Number(raw.slice(4, 6)) - 1; // 0‑based
+      const day    = Number(raw.slice(6, 8));
+      const hour   = Number(raw.slice(8, 10));
+      const minute = Number(raw.slice(10, 12));
+      const second = Number(raw.slice(12, 14));
+
+      const lastMs = Date.UTC(year, month, day, hour, minute, second);
       const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
-      console.log('[LCD DEBUG]', row.deviceId, row.lcd_status, lastMs, row.lcd_offline_alert_sent, isLcdOffline);
+      console.log('[LCD DEBUG]', row.deviceId, row.lcd_status, raw, lastMs, row.lcd_offline_alert_sent, isLcdOffline);
 
       // LCD OFFLINE e ainda não mandou alerta
       if (isLcdOffline && row.lcd_status === 'offline' && !row.lcd_offline_alert_sent) {
@@ -336,6 +343,7 @@ async function checkDevicesOnlineStatus() {
         }
       }
     }
+
 
   } catch (err) {
     console.error('[ALERT] Erro no monitor de devices online/offline:', err.message);
