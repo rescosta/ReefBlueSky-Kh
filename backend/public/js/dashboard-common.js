@@ -115,7 +115,7 @@ async function loadUserCommon() {
 }
 
 
-// Carregar lista de devices
+
 // Carregar lista de devices
 async function loadDevicesCommon() {
   try {
@@ -128,7 +128,9 @@ async function loadDevicesCommon() {
       return [];
     }
 
-    currentDevices = json.data || [];
+    const allDevices  = json.data || [];
+    currentDevices = allDevices.filter((d) => d.type !== 'LCD');
+
     const select = document.getElementById('deviceSelect');
     if (!select) return currentDevices;
 
@@ -144,13 +146,13 @@ async function loadDevicesCommon() {
       select.appendChild(opt);
     });
 
-    // Atualiza badge do LCD para o device selecionado
+  
     const currentId = getSelectedDeviceId();
     const cur = currentDevices.find((d) => d.deviceId === currentId);
     if (cur && cur.lcdStatus) {
       DashboardCommon.setLcdStatus(cur.lcdStatus);
     } else {
-      DashboardCommon.setLcdStatus('never'); // esconde se não tiver info
+      DashboardCommon.setLcdStatus('never'); 
     }
 
     return currentDevices;
