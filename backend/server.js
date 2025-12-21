@@ -291,7 +291,7 @@ async function checkDevicesOnlineStatus() {
       console.log('[LCD DEBUG]', row.deviceId, row.lcd_status, raw, lastMs, row.lcd_offline_alert_sent, isLcdOffline);
 
       // LCD OFFLINE e ainda não mandou alerta
-      if (isLcdOffline && row.lcd_status === 'offline' && !row.lcd_offline_alert_sent) {
+      if (isLcdOffline && !row.lcd_offline_alert_sent) {
         try {
           const lastSeenBr = new Date(lastMs).toLocaleString('pt-BR', {
             timeZone: 'America/Sao_Paulo',
