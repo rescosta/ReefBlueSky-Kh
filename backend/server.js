@@ -275,92 +275,94 @@ async function checkDevicesOnlineStatus() {
           AND d.lcd_last_seen IS NOT NULL`
     );
 
-    for (const row of lcdRows) {
-      const lastMs = new Date(row.lcd_last_seen).getTime();
-      const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
+for (const row of lcdRows) {
+  const lastMs = Number(row.lcd_last_seen || 0);
+  if (!lastMs) continue;
 
-      // LCD OFFLINE e ainda não mandou alerta
-      if (isLcdOffline && row.lcd_status === 'offline' && !row.lcd_offline_alert_sent) {
-        console.log('[ALERT DEBUG] LCD %s: isOffline=%s, lcd_offline_alert_sent=%s → enviando OFFLINE',
-          row.deviceId, isLcdOffline, row.lcd_offline_alert_sent);
+  const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
-        try {
-          const lastSeenBr = new Date(row.lcd_last_seen).toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
+  console.log('[LCD DEBUG]', row.deviceId, row.lcd_status, lastMs, row.lcd_offline_alert_sent, isLcdOffline);
 
-          const text =
-            `O display LCD associado ao device ${row.deviceId} ` +
-            `não envia sinais há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-            `Último ping do LCD em: ${lastSeenBr} (horário de Brasília).\n\n` +
-            `Verifique alimentação do display e conexão Wi‑Fi.`;
+  // LCD OFFLINE e ainda não mandou alerta
+  if (isLcdOffline && row.lcd_status === 'offline' && !row.lcd_offline_alert_sent) {
+    try {
+      const lastSeenBr = new Date(lastMs).toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
 
-          const result = await conn.query(
-            'UPDATE devices SET lcd_offline_alert_sent = 1 WHERE id = ? AND lcd_offline_alert_sent = 0',
-            [row.id]
-          );
+      const text =
+        `O display LCD associado ao device ${row.deviceId} ` +
+        `não envia sinais há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+        `Último ping do LCD em: ${lastSeenBr} (horário de Brasília).\n\n` +
+        `Verifique alimentação do display e conexão Wi‑Fi.`;
 
-          if (result.affectedRows > 0) {
-            await mailTransporter.sendMail({
-              from: ALERT_FROM,
-              to: row.email,
-              subject: `ReefBlueSky KH - LCD do device ${row.deviceId} offline`,
-              text,
-            });
-            console.log('[ALERT] E-mail de LCD offline enviado para', row.email, 'device', row.deviceId);
-          }
-        } catch (err) {
-          console.error('[ALERT] Erro ao enviar alerta de LCD offline para', row.deviceId, err.message);
-        }
+      const result = await conn.query(
+        'UPDATE devices SET lcd_offline_alert_sent = 1 WHERE id = ? AND lcd_offline_alert_sent = 0',
+        [row.id]
+      );
+
+      if (result.affectedRows > 0) {
+        await mailTransporter.sendMail({
+          from: ALERT_FROM,
+          to: row.email,
+          subject: `ReefBlueSky KH - LCD do device ${row.deviceId} offline`,
+          text,
+        });
+        console.log('[ALERT] E-mail de LCD offline enviado para', row.email, 'device', row.deviceId);
       }
-
-      // LCD voltou a ficar online → limpa flag
-      if (!isLcdOffline && row.lcd_offline_alert_sent) {
-        try {
-          const result = await conn.query(
-            'UPDATE devices SET lcd_offline_alert_sent = 0 WHERE id = ? AND lcd_offline_alert_sent = 1',
-            [row.id]
-          );
-          if (result.affectedRows > 0) {
-            console.log('[ALERT] LCD voltou online, limpando flag de alerta para device', row.deviceId);
-          }
-        } catch (err) {
-          console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
-        }
-      }
+    } catch (err) {
+      console.error('[ALERT] Erro ao enviar alerta de LCD offline para', row.deviceId, err.message);
     }
+  }
 
-  } catch (err) {
-    console.error('[ALERT] Erro no monitor de devices online/offline:', err.message);
-  } finally {
-    if (conn) conn.release();
+  // LCD voltou a ficar online → limpa flag
+  if (!isLcdOffline && row.lcd_offline_alert_sent) {
+    try {
+      const result = await conn.query(
+        'UPDATE devices SET lcd_offline_alert_sent = 0 WHERE id = ? AND lcd_offline_alert_sent = 1',
+        [row.id]
+      );
+      if (result.affectedRows > 0) {
+        console.log('[ALERT] LCD voltou online, limpando flag de alerta para device', row.deviceId);
+      }
+    } catch (err) {
+      console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
+    }
   }
 }
 
-
 async function checkLcdStatus() {
+  const now = Date.now();
   let conn;
   try {
     conn = await pool.getConnection();
 
-    const result = await conn.query(
-      `UPDATE devices
-         SET lcd_status = 'offline'
-       WHERE type = 'KH'
-         AND lcd_status = 'online'
-         AND lcd_last_seen IS NOT NULL
-         AND lcd_last_seen < (NOW() - INTERVAL ? MINUTE)`,
-      [OFFLINE_THRESHOLD_MINUTES]
+    const rows = await conn.query(
+      `SELECT id, deviceId, lcd_last_seen, lcd_status
+         FROM devices
+        WHERE type = 'KH'
+          AND lcd_last_seen IS NOT NULL`
     );
 
-    if (result.affectedRows > 0) {
-      console.log('[LCD] KH marcados como LCD OFFLINE:', result.affectedRows);
+    for (const row of rows) {
+      const lastMs = Number(row.lcd_last_seen || 0);
+      if (!lastMs) continue;
+
+      const isOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
+
+      if (isOffline && row.lcd_status === 'online') {
+        await conn.query(
+          'UPDATE devices SET lcd_status = ? WHERE id = ?',
+          ['offline', row.id]
+        );
+        console.log('[LCD] Marcando LCD como OFFLINE para KH', row.deviceId);
+      }
     }
   } catch (err) {
     console.error('[LCD] Erro no monitor de lcd_status:', err.message);
@@ -371,9 +373,10 @@ async function checkLcdStatus() {
 
 
 
+
 setInterval(async () => {
-  await checkDevicesOnlineStatus();
   await checkLcdStatus();
+  await checkDevicesOnlineStatus();
 }, MONITOR_INTERVAL_MS);
 
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
