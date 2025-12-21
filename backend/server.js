@@ -267,34 +267,22 @@ async function checkDevicesOnlineStatus() {
 
 
 async function checkLcdStatus() {
-  const now = Date.now();
   let conn;
-
   try {
     conn = await pool.getConnection();
 
-    const rows = await conn.query(
-      `SELECT id, deviceId, lcd_last_seen, lcd_status
-         FROM devices
-        WHERE type = 'KH' AND lcd_last_seen IS NOT NULL`
+    const result = await conn.query(
+      `UPDATE devices
+         SET lcd_status = 'offline'
+       WHERE type = 'KH'
+         AND lcd_status = 'online'
+         AND lcd_last_seen IS NOT NULL
+         AND lcd_last_seen < (NOW() - INTERVAL ? MINUTE)`,
+      [OFFLINE_THRESHOLD_MINUTES]
     );
 
-    for (const row of rows) {
-      const lastMs = typeof row.lcd_last_seen === 'number'
-        ? row.lcd_last_seen
-        : new Date(row.lcd_last_seen).getTime();
-
-      if (!lastMs) continue;
-
-      const isOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
-
-      if (isOffline && row.lcd_status === 'online') {
-        await conn.query(
-          'UPDATE devices SET lcd_status = ? WHERE id = ?',
-          ['offline', row.id]
-        );
-        console.log('[LCD] Marcando LCD como OFFLINE para KH', row.deviceId);
-      }
+    if (result.affectedRows > 0) {
+      console.log('[LCD] KH marcados como LCD OFFLINE:', result.affectedRows);
     }
   } catch (err) {
     console.error('[LCD] Erro no monitor de lcd_status:', err.message);
@@ -302,6 +290,7 @@ async function checkLcdStatus() {
     if (conn) conn.release();
   }
 }
+
 
 
 setInterval(async () => {
