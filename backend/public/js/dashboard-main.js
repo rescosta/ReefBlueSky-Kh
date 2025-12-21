@@ -784,21 +784,19 @@ if (pump4CalibBtn) {
   });
 }
 
-async function loadDevicesCommon() {
-  const res = await fetch('/api/v1/user/devices', { headers: headersAuth });
-  const json = await res.json();
-  if (!json.success) return [];
+async function initDashboardMain() {
+  await DashboardCommon.initTopbar();
 
-  const allDevices = json.data || [];
+  const devs = await DashboardCommon.loadDevicesCommon(); // usa a global
+  if (!devs.length) {
+    lastCountInfo.textContent = 'Nenhum dispositivo associado';
+    updateMeasurementsView([]);
+    return;
+  }
 
-  // filtra fora os LCD (type === 'LCD')
-  const khDevices = allDevices.filter(d => d.type === 'KH');
-
-  // popula o select do topo só com KH
-  fillTopbarDeviceSelect(khDevices);
-
-  return khDevices;
+  await loadMeasurementsForSelected();
 }
+
 
 
 // Inicialização da página principal

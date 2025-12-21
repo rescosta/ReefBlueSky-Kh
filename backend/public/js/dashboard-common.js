@@ -236,6 +236,13 @@ async function initTopbar() {
   if (select) {
     select.addEventListener('change', () => {
       updateDeviceStatusBadge();
+      const currentId = getSelectedDeviceId();
+      const cur = currentDevices.find((d) => d.deviceId === currentId);
+      if (cur && cur.lcdStatus) {
+        DashboardCommon.setLcdStatus(cur.lcdStatus);
+      } else {
+        DashboardCommon.setLcdStatus('never');
+      }
       const evt = new CustomEvent('deviceChanged', {
         detail: { deviceId: select.value },
       });
