@@ -288,7 +288,15 @@ async function checkDevicesOnlineStatus() {
       const lastMs = Date.UTC(year, month, day, hour, minute, second);
       const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
-      console.log('[LCD DEBUG]', row.deviceId, row.lcd_status, raw, lastMs, row.lcd_offline_alert_sent, isLcdOffline);
+      console.log(
+        '[LCD DEBUG]',
+        row.deviceId,
+        'lcd_status=', row.lcd_status,
+        'lcd_last_seen=', raw,
+        'lastMs=', lastMs,
+        'lcd_offline_alert_sent=', row.lcd_offline_alert_sent,
+        'isLcdOffline=', isLcdOffline
+      );
 
       // LCD OFFLINE e ainda não mandou alerta
       if (isLcdOffline && !row.lcd_offline_alert_sent) {
@@ -366,9 +374,17 @@ async function checkLcdStatus() {
     );
 
     for (const row of rows) {
-      const lastMs = Number(row.lcd_last_seen || 0);
-      if (!lastMs) continue;
+      const raw = String(row.lcd_last_seen || '');
+      if (raw.length !== 14) continue;
 
+      const year   = Number(raw.slice(0, 4));
+      const month  = Number(raw.slice(4, 6)) - 1;
+      const day    = Number(raw.slice(6, 8));
+      const hour   = Number(raw.slice(8, 10));
+      const minute = Number(raw.slice(10, 12));
+      const second = Number(raw.slice(12, 14));
+
+      const lastMs = Date.UTC(year, month, day, hour, minute, second);
       const isOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
       if (isOffline && row.lcd_status === 'online') {
@@ -379,8 +395,6 @@ async function checkLcdStatus() {
         console.log('[LCD] Marcando LCD como OFFLINE para KH', row.deviceId);
       }
     }
-  } catch (err) {
-    console.error('[LCD] Erro no monitor de lcd_status:', err.message);
   } finally {
     if (conn) conn.release();
   }
