@@ -436,7 +436,7 @@ window.DashboardCommon = {
   getSelectedDeviceId,
   getSelectedDeviceIdOrAlert,
   applyRoleMenuVisibility,
-  setLcdStatus,          // <- novo
+  setLcdStatus,          
   currentUserRole: 'user',
 };
 
@@ -782,6 +782,22 @@ if (pump4CalibBtn) {
       console.error('pump4calibrate command error', err);
     }
   });
+}
+
+async function loadDevicesCommon() {
+  const res = await fetch('/api/v1/user/devices', { headers: headersAuth });
+  const json = await res.json();
+  if (!json.success) return [];
+
+  const allDevices = json.data || [];
+
+  // filtra fora os LCD (type === 'LCD')
+  const khDevices = allDevices.filter(d => d.type === 'KH');
+
+  // popula o select do topo só com KH
+  fillTopbarDeviceSelect(khDevices);
+
+  return khDevices;
 }
 
 
