@@ -1,9 +1,9 @@
 /*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19  Distrib 10.11.13-MariaDB, for debian-linux-gnu (aarch64)
+-- MariaDB dump 10.19  Distrib 10.11.14-MariaDB, for debian-linux-gnu (aarch64)
 --
 -- Host: localhost    Database: reefbluesky
 -- ------------------------------------------------------
--- Server version	10.11.13-MariaDB-0ubuntu0.24.04.1
+-- Server version	10.11.14-MariaDB-0+deb12u2
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -34,7 +34,7 @@ CREATE TABLE `device_commands` (
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_device_status` (`deviceId`,`status`,`createdAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=73 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=75 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -76,7 +76,7 @@ CREATE TABLE `device_health` (
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_dev_user` (`deviceId`,`userId`,`updatedAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=213 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=219 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -120,6 +120,8 @@ CREATE TABLE `devices` (
   `name` varchar(100) DEFAULT NULL,
   `local_ip` varchar(45) DEFAULT NULL,
   `last_seen` datetime DEFAULT NULL,
+  `lcd_last_seen` bigint(20) DEFAULT NULL,
+  `lcd_status` varchar(16) NOT NULL DEFAULT 'offline',
   `offline_alert_sent` tinyint(1) NOT NULL DEFAULT 0,
   `khreference` float DEFAULT NULL,
   `khtarget` float DEFAULT NULL,
@@ -136,11 +138,12 @@ CREATE TABLE `devices` (
   `kh_health_yellow_max_dev` decimal(5,2) DEFAULT NULL,
   `kh_auto_enabled` tinyint(1) DEFAULT NULL,
   `type` varchar(10) NOT NULL DEFAULT 'KH',
+  `lcd_offline_alert_sent` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_devices_deviceId` (`deviceId`),
   KEY `idx_devices_userId` (`userId`),
   CONSTRAINT `fk_devices_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=183 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=188 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -163,7 +166,7 @@ CREATE TABLE `measurements` (
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_measurements_device_ts` (`deviceId`,`timestamp`)
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -185,7 +188,7 @@ CREATE TABLE `users` (
   `role` varchar(50) NOT NULL DEFAULT 'user',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_users_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -197,4 +200,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-12-20 14:58:40
+-- Dump completed on 2025-12-21 18:32:51
