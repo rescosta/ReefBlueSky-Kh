@@ -258,6 +258,84 @@ async function checkDevicesOnlineStatus() {
       }
 
     }
+
+
+        // --- NOVO BLOCO: alerta de LCD offline ---
+    const lcdRows = await conn.query(
+      `SELECT d.id,
+              d.deviceId,
+              d.userId,
+              d.lcd_last_seen,
+              d.lcd_status,
+              d.lcd_offline_alert_sent,
+              u.email
+         FROM devices d
+         JOIN users u ON u.id = d.userId
+        WHERE d.type = 'KH'
+          AND d.lcd_last_seen IS NOT NULL`
+    );
+
+    for (const row of lcdRows) {
+      const lastMs = new Date(row.lcd_last_seen).getTime();
+      const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
+
+      // LCD OFFLINE e ainda não mandou alerta
+      if (isLcdOffline && row.lcd_status === 'offline' && !row.lcd_offline_alert_sent) {
+        console.log('[ALERT DEBUG] LCD %s: isOffline=%s, lcd_offline_alert_sent=%s → enviando OFFLINE',
+          row.deviceId, isLcdOffline, row.lcd_offline_alert_sent);
+
+        try {
+          const lastSeenBr = new Date(row.lcd_last_seen).toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
+
+          const text =
+            `O display LCD associado ao device ${row.deviceId} ` +
+            `não envia sinais há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+            `Último ping do LCD em: ${lastSeenBr} (horário de Brasília).\n\n` +
+            `Verifique alimentação do display e conexão Wi‑Fi.`;
+
+          const result = await conn.query(
+            'UPDATE devices SET lcd_offline_alert_sent = 1 WHERE id = ? AND lcd_offline_alert_sent = 0',
+            [row.id]
+          );
+
+          if (result.affectedRows > 0) {
+            await mailTransporter.sendMail({
+              from: ALERT_FROM,
+              to: row.email,
+              subject: `ReefBlueSky KH - LCD do device ${row.deviceId} offline`,
+              text,
+            });
+            console.log('[ALERT] E-mail de LCD offline enviado para', row.email, 'device', row.deviceId);
+          }
+        } catch (err) {
+          console.error('[ALERT] Erro ao enviar alerta de LCD offline para', row.deviceId, err.message);
+        }
+      }
+
+      // LCD voltou a ficar online → limpa flag
+      if (!isLcdOffline && row.lcd_offline_alert_sent) {
+        try {
+          const result = await conn.query(
+            'UPDATE devices SET lcd_offline_alert_sent = 0 WHERE id = ? AND lcd_offline_alert_sent = 1',
+            [row.id]
+          );
+          if (result.affectedRows > 0) {
+            console.log('[ALERT] LCD voltou online, limpando flag de alerta para device', row.deviceId);
+          }
+        } catch (err) {
+          console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
+        }
+      }
+    }
+
   } catch (err) {
     console.error('[ALERT] Erro no monitor de devices online/offline:', err.message);
   } finally {
