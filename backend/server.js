@@ -2860,11 +2860,12 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
         health = 0.5 * (1.0 - t);          // cai de 0.5 para 0.0
       }
     }
+    
     return res.json({
       success: true,
       data: {
         nowIso:   new Date(lastTsMs).toISOString(),
-        kh,
+        kh:       lastKh,
         khMin24h: khMin,
         khMax24h: khMax,
         khVar24h: khVar,
@@ -2874,6 +2875,7 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
         khHealthYellowMaxDev: yellowMaxDev
       }
     });
+
 
 
   } catch (err) {
