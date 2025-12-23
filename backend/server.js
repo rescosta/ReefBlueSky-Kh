@@ -2812,18 +2812,21 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
     const khMin = mm.minKh != null ? parseFloat(mm.minKh) : lastKh;
     const khMax = mm.maxKh != null ? parseFloat(mm.maxKh) : lastKh;
 
-    // 4) variação em 24h
-    const firstRows = await pool.query(
+    // 4) variação em relação ao teste anterior
+    const prevRows = await pool.query(
       `SELECT kh
          FROM measurements
-        WHERE deviceId = ? AND timestamp >= ?
-        ORDER BY timestamp ASC
+        WHERE deviceId = ?
+          AND timestamp < ?
+        ORDER BY timestamp DESC
         LIMIT 1`,
-      [deviceId, from24h]
+      [deviceId, lastTsMs]
     );
+
     let khVar = 0;
-    if (firstRows.length) {
-      khVar = lastKh - parseFloat(firstRows[0].kh);
+    if (prevRows.length) {
+      const prevKh = parseFloat(prevRows[0].kh);
+      khVar = lastKh - prevKh;   // KH atual - KH anterior
     }
 
     // 5) saúde
