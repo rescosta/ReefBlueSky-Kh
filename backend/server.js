@@ -2831,25 +2831,50 @@ app.get('/api/v1/user/devices/:deviceId/display/kh-summary', authUserMiddleware,
 
     // 5) saúde
     let health = null;
+
+    const devCfgRows = await pool.query(
+      `SELECT kh_health_green_max_dev, kh_health_yellow_max_dev
+         FROM devices
+        WHERE deviceId = ? AND userId = ?
+        LIMIT 1`,
+      [deviceId, userId]
+    );
+    const cfg = devCfgRows[0] || {};
+    const greenMaxDev  = cfg.kh_health_green_max_dev  != null ? parseFloat(cfg.kh_health_green_max_dev)  : 0.2;
+    const yellowMaxDev = cfg.kh_health_yellow_max_dev != null ? parseFloat(cfg.kh_health_yellow_max_dev) : 0.5;
+
     if (khTarget != null) {
       const khTargetNum = parseFloat(khTarget);
-      const dev = Math.abs(lastKh - khTargetNum);
-      const h = 1 - (dev / 1.5);
-      health = Math.max(0, Math.min(1, h));
-    }
+      const dev = Math.abs(lastKh - khTargetNum); // desvio em dKH
 
+      if (dev <= greenMaxDev) {
+        health = 1.0;                       // 100% saudável
+      } else if (dev <= yellowMaxDev) {
+        // interpolação linear entre verde e amarelo
+        const t = (dev - greenMaxDev) / (yellowMaxDev - greenMaxDev);
+        health = 1.0 - 0.5 * t;            // cai de 1.0 para 0.5
+      } else {
+        // desvio acima do amarelo, vai até 0
+        const maxDev = yellowMaxDev * 2;   // por exemplo
+        const t = Math.min(1, (dev - yellowMaxDev) / (maxDev - yellowMaxDev));
+        health = 0.5 * (1.0 - t);          // cai de 0.5 para 0.0
+      }
+    }
     return res.json({
       success: true,
       data: {
         nowIso:   new Date(lastTsMs).toISOString(),
-        kh:       lastKh,
+        kh,
         khMin24h: khMin,
         khMax24h: khMax,
         khVar24h: khVar,
         khTarget: khTarget,
-        health:   health
+        health,
+        khHealthGreenMaxDev:  greenMaxDev,
+        khHealthYellowMaxDev: yellowMaxDev
       }
     });
+
 
   } catch (err) {
     console.error('Error kh-summary', err);
