@@ -43,14 +43,12 @@ const pumpProgEls = {
   3: document.getElementById('pumpProg3'),
 };
 
-const pump4CalibSecondsInput = document.getElementById('pump4CalibSeconds');
 const pump4RunCalibBtn       = document.getElementById('pump4RunCalibBtn');
 const pump4CalibVolumeInput  = document.getElementById('pump4CalibVolume');
 const pump4SaveCalibBtn      = document.getElementById('pump4SaveCalibBtn');
 const pump4CalibStatusEl     = document.getElementById('pump4CalibStatus');
 
 
-const pump4CalibProgressWrapper = document.getElementById('pump4CalibProgressWrapper');
 const pump4CalibProgressFill    = document.getElementById('pump4CalibProgressFill');
 const pump4CalibProgressLabel   = document.getElementById('pump4CalibProgressLabel');
 
@@ -287,9 +285,11 @@ function startPump4CalibProgress() {
   pump4CalibRunning = true;
   let secondsRemaining = PUMP4_CALIB_SECONDS;
 
-  pump4CalibProgressWrapper.style.display = 'block';
-  pump4CalibProgressFill.style.width = '100%';
-  pump4CalibProgressLabel.textContent = `Calibrando... ${secondsRemaining}s restantes`;
+  if (!pump4CalibProgressFill || !pump4CalibProgressLabel) return;
+
+  pump4CalibProgressFill.style.width = '0%';
+  pump4CalibProgressLabel.textContent =
+    `Calibrando... ${secondsRemaining}s restantes`;
 
   if (pump4CalibTimerId) clearInterval(pump4CalibTimerId);
 
@@ -299,18 +299,22 @@ function startPump4CalibProgress() {
     if (secondsRemaining <= 0) {
       clearInterval(pump4CalibTimerId);
       pump4CalibRunning = false;
-      pump4CalibProgressWrapper.style.display = 'none';
-      pump4CalibProgressFill.style.width = '0%';
+
+      pump4CalibProgressFill.style.width = '100%';
       pump4CalibProgressLabel.textContent = 'Calibração concluída!';
-      pump4CalibStatusEl.textContent = 'Informe o volume medido e clique "Salvar calibração".';
+      pump4CalibStatusEl.textContent =
+        'Informe o volume medido e clique "Salvar calibração".';
       pump4RunCalibBtn.disabled = false;
     } else {
-      const percent = ((PUMP4_CALIB_SECONDS - secondsRemaining) / PUMP4_CALIB_SECONDS) * 100;
+      const percent =
+        ((PUMP4_CALIB_SECONDS - secondsRemaining) / PUMP4_CALIB_SECONDS) * 100;
       pump4CalibProgressFill.style.width = `${percent}%`;
-      pump4CalibProgressLabel.textContent = `Calibrando... ${secondsRemaining}s restantes`;
+      pump4CalibProgressLabel.textContent =
+        `Calibrando... ${secondsRemaining}s restantes`;
     }
   }, 1000);
 }
+
 
 // Calibração bomba 4: salvar mL/s (setpump4mlpersec)
 // Calibração bomba 4: salvar mL/s (setpump4mlpersec)
