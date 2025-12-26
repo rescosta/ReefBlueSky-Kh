@@ -227,8 +227,35 @@ async function apiKhCorrection(deviceId, volume) {
   }
 }
 
+async function apiFakeMeasurement(deviceId) {
+  try {
+    await sendDeviceCommand(deviceId, 'fake_measurement');
+    return true;
+  } catch (err) {
+    console.error('apiFakeMeasurement error', err);
+    return false;
+  }
+}
 
+const btnFakeMeasurement = document.getElementById('btnFakeMeasurement');
+const fakeMeasurementStatus = document.getElementById('fakeMeasurementStatus');
 
+if (btnFakeMeasurement) {
+  btnFakeMeasurement.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    btnFakeMeasurement.disabled = true;
+    fakeMeasurementStatus.textContent = 'Enviando comando de medição fake...';
+
+    const ok = await apiFakeMeasurement(deviceId);
+    fakeMeasurementStatus.textContent = ok
+      ? 'Comando enviado. Aguarde a medição aparecer no histórico.'
+      : 'Erro ao enviar comando de medição fake.';
+
+    btnFakeMeasurement.disabled = false;
+  });
+}
 // Calibração bomba 4: rodar calibração por 60s com barra regressiva
 if (pump4RunCalibBtn) {
   pump4RunCalibBtn.addEventListener('click', async () => {
