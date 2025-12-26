@@ -225,15 +225,17 @@ async function apiKhCorrection(deviceId, volume) {
   }
 }
 
-async function apiFakeMeasurement(deviceId) {
+async function apiFakeMeasurement(deviceId, khValue) {
   try {
-    await sendDeviceCommand(deviceId, 'fake_measurement');
+    // manda como "value" para o backend
+    await sendDeviceCommand(deviceId, 'fake_measurement', khValue);
     return true;
   } catch (err) {
     console.error('apiFakeMeasurement error', err);
     return false;
   }
 }
+
 
 const btnFakeMeasurement = document.getElementById('btnFakeMeasurement');
 const fakeMeasurementStatus = document.getElementById('fakeMeasurementStatus');
@@ -243,10 +245,21 @@ if (btnFakeMeasurement) {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
     if (!deviceId) return;
 
-    btnFakeMeasurement.disabled = true;
-    fakeMeasurementStatus.textContent = 'Enviando comando de medição fake...';
+    // pede o KH fake
+    const khStr = prompt('Informe o KH da medição fake (ex: 7.8):');
+    if (khStr === null) return; // cancelou
 
-    const ok = await apiFakeMeasurement(deviceId);
+    const kh = parseFloat(khStr.replace(',', '.'));
+    if (!Number.isFinite(kh) || kh <= 0 || kh >= 25) {
+      alert('KH inválido. Use um valor entre 0 e 25.');
+      return;
+    }
+
+    btnFakeMeasurement.disabled = true;
+    fakeMeasurementStatus.textContent =
+      `Enviando medição fake com KH=${kh.toFixed(2)}...`;
+
+    const ok = await apiFakeMeasurement(deviceId, kh);
     fakeMeasurementStatus.textContent = ok
       ? 'Comando enviado. Aguarde a medição aparecer no histórico.'
       : 'Erro ao enviar comando de medição fake.';
@@ -254,6 +267,7 @@ if (btnFakeMeasurement) {
     btnFakeMeasurement.disabled = false;
   });
 }
+
 // Calibração bomba 4: rodar calibração por 60s com barra regressiva
 if (pump4RunCalibBtn) {
   pump4RunCalibBtn.addEventListener('click', async () => {
@@ -686,7 +700,12 @@ abortBtn.addEventListener('click', async () => {
     updateAbortVisibility();
     calibrationStatus.textContent = 'Ciclo abortado pelo usuário.';
 
-    // === abortar calibração da bomba 4, se estiver rodando ===
+    try {
+      await sendDeviceCommand(deviceId, 'pump4abort');
+    } catch (e) {
+      console.error('pump4abort error', e);
+    }
+
     if (pump4CalibRunning) {
       pump4CalibRunning = false;
       if (pump4CalibTimerId) {
