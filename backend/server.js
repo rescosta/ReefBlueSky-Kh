@@ -1994,6 +1994,46 @@ app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, asyn
   }
 });
 
+// PUT /pump4-calib: salva mL/s da bomba 4 no backend
+app.put(
+  '/api/v1/user/devices/:deviceId/pump4-calib',
+  authUserMiddleware,
+  async (req, res) => {
+    try {
+      const userId   = req.user.userId;
+      const { deviceId } = req.params;
+      const { mlPerSec } = req.body || {};
+
+      const v = parseFloat(mlPerSec);
+      if (!v || Number.isNaN(v) || v <= 0 || v > 10) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'mlPerSec inválido' });
+      }
+
+      const sql = `
+        UPDATE devices
+        SET pump4_ml_per_sec = ?
+        WHERE deviceId = ? AND userId = ?
+      `;
+      const result = await pool.query(sql, [v, deviceId, userId]);
+      if (result.affectedRows === 0) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Device not found' });
+      }
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('Error updating pump4 calibration', err);
+      return res
+        .status(500)
+        .json({ success: false, message: 'Internal server error' });
+    }
+  }
+);
+
+
 // POST /command/kh-correction
 app.post('/api/v1/user/devices/:deviceId/command/kh-correction', authUserMiddleware, async (req, res) => {
   try {
