@@ -270,7 +270,7 @@ if (pump4RunCalibBtn) {
       // Iniciar barra regressiva de 60s
       startPump4CalibProgress();
       pump4CalibStatusEl.textContent =
-        'Calibração em andamento. Meça o volume que saiu.';
+        'Calibração em andamento...';
     } catch (err) {
       console.error('pump4calibrate error', err);
       pump4CalibStatusEl.textContent =
