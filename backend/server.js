@@ -2091,6 +2091,7 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'setpump4mlpersec',
       'khcorrection',
       'fake_measurement',
+      'pump4abort', 
 
     ]);
 
@@ -2149,70 +2150,74 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
         break;
 
       case 'fake_measurement':
-      dbType = 'fake_measurement';
-      payload = {};
-      break;
+        dbType = 'fake_measurement';
 
+        let kh = value;
+        if (typeof kh === 'string') kh = parseFloat(kh);
 
-      // ------- NOVOS COMANDOS BOMBA 4 / KH --------
+        if (Number.isFinite(kh) && kh > 0 && kh < 25) {
+          payload = { kh };        // vai virar cmd.params["kh"]
+        } else {
+          payload = {};            // usa default 7.5 no firmware
+        }
+        break;
+
 
       case 'pump4calibrate':
-        // firmware: cmd.action == "pump4calibrate"
-        // seconds é opcional, default 60, então não precisamos mandar nada
         dbType = 'pump4calibrate';
         payload = {};
         break;
 
-    case 'setpump4mlpersec':
-      // firmware: cmd.action == "setpump4mlpersec"
-      // espera cmd.params["ml_per_sec"]
-      dbType = 'setpump4mlpersec';
-
-      // aceita number ou string; normaliza
-      let rate = req.body.value;
-      rate = typeof rate === 'string' ? parseFloat(rate) : rate;
-
-      if (!Number.isFinite(rate) || rate <= 0 || rate > 10) {
-        return res.status(400).json({
-          success: false,
-          message: 'value (ml/s) deve ser um número entre 0 e 10',
-        });
-      }
-
-      payload = { ml_per_sec: rate }; // <-- bate com cmd.params["ml_per_sec"]
-
-      // >>> gravar também na tabela devices para a tela principal usar
-      await pool.query(
-        `
-        UPDATE devices
-        SET pump4_ml_per_sec = ?
-        WHERE deviceId = ? AND userId = ?
-        `,
-        [rate, deviceId, userId]
-      );
-      console.log('[KH] pump4_ml_per_sec atualizado para', rate, 'no device', deviceId);
-
+      case 'pump4abort':      
+      dbType = 'pump4abort'; 
+      payload = {};
       break;
 
+      case 'setpump4mlpersec':
+        dbType = 'setpump4mlpersec';
 
-      case 'khcorrection':
-        // firmware: cmd.action == "khcorrection"
-        // espera cmd.params["volume"] em mL
-        dbType = 'khcorrection';
+        let rate = req.body.value;
+        rate = typeof rate === 'string' ? parseFloat(rate) : rate;
 
-        if (typeof value !== 'number' || value <= 0 || value > 500) {
+        if (!Number.isFinite(rate) || rate <= 0 || rate > 10) {
           return res.status(400).json({
             success: false,
-            message: 'value (mL) deve ser um número entre 0 e 500'
+            message: 'value (ml/s) deve ser um número entre 0 e 10',
           });
         }
 
-        payload = { volume: value };
+        payload = { ml_per_sec: rate };
+        await pool.query(
+          `
+          UPDATE devices
+          SET pump4_ml_per_sec = ?
+          WHERE deviceId = ? AND userId = ?
+          `,
+          [rate, deviceId, userId]
+        );
+        console.log('[KH] pump4_ml_per_sec atualizado para', rate, 'no device', deviceId);
+
         break;
 
-      default:
-        break;
-    }
+
+        case 'khcorrection':
+          // firmware: cmd.action == "khcorrection"
+          // espera cmd.params["volume"] em mL
+          dbType = 'khcorrection';
+
+          if (typeof value !== 'number' || value <= 0 || value > 500) {
+            return res.status(400).json({
+              success: false,
+              message: 'value (mL) deve ser um número entre 0 e 500'
+            });
+          }
+
+          payload = { volume: value };
+          break;
+
+        default:
+          break;
+      }
 
     const cmd = await enqueueDbCommand(deviceId, dbType, payload);
 
