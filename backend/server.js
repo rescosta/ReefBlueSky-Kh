@@ -2050,6 +2050,8 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'pump4calibrate',
       'setpump4mlpersec',
       'khcorrection',
+      'fake_measurement',
+
     ]);
 
     if (!allowed.has(type)) {
@@ -2106,6 +2108,12 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
         payload = {};
         break;
 
+      case 'fake_measurement':
+      dbType = 'fake_measurement';
+      payload = {};
+      break;
+
+
       // ------- NOVOS COMANDOS BOMBA 4 / KH --------
 
       case 'pump4calibrate':
@@ -2115,24 +2123,36 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
         payload = {};
         break;
 
-       case 'setpump4mlpersec':
-        // firmware: cmd.action == "setpump4mlpersec"
-        // espera cmd.params["ml_per_sec"]
-        dbType = 'setpump4mlpersec';
+    case 'setpump4mlpersec':
+      // firmware: cmd.action == "setpump4mlpersec"
+      // espera cmd.params["ml_per_sec"]
+      dbType = 'setpump4mlpersec';
 
-        // aceita number ou string; normaliza
-        let rate = req.body.value;
-        rate = typeof rate === 'string' ? parseFloat(rate) : rate;
+      // aceita number ou string; normaliza
+      let rate = req.body.value;
+      rate = typeof rate === 'string' ? parseFloat(rate) : rate;
 
-        if (!Number.isFinite(rate) || rate <= 0 || rate > 10) {
-          return res.status(400).json({
-            success: false,
-            message: 'value (ml/s) deve ser um número entre 0 e 10',
-          });
-        }
+      if (!Number.isFinite(rate) || rate <= 0 || rate > 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'value (ml/s) deve ser um número entre 0 e 10',
+        });
+      }
 
-        payload = { ml_per_sec: rate }; // <-- bate com cmd.params["ml_per_sec"]
-        break;
+      payload = { ml_per_sec: rate }; // <-- bate com cmd.params["ml_per_sec"]
+
+      // >>> gravar também na tabela devices para a tela principal usar
+      await pool.query(
+        `
+        UPDATE devices
+        SET pump4_ml_per_sec = ?
+        WHERE deviceId = ? AND userId = ?
+        `,
+        [rate, deviceId, userId]
+      );
+      console.log('[KH] pump4_ml_per_sec atualizado para', rate, 'no device', deviceId);
+
+      break;
 
 
       case 'khcorrection':
