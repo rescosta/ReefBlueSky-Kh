@@ -266,6 +266,11 @@ if (pump4RunCalibBtn) {
     try {
       // sem payload extra, backend traduz para dbType 'pump4calibrate'
       await sendDeviceCommand(deviceId, 'pump4calibrate');
+      startPump4CalibProgress();
+      pump4CalibStatusEl.textContent = 'Calibração em andamento...';
+      isRunningCycle = true;
+      updateAbortVisibility();
+
 
       // Iniciar barra regressiva de 60s
       startPump4CalibProgress();
@@ -680,8 +685,25 @@ abortBtn.addEventListener('click', async () => {
     isRunningCycle = false;
     updateAbortVisibility();
     calibrationStatus.textContent = 'Ciclo abortado pelo usuário.';
+
+    // === abortar calibração da bomba 4, se estiver rodando ===
+    if (pump4CalibRunning) {
+      pump4CalibRunning = false;
+      if (pump4CalibTimerId) {
+        clearInterval(pump4CalibTimerId);
+        pump4CalibTimerId = null;
+      }
+      if (pump4CalibProgressFill && pump4CalibProgressLabel) {
+        pump4CalibProgressFill.style.width = '0%';
+        pump4CalibProgressLabel.textContent = 'Calibração abortada.';
+      }
+      pump4CalibStatusEl.textContent =
+        'Calibração abortada. Ajuste o setup e inicie novamente se necessário.';
+      pump4RunCalibBtn.disabled = false;
+    }
   }
 });
+
 
 
 document
