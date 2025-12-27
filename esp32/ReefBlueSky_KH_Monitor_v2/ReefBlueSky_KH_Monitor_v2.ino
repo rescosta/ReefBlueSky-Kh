@@ -29,6 +29,17 @@
 #include "WiFiSetup.h"
 #include "CloudAuth.h"
 
+// =================================================================================
+// Definições de Hardware (Mapeamento de GPIO)
+// =================================================================================
+
+#define LEVEL_A_PIN 16
+#define LEVEL_B_PIN 17
+#define LEVEL_C_PIN 5
+#define ONE_WIRE_BUS 4
+#define PH_PIN 36
+#define RESET_BUTTON_PIN 35  // reset KH/fábrica
+static const gpio_num_t WIFI_RESET_BTN_GPIO = GPIO_NUM_0; // botão BOOT do DevKit
 
 
 // teste forçando mediçao fake
@@ -38,7 +49,7 @@ extern CloudAuth cloudAuth;
 void debugForceSync() {
   Measurement m;
   m.timestamp    = getCurrentEpochMs();
-  m.kh           = 7.0;   // resultado da conta
+  m.kh           = 7.5;   // resultado da conta
   m.ph_reference = 8.2;   // puxar do sistema depois
   m.ph_sample    = 8.0;   // puxar da sonda de pH depois
   m.temperature  = 24.0;  // puxar do termômetro depois
@@ -54,27 +65,34 @@ void debugForceSync() {
   Serial.println("[DEBUG] Sync manual disparado.");
 }
 
+void debugForceSyncWithKH(float kh) {
+  Measurement m;
+  m.timestamp    = getCurrentEpochMs();
+  m.kh           = kh;
+  m.ph_reference = 8.2;
+  m.ph_sample    = 8.0;
+  m.temperature  = 24.0;
+  m.is_valid     = true;
+  m.confidence   = 0.9;
+
+  cloudAuth.queueMeasurement(m);
+  Serial.printf("[DEBUG] Medição fake (KH=%.2f) enfileirada. Fila: %d\n",
+                kh, cloudAuth.getQueueSize());
+  //cloudAuth.syncOfflineMeasurements();
+}
+
 // fim do teste
 
 
 
-// =================================================================================
-// Definições de Hardware (Mapeamento de GPIO)
-// =================================================================================
 
-#define LEVEL_A_PIN 16
-#define LEVEL_B_PIN 17
-#define LEVEL_C_PIN 5
-#define ONE_WIRE_BUS 4
-#define PH_PIN 36
-#define RESET_BUTTON_PIN 35  // [RESET] Botão físico para reset
 
 // =================================================================================
 // Configurações de Comunicação
 // =================================================================================
 
-const char* ssid = "CRB_Engenharia_2G";
-const char* password = "crbengenharia2022";
+const char* ssid = "COSTA_03";
+const char* password = "Gama2010*";
 const char* mqtt_server = "SEU_BROKER_MQTT_IP";
 
 // Tópicos MQTT
@@ -95,6 +113,7 @@ const float PUMP1MLPERSEC = 0.8f;
 const int   MAX_CORRECTION_SECONDS = 120;  // safety
 // Vazão da bomba 4 (correção de KH) em mL/s, calibrável
 float pump4MlPerSec = 0.8f;   // valor default até calibrar
+bool pump4AbortRequested = false; 
 
 //NTP
 const char* ntpServer = "pool.ntp.org";
@@ -103,8 +122,8 @@ const int   daylightOffset_sec = 0;     // sem horário de verão
 
 //
 
-const unsigned long CMD_INTERVAL_MS  = 3000;   // 3 s
-const unsigned long SYNC_INTERVAL_MS = 60000;  // 60 s
+const unsigned long CMD_INTERVAL_MS  = 1000;   // 1 s
+const unsigned long SYNC_INTERVAL_MS = 10000;  // 10 s
 
 static unsigned long lastCmdPoll  = 0;
 static unsigned long lastSyncTry  = 0;
@@ -162,12 +181,68 @@ SystemState systemState = STARTUP;
 unsigned long lastMeasurementTime = 0;
 unsigned long measurementInterval = 3600000;  // 1 hora em ms
 unsigned long lastResetButtonCheck = 0;
-const unsigned long HEALTH_INTERVAL_MS = 60UL * 1000UL; // 60 segundos
+const unsigned long HEALTH_INTERVAL_MS = 120UL * 1000UL; // 120 segundos
 unsigned long lastHealthSent = 0;
 
 bool resetButtonPressed = false;
 
-bool testModeEnabled = true;        // ou false por padrão
+bool testModeEnabled = true;    
+
+#include <nvs_flash.h>
+#include <nvs.h>
+
+void wifiResetButtonTask(void *arg) {
+  gpio_config_t io_conf = {};
+  io_conf.pin_bit_mask = 1ULL << WIFI_RESET_BTN_GPIO;
+  io_conf.mode = GPIO_MODE_INPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+  gpio_config(&io_conf);
+
+  const TickType_t checkInterval = pdMS_TO_TICKS(50);
+  const TickType_t holdTime      = pdMS_TO_TICKS(5000); // 5s
+
+  TickType_t pressedSince = 0;
+  bool wasPressed = false;
+
+  while (true) {
+    int level = gpio_get_level(WIFI_RESET_BTN_GPIO); // 0 = pressionado (pull-up)
+
+    if (level == 0) {
+      if (!wasPressed) {
+        wasPressed = true;
+        pressedSince = xTaskGetTickCount();
+        Serial.println("[WiFiReset] Botão BOOT pressionado...");
+      } else {
+        TickType_t now = xTaskGetTickCount();
+        if ((now - pressedSince) >= holdTime) {
+          Serial.println("[WiFiReset] BOOT segurado 5s. Limpando Wi‑Fi e reiniciando...");
+
+          nvs_handle_t nvs;
+          if (nvs_open("wifi", NVS_READWRITE, &nvs) == ESP_OK) {
+            nvs_erase_all(nvs);
+            nvs_commit(nvs);
+            nvs_close(nvs);
+            Serial.println("[WiFiReset] NVS 'wifi' apagado.");
+          } else {
+            Serial.println("[WiFiReset] Falha ao abrir NVS 'wifi'.");
+          }
+
+          vTaskDelay(pdMS_TO_TICKS(500));
+          esp_restart();
+        }
+      }
+    } else {
+      wasPressed = false;
+    }
+
+    vTaskDelay(checkInterval);
+  }
+}
+
+
+
 bool forceImmediateMeasurement = false;
 
 // Estado da conexão com a nuvem
@@ -316,8 +391,16 @@ void setup() {
     // por enquanto, simular pH
     sensorManager.setSimulatePH(true, 8.2f, 8.0f);
 
-
-}
+    // Task para reset de Wi‑Fi usando botão BOOT (GPIO0) por 5s
+    xTaskCreate(
+      wifiResetButtonTask,
+      "wifi_reset_btn",
+      4096,
+      nullptr,
+      5,
+      nullptr
+    );
+  }
 
 // =================================================================================
 // Loop Principal
@@ -447,7 +530,7 @@ if (Serial.available()) {
 
 // sensor PH FAKE
   static unsigned long lastDebug = 0;
-  if (now - lastDebug > 2000) {
+  if (now - lastDebug > 6000) {
     lastDebug = now;
     float ph   = sensorManager.getPH();
     float temp = sensorManager.getTemperature();
@@ -735,8 +818,8 @@ void performMeasurement() {
 
       if (deviceToken.length() > 0) {
         cloudAuth.queueMeasurement(mc);
-        //cloudAuth.syncOfflineMeasurements();
-        sendHealthToCloud(); 
+        cloudAuth.syncOfflineMeasurements();
+        //sendHealthToCloud(); 
       }
 
     } else {
@@ -920,7 +1003,7 @@ void processCloudCommand() {
   } else if (cmd.action == "testnow") {
     forceImmediateMeasurement = true;
 
-  } else if (cmd.action == "manualpump") {
+    } else if (cmd.action == "manualpump") {
     if (cmd.params.isNull()) {
       ok = false;
       errorMsg = "missing payload";
@@ -962,7 +1045,8 @@ void processCloudCommand() {
         else if (pumpId == 2) pumpControl.pumpB_stop();
         else if (pumpId == 3) pumpControl.pumpC_stop();
       }
-    }
+    }                                    // <-- fecha o else de manualpump
+
   } else if (cmd.action == "pump4calibrate") {
     // Espera payload opcional: { "seconds": 60 }
     int seconds = 60;
@@ -976,14 +1060,24 @@ void processCloudCommand() {
     } else {
       Serial.printf("[CMD] pump4calibrate: %d s\n", seconds);
 
-      // aqui assume que bomba 4 == pump A; se for outra, ajuste
+      pump4AbortRequested = false;          // zera flag antes de iniciar
       pumpControl.pumpA_fill();
       unsigned long endTime = millis() + (unsigned long)seconds * 1000UL;
+
       while (millis() < endTime) {
+        if (pump4AbortRequested) {          // checa abort
+          Serial.println("[CMD] pump4calibrate: abort recebido, parando bomba 4");
+          break;
+        }
         delay(10);
       }
       pumpControl.pumpA_stop();
     }
+
+  } else if (cmd.action == "pump4abort") {
+    Serial.println("[CMD] pump4abort: flag de abort acionada");
+    pump4AbortRequested = true;
+
 
   } else if (cmd.action == "setpump4mlpersec") {
     if (cmd.params.isNull()) {
@@ -1099,6 +1193,18 @@ void processCloudCommand() {
         }
       }
     }
+
+  } else if (cmd.action == "fake_measurement") {
+    float kh = 7.5f; // default
+    if (!cmd.params.isNull()) {
+      float v = cmd.params["kh"] | 0.0f;
+      if (v > 0.0f && v < 25.0f) {
+        kh = v;
+      }
+    }
+    Serial.printf("[CMD] fake_measurement - KH=%.2f\n", kh);
+    debugForceSyncWithKH(kh);
+
 
   } else if (cmd.action == "testmode") {
     if (cmd.params.isNull()) {

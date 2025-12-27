@@ -17,7 +17,7 @@ bool menuShown = false;
 
 // ============================================================================
 // Função auxiliar: gerar deviceId único a partir do MAC do ESP32
-// Formato: RBS-XXXXXXXXXXXX
+// Formato: RBS-KH-XXXXXXXXXXXX
 // ============================================================================
 String generateDeviceId() {
   uint64_t chipid = ESP.getEfuseMac();
@@ -25,7 +25,7 @@ String generateDeviceId() {
   uint32_t chipLow  = (uint32_t)chipid;
 
   char buffer[20];
-  sprintf(buffer, "RBS-%04X%08X", chipHigh, chipLow);
+  sprintf(buffer, "RBS-KH-%04X%08X", chipHigh, chipLow);
   return String(buffer);
 }
 
@@ -283,6 +283,7 @@ bool registerDevice() {
   doc["username"] = userEmail;
   doc["password"] = userPassword;
   doc["local_ip"] = WiFi.localIP().toString();
+  doc["type"]      = "KH";   
 
   String payload;
   serializeJson(doc, payload);

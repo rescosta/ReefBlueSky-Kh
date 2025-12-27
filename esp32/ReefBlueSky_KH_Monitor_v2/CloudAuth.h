@@ -74,7 +74,7 @@ private:
     unsigned long minIntervalMs = 1000;  // Mínimo 1 segundo entre requisições
     int requestCount = 0;
     unsigned long windowStart = 0;
-    static constexpr int MAX_REQUESTS_PER_MINUTE = 60;
+    static constexpr int MAX_REQUESTS_PER_MINUTE = 200;
     
 public:
     bool canMakeRequest() {
@@ -129,7 +129,8 @@ private:
         "abort",
         "pump4calibrate",
         "setpump4mlpersec",
-        "setkhtarget" 
+        "setkhtarget",
+        "fake_measurement"    
     };
     static constexpr int ALLOWED_COUNT = 
         sizeof(ALLOWED_COMMANDS) / sizeof(ALLOWED_COMMANDS[0]);

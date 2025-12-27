@@ -320,10 +320,10 @@ bool CloudAuth::syncOfflineMeasurements() {
         return true;
     }
 
-    if (!rateLimiter.canMakeRequest()) {
+    /*if (!rateLimiter.canMakeRequest()) {
         Serial.println("[CloudAuth::syncOfflineMeasurements] Rate limit atingido");
         return false;
-    }
+    }*/
 
     Serial.printf("[CloudAuth::syncOfflineMeasurements] Sincronizando %d medições...\n", offlineMeasurementQueue.size());
 
