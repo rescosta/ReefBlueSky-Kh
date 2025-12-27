@@ -446,18 +446,20 @@ window.DashboardCommon = {
 
   measures.slice(0, 30).forEach((m) => {
     const tr = document.createElement('tr');
+
+    const tempText = (typeof m.temperature === 'number')
+      ? m.temperature.toFixed(1)
+      : (m.temperature ?? '--');
+
     tr.innerHTML = `
       <td>${formatDateTime(m.timestamp)}</td>
       <td>${typeof m.kh === 'number' ? m.kh.toFixed(2) : (m.kh ?? '--')}</td>
       <td>${m.phref ?? '--'}</td>
       <td>${m.phsample ?? '--'}</td>
-      <td>${
-        typeof m.temperature === 'number'
-          ? m.temperature.toFixed(1)
-          : (m.temperature ?? '--')
-      }</td>
+      <td>${tempText}</td>
       <td>${m.status ?? '--'}</td>
     `;
+
 
     measurementsBody.appendChild(tr);
   });
