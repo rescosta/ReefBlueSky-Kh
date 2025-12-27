@@ -451,11 +451,14 @@ window.DashboardCommon = {
       <td>${typeof m.kh === 'number' ? m.kh.toFixed(2) : (m.kh ?? '--')}</td>
       <td>${m.phref ?? '--'}</td>
       <td>${m.phsample ?? '--'}</td>
-      <td>typeof m.temperature === 'number'
-            ? m.temperature.toFixed(1)
-            : (m.temperature ?? '--')
+      <td>${
+        typeof m.temperature === 'number'
+          ? m.temperature.toFixed(1)
+          : (m.temperature ?? '--')
+      }</td>
       <td>${m.status ?? '--'}</td>
     `;
+
     measurementsBody.appendChild(tr);
   });
 
