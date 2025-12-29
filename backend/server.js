@@ -27,6 +27,8 @@ const displayRoutes = require('./display-endpoints');
 const axios = require('axios');
 
 
+dotenv.config();
+
 const pool = mariadb.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
   user: process.env.DB_USER || 'reefapp',
@@ -38,23 +40,23 @@ const pool = mariadb.createPool({
   idleTimeout: 60000
 });
 
+// === TELEGRAM ===
 
 // Carregar variáveis de ambiente
-dotenv.config();
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-async function sendTelegram(text) {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.warn('Telegram não configurado (TOKEN/CHAT_ID ausentes).');
+// função base: manda para um chat_id qualquer
+async function sendTelegramToChat(chatId, text) {
+  if (!TELEGRAM_TOKEN || !chatId) {
+    console.warn('Telegram não configurado ou chatId ausente.');
     return;
   }
 
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
     const res = await axios.post(url, {
-      chat_id: TELEGRAM_CHAT_ID,
+      chat_id: chatId,
       text,
       parse_mode: 'Markdown'
     });
@@ -65,6 +67,42 @@ async function sendTelegram(text) {
     console.error('Falha ao enviar Telegram:', err.message);
   }
 }
+
+// compat: se quiser manter um chat global temporariamente
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+async function sendTelegram(text) {
+  return sendTelegramToChat(TELEGRAM_CHAT_ID, text);
+}
+
+// NOVO: enviar para um usuário específico (usado depois nos alerts)
+async function sendTelegramForUser(userId, text) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      'SELECT telegram_chat_id, telegram_enabled FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if (!rows.length) {
+      console.warn('sendTelegramForUser: user não encontrado', userId);
+      return;
+    }
+
+    const u = rows[0];
+    if (!u.telegram_enabled || !u.telegram_chat_id) {
+      console.log('sendTelegramForUser: Telegram desabilitado ou chat_id vazio para user', userId);
+      return;
+    }
+
+    await sendTelegramToChat(u.telegram_chat_id, text);
+  } catch (err) {
+    console.error('sendTelegramForUser error:', err.message);
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+}
+
+// === EMAIL ===
 
 const mailTransporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -1282,6 +1320,30 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const rows = await pool.query(
+      'SELECT telegram_chat_id, telegram_enabled FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const u = rows[0];
+    return res.json({
+      success: true,
+      data: {
+        telegramChatId: u.telegram_chat_id || null,
+        telegramEnabled: !!u.telegram_enabled,
+      },
+    });
+  } catch (err) {
+    console.error('GET /user/telegram-config error', err.message);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 
 
 // ===== ENDPOINTS WEB: DISPOSITIVOS DO USUÁRIO =====
@@ -2033,6 +2095,42 @@ app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, asyn
     return res.status(500).json({ success: false, message: 'Erro ao enviar comando de bomba' });
   }
 });
+
+
+app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { telegramChatId, telegramEnabled } = req.body || {};
+
+  let chatId = telegramChatId == null || telegramChatId === ''
+    ? null
+    : Number(telegramChatId);
+
+  if (chatId !== null && !Number.isFinite(chatId)) {
+    return res.status(400).json({ success: false, message: 'telegramChatId inválido' });
+  }
+
+  const enabled = !!telegramEnabled;
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+          SET telegram_chat_id = ?,
+              telegram_enabled = ?
+        WHERE id = ?`,
+      [chatId, enabled ? 1 : 0, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    return res.json({ success: true, message: 'Config Telegram atualizada.' });
+  } catch (err) {
+    console.error('PUT /user/telegram-config error', err.message);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 
 // PUT /pump4-calib: salva mL/s da bomba 4 no backend
 app.put(
