@@ -78,14 +78,14 @@ async function sendTelegramForUser(userId, text) {
   let conn;
   try {
     conn = await pool.getConnection();
-    const [rows] = await conn.query(
+    const rows = await conn.query(
       `SELECT telegram_bot_token, telegram_chat_id, telegram_enabled
          FROM users
         WHERE id = ?
         LIMIT 1`,
       [userId]
     );
-    if (!rows.length) {
+    if (!rows || rows.length === 0) {
       console.warn('sendTelegramForUser: user não encontrado', userId);
       return;
     }
