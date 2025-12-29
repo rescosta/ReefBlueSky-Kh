@@ -107,11 +107,7 @@ async function sendTelegramForUser(userId, text) {
     }); // formato aceito pela API Bot. [web:260][web:456]
   } catch (err) {
     if (err.response) {
-      console.error(
-        'sendTelegramForUser HTTP error:',
-        err.response.status,
-        err.response.data
-      );
+      console.error('sendTelegramForUser HTTP error:', err.response.status, err.response.data);
     } else {
       console.error('sendTelegramForUser error:', err.message);
     }
@@ -1343,7 +1339,7 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
   const userId = req.user.userId;
   try {
     const rows = await pool.query(
-      'SELECT telegram_chat_id, telegram_enabled FROM users WHERE id = ? LIMIT 1',
+      'SELECT telegram_chat_id, telegram_enabled, telegram_bot_token FROM users WHERE id = ? LIMIT 1',
       [userId]
     );
     if (!rows.length) {
@@ -1353,6 +1349,7 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
     return res.json({
       success: true,
       data: {
+        telegramBotToken: u.telegram_bot_token || null,
         telegramChatId: u.telegram_chat_id || null,
         telegramEnabled: !!u.telegram_enabled,
       },
@@ -1364,16 +1361,17 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
 });
 
 
-app.post('/api/user/telegram/test', authRequired, async (req, res) => {
-  const userId = req.user.id;
+app.post('/api/user/telegram/test', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;  // segue o padrão das outras rotas
+
   const text = req.body.text || 'Teste de Telegram do ReefBlueSky KH Monitor.';
 
   try {
     await sendTelegramForUser(userId, text);
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
-    console.error('Telegram test error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Telegram test error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -2132,37 +2130,29 @@ app.post('/api/v1/user/devices/:deviceId/command/pump', authUserMiddleware, asyn
 
 app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
   const userId = req.user.userId;
-  const { telegramChatId, telegramEnabled } = req.body || {};
-
-  let chatId = telegramChatId == null || telegramChatId === ''
-    ? null
-    : Number(telegramChatId);
-
-  if (chatId !== null && !Number.isFinite(chatId)) {
-    return res.status(400).json({ success: false, message: 'telegramChatId inválido' });
-  }
-
-  const enabled = !!telegramEnabled;
+  const { telegramBotToken, telegramChatId, telegramEnabled } = req.body;
 
   try {
-    const result = await pool.query(
+    await pool.query(
       `UPDATE users
-          SET telegram_chat_id = ?,
-              telegram_enabled = ?
+          SET telegram_bot_token = ?,
+              telegram_chat_id   = ?,
+              telegram_enabled   = ?
         WHERE id = ?`,
-      [chatId, enabled ? 1 : 0, userId]
+      [
+        telegramBotToken || null,
+        telegramChatId ? Number(telegramChatId) : null,
+        telegramEnabled ? 1 : 0,
+        userId,
+      ]
     );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    return res.json({ success: true, message: 'Config Telegram atualizada.' });
+    return res.json({ success: true });
   } catch (err) {
     console.error('PUT /user/telegram-config error', err.message);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 
 // PUT /pump4-calib: salva mL/s da bomba 4 no backend
