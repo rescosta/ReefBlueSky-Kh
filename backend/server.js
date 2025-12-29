@@ -40,6 +40,11 @@ const pool = mariadb.createPool({
   idleTimeout: 60000
 });
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
+
 // === TELEGRAM ===
 
 // Carregar variáveis de ambiente
@@ -106,23 +111,27 @@ async function sendTelegramForUser(userId, text) {
       text,
       parse_mode: 'Markdown',
     });
-  } catch (err) {
-    if (err.response) {
-      console.error(
-        'sendTelegramForUser HTTP error:',
-        err.response.status,
-        typeof err.response.data === 'object'
-          ? JSON.stringify(err.response.data, (_, v) =>
-              typeof v === 'bigint' ? v.toString() : v
-            )
-          : err.response.data
-      );
-    } else {
-      console.error('sendTelegramForUser error:', err.message);
+    } catch (err) {
+      if (err.response) {
+        let body = err.response.data;
+        if (typeof body === 'object') {
+          body = JSON.stringify(body, (_, v) =>
+            typeof v === 'bigint' ? v.toString() : v
+          );
+        }
+        console.error(
+          'sendTelegramForUser HTTP error:',
+          err.response.status,
+          body
+        );
+      } else {
+        // aqui não passa pelo JSON.stringify, só string pura
+        console.error('sendTelegramForUser error:', err.message);
+      }
+    } finally {
+      if (conn) try { conn.release(); } catch (e) {}
     }
-  } finally {
-    if (conn) try { conn.release(); } catch (e) {}
-  }
+
 }
 
 // === EMAIL ===
