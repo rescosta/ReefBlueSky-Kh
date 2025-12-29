@@ -10,6 +10,11 @@ const headersAuthCfg = {
   Authorization: `Bearer ${cfgToken}`,
 };
 
+const telegramChatIdInput   = document.getElementById('telegramChatIdInput');
+const telegramEnabledInput  = document.getElementById('telegramEnabledInput');
+const saveTelegramConfigBtn = document.getElementById('saveTelegramConfigBtn');
+const telegramConfigStatus  = document.getElementById('telegramConfigStatus');
+
 
 const khRefInput = document.getElementById('khRefInput');
 const khRefStatus = document.getElementById('khRefStatus');
@@ -235,6 +240,46 @@ async function apiFakeMeasurement(deviceId, khValue) {
     return false;
   }
 }
+
+async function apiLoadTelegramConfig() {
+  try {
+    const res = await fetch('/api/v1/user/telegram-config', {
+      headers: headersAuthCfg,
+    });
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      console.error('Erro ao carregar config Telegram', json.message || json.error);
+      return null;
+    }
+    return json.data || null;
+  } catch (err) {
+    console.error('apiLoadTelegramConfig error', err);
+    return null;
+  }
+}
+
+async function apiSaveTelegramConfig(chatId, enabled) {
+  try {
+    const res = await fetch('/api/v1/user/telegram-config', {
+      method: 'PUT',
+      headers: headersAuthCfg,
+      body: JSON.stringify({
+        telegramChatId: chatId,
+        telegramEnabled: enabled,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.success === false) {
+      console.error(json.message || 'Erro ao salvar config Telegram');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('apiSaveTelegramConfig error', err);
+    return false;
+  }
+}
+
 
 
 const btnFakeMeasurement = document.getElementById('btnFakeMeasurement');
@@ -592,6 +637,8 @@ if (saveKhHealthBtn) {
 }
 
 
+
+
 // Controle manual das bombas 1–3 com barra regressiva
 const pumpStartButtons = document.querySelectorAll('.pumpStartBtn');
 const activeTimers = {};
@@ -635,8 +682,38 @@ pumpStartButtons.forEach((btn) => {
 });
 
 
+if (saveTelegramConfigBtn) {
+  saveTelegramConfigBtn.addEventListener('click', async () => {
+    const chatIdStr = (telegramChatIdInput.value || '').trim();
+    const enabled = telegramEnabledInput.checked;
+
+    if (chatIdStr && !/^-?\d+$/.test(chatIdStr)) {
+      alert('Chat ID deve ser um número (pode ser negativo para grupos).');
+      return;
+    }
+
+    telegramConfigStatus.textContent = 'Salvando config Telegram...';
+
+    const ok = await apiSaveTelegramConfig(chatIdStr, enabled);
+    telegramConfigStatus.textContent = ok
+      ? 'Config Telegram salva.'
+      : 'Erro ao salvar config Telegram.';
+  });
+}
+
+
 async function initDashboardConfig() {
   DashboardCommon.initTopbar();
+
+  const teleCfg = await apiLoadTelegramConfig();
+  if (teleCfg) {
+    if (telegramChatIdInput) {
+      telegramChatIdInput.value = teleCfg.telegramChatId || '';
+    }
+    if (telegramEnabledInput) {
+      telegramEnabledInput.checked = !!teleCfg.telegramEnabled;
+    }
+  }
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
@@ -659,7 +736,6 @@ window.addEventListener('deviceChanged', async () => {
   await DashboardCommon.loadDevicesCommon();
   DashboardCommon.renderTopbarDevices();
 });
-
 
 
 async function apiStartCalibration(deviceId) {
