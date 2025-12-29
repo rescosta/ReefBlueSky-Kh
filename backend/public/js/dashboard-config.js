@@ -10,10 +10,6 @@ const headersAuthCfg = {
   Authorization: `Bearer ${cfgToken}`,
 };
 
-const telegramChatIdInput   = document.getElementById('telegramChatIdInput');
-const telegramEnabledInput  = document.getElementById('telegramEnabledInput');
-const saveTelegramConfigBtn = document.getElementById('saveTelegramConfigBtn');
-const telegramConfigStatus  = document.getElementById('telegramConfigStatus');
 
 
 const khRefInput = document.getElementById('khRefInput');
@@ -74,6 +70,41 @@ const deviceNameStatus  = document.getElementById('deviceNameStatus');
 
 const khHealthGreenMaxDevInput = document.getElementById('khHealthGreenMaxDev');
 const khHealthYellowMaxDevInput = document.getElementById('khHealthYellowMaxDev');
+
+const telegramChatIdInput   = document.getElementById('telegramChatIdInput');
+const telegramEnabledInput  = document.getElementById('telegramEnabledInput');
+const saveTelegramConfigBtn = document.getElementById('saveTelegramConfigBtn');
+const telegramConfigStatus  = document.getElementById('telegramConfigStatus');
+const telegramBotTokenInput = document.getElementById('telegramBotTokenInput');
+const testTelegramBtn       = document.getElementById('testTelegramBtn');
+
+
+
+function fillTelegramConfigFromApi(user) {
+  telegramBotTokenInput.value  = user.telegramBotToken || '';
+  telegramChatIdInput.value    = user.telegramChatId || '';
+  telegramEnabledInput.checked = !!user.telegramEnabled;
+}
+
+
+if (testTelegramBtn) {
+  testTelegramBtn.addEventListener('click', async () => {
+    telegramConfigStatus.textContent = 'Enviando teste...';
+
+    const res = await fetch('/api/user/telegram/test', {
+      method: 'POST',
+      headers: headersAuthCfg,
+      body: JSON.stringify({
+        text: 'Mensagem de teste do ReefBlueSky KH Monitor.',
+      }),
+    });
+
+    telegramConfigStatus.textContent = res.ok
+      ? 'Mensagem de teste enviada.'
+      : 'Erro ao enviar teste.';
+  });
+}
+
 
 
 async function sendDeviceCommand(deviceId, type, value = null) {
@@ -251,19 +282,20 @@ async function apiLoadTelegramConfig() {
       console.error('Erro ao carregar config Telegram', json.message || json.error);
       return null;
     }
-    return json.data || null;
+    return json.data || null; // precisa conter telegramBotToken, telegramChatId, telegramEnabled
   } catch (err) {
     console.error('apiLoadTelegramConfig error', err);
     return null;
   }
 }
 
-async function apiSaveTelegramConfig(chatId, enabled) {
+async function apiSaveTelegramConfig(botToken, chatId, enabled) {
   try {
     const res = await fetch('/api/v1/user/telegram-config', {
       method: 'PUT',
       headers: headersAuthCfg,
       body: JSON.stringify({
+        telegramBotToken: botToken,
         telegramChatId: chatId,
         telegramEnabled: enabled,
       }),
@@ -279,6 +311,7 @@ async function apiSaveTelegramConfig(chatId, enabled) {
     return false;
   }
 }
+
 
 
 
@@ -684,6 +717,7 @@ pumpStartButtons.forEach((btn) => {
 
 if (saveTelegramConfigBtn) {
   saveTelegramConfigBtn.addEventListener('click', async () => {
+    const botToken = (telegramBotTokenInput.value || '').trim();
     const chatIdStr = (telegramChatIdInput.value || '').trim();
     const enabled = telegramEnabledInput.checked;
 
@@ -694,7 +728,7 @@ if (saveTelegramConfigBtn) {
 
     telegramConfigStatus.textContent = 'Salvando config Telegram...';
 
-    const ok = await apiSaveTelegramConfig(chatIdStr, enabled);
+    const ok = await apiSaveTelegramConfig(botToken, chatIdStr, enabled);
     telegramConfigStatus.textContent = ok
       ? 'Config Telegram salva.'
       : 'Erro ao salvar config Telegram.';
@@ -702,11 +736,15 @@ if (saveTelegramConfigBtn) {
 }
 
 
+
 async function initDashboardConfig() {
   DashboardCommon.initTopbar();
 
   const teleCfg = await apiLoadTelegramConfig();
   if (teleCfg) {
+    if (telegramBotTokenInput) {
+      telegramBotTokenInput.value = teleCfg.telegramBotToken || '';
+    }
     if (telegramChatIdInput) {
       telegramChatIdInput.value = teleCfg.telegramChatId || '';
     }
@@ -714,6 +752,7 @@ async function initDashboardConfig() {
       telegramEnabledInput.checked = !!teleCfg.telegramEnabled;
     }
   }
+
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
