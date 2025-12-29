@@ -1339,19 +1339,27 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
   const userId = req.user.userId;
   try {
     const rows = await pool.query(
-      'SELECT telegram_chat_id, telegram_enabled, telegram_bot_token FROM users WHERE id = ? LIMIT 1',
+      'SELECT telegram_bot_token, telegram_chat_id, telegram_enabled FROM users WHERE id = ? LIMIT 1',
       [userId]
     );
+
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
     const u = rows[0];
+
+    // garante tipos serializáveis
+    const telegramChatId =
+      u.telegram_chat_id != null ? Number(u.telegram_chat_id) : null;
+    const telegramEnabled = !!u.telegram_enabled;
+
     return res.json({
       success: true,
       data: {
         telegramBotToken: u.telegram_bot_token || null,
-        telegramChatId: u.telegram_chat_id || null,
-        telegramEnabled: !!u.telegram_enabled,
+        telegramChatId,
+        telegramEnabled,
       },
     });
   } catch (err) {
@@ -1359,6 +1367,7 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 
 app.post('/api/user/telegram/test', authUserMiddleware, async (req, res) => {
