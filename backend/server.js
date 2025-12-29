@@ -74,13 +74,15 @@ async function sendTelegram(text) {
   return sendTelegramToChat(TELEGRAM_CHAT_ID, text);
 }
 
-// NOVO: enviar para um usuário específico (usado depois nos alerts)
 async function sendTelegramForUser(userId, text) {
   let conn;
   try {
     conn = await pool.getConnection();
-    const rows = await conn.query(
-      'SELECT telegram_chat_id, telegram_enabled FROM users WHERE id = ? LIMIT 1',
+    const [rows] = await conn.query(
+      `SELECT telegram_bot_token, telegram_chat_id, telegram_enabled
+         FROM users
+        WHERE id = ?
+        LIMIT 1`,
       [userId]
     );
     if (!rows.length) {
@@ -89,18 +91,35 @@ async function sendTelegramForUser(userId, text) {
     }
 
     const u = rows[0];
-    if (!u.telegram_enabled || !u.telegram_chat_id) {
-      console.log('sendTelegramForUser: Telegram desabilitado ou chat_id vazio para user', userId);
+    if (!u.telegram_enabled || !u.telegram_bot_token || !u.telegram_chat_id) {
+      console.log(
+        'sendTelegramForUser: Telegram desabilitado ou config incompleta para user',
+        userId
+      );
       return;
     }
 
-    await sendTelegramToChat(u.telegram_chat_id, text);
+    const url = `https://api.telegram.org/bot${u.telegram_bot_token}/sendMessage`;
+    await axios.post(url, {
+      chat_id: u.telegram_chat_id,
+      text,
+      parse_mode: 'Markdown',
+    }); // formato aceito pela API Bot. [web:260][web:456]
   } catch (err) {
-    console.error('sendTelegramForUser error:', err.message);
+    if (err.response) {
+      console.error(
+        'sendTelegramForUser HTTP error:',
+        err.response.status,
+        err.response.data
+      );
+    } else {
+      console.error('sendTelegramForUser error:', err.message);
+    }
   } finally {
     if (conn) try { conn.release(); } catch (e) {}
   }
 }
+
 
 // === EMAIL ===
 
@@ -1341,6 +1360,20 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
   } catch (err) {
     console.error('GET /user/telegram-config error', err.message);
     return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+
+app.post('/api/user/telegram/test', authRequired, async (req, res) => {
+  const userId = req.user.id;
+  const text = req.body.text || 'Teste de Telegram do ReefBlueSky KH Monitor.';
+
+  try {
+    await sendTelegramForUser(userId, text);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Telegram test error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
