@@ -6,7 +6,6 @@
  * - Autenticação JWT com refresh tokens
  * - Endpoints protegidos para sincronização de dados
  * - Armazenamento de medições em banco de dados
- * - Integração com MQTT para fallback
  * - Métricas de saúde do sistema
  * - Compatibilidade com Cloudflare Tunnel
  */
@@ -16,7 +15,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const dotenv = require('dotenv');
-//const mqtt = require('mqtt');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
@@ -44,6 +42,30 @@ const pool = mariadb.createPool({
 // Carregar variáveis de ambiente
 dotenv.config();
 
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+async function sendTelegram(text) {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn('Telegram não configurado (TOKEN/CHAT_ID ausentes).');
+    return;
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+    const res = await axios.post(url, {
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: 'Markdown'
+    });
+    if (res.status !== 200) {
+      console.error('Erro Telegram:', res.status, res.data);
+    }
+  } catch (err) {
+    console.error('Falha ao enviar Telegram:', err.message);
+  }
+}
+
 const mailTransporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: Number(process.env.EMAIL_PORT),
@@ -53,6 +75,7 @@ const mailTransporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 });
+
 
 // (opcional) testar conexão SMTP ao subir o servidor
 mailTransporter.verify((error, success) => {
@@ -147,6 +170,7 @@ async function checkDevicesOnlineStatus() {
       `SELECT d.id,
               d.deviceId,
               d.userId,
+              d.name,
               d.last_seen,
               d.offline_alert_sent,
               u.email
@@ -197,6 +221,13 @@ async function checkDevicesOnlineStatus() {
               text,
             });
             console.log('[ALERT] E-mail de offline enviado para', row.email, 'device', row.deviceId);
+
+            // Telegram OFFLINE
+            await sendTelegram(
+              ` *${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+              `Último sinal em: ${lastSeenBr} (Brasília).`
+            );
+
           }
         } catch (err) {
           console.error('[ALERT] Erro ao enviar alerta offline para device', row.deviceId, err.message);
@@ -247,6 +278,13 @@ async function checkDevicesOnlineStatus() {
               'device',
               row.deviceId
             );
+
+            // Telegram ONLINE
+            await sendTelegram(
+              `✅ *${deviceLabel}* voltou *ONLINE*.\n` +
+              `Último sinal em: ${nowBr} (Brasília).`
+            );
+
           }
         } catch (err) {
           console.error(
@@ -424,8 +462,6 @@ function buildTokenPayload(userRow) {
     role: userRow.role || 'user',
   };
 }
-
-const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
 
 // ===== SERVIR ARQUIVOS ESTÁTICOS ===== ← ADICIONAR AQUI
 app.use(express.static('public'));
@@ -675,81 +711,6 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, 
   });
 });
 
-
-
-
-// ============================================================================
-// [MQTT] Integração com MQTT Broker
-// ============================================================================
-
-//let mqttClient = null;
-
-//function initMQTT() {
-//   console.log('[MQTT] Conectando ao broker:', MQTT_BROKER);
-//  
-//    mqttClient = mqtt.connect(MQTT_BROKER, {
-//        clientId: 'reefbluesky-server',
-//        username: process.env.MQTT_USERNAME,
-//        password: process.env.MQTT_PASSWORD,
-//        reconnectPeriod: 5000,
-//        connectTimeout: 10000
-//    });
-//    
-//    mqttClient.on('connect', () => {
-//        console.log('[MQTT] Conectado ao broker');
-//        
-//        // Subscrever a tópicos de interesse
-//        mqttClient.subscribe('reefbluesky/+/measurement', (err) => {
-//            if (!err) {
-//                console.log('[MQTT] Inscrito em reefbluesky/+/measurement');
-//            }
-//        });
-//        
-//       mqttClient.subscribe('reefbluesky/+/health', (err) => {
-//            if (!err) {
-//                console.log('[MQTT] Inscrito em reefbluesky/+/health');
-//            }
-//        });
-//    });
-    
-//    mqttClient.on('message', (topic, message) => {
-//        console.log(`[MQTT] Mensagem recebida em ${topic}:`, message.toString());
-        
-//        try {
-//            const data = JSON.parse(message.toString());
-            
-//            // Processar medição
-//            if (topic.includes('measurement')) {
-//                handleMQTTMeasurement(data);
-//            }
-//            
-//            // Processar health metrics
-//            if (topic.includes('health')) {
-//                handleMQTTHealth(data);
-//            }
-//        } catch (error) {
-//            console.error('[MQTT] Erro ao processar mensagem:', error.message);
-//        }
-//   });
-//    
-//    mqttClient.on('error', (error) => {
-//        console.error('[MQTT] Erro:', error.message);
-//    });
-    
-//    mqttClient.on('disconnect', () => {
-//        console.log('[MQTT] Desconectado do broker');
-//    });
-//}
-
-function handleMQTTMeasurement(data) {
-    console.log('[MQTT] Medição recebida:', data);
-    // TODO: Salvar em banco de dados
-}
-
-function handleMQTTHealth(data) {
-    console.log('[MQTT] Health metrics recebidos:', data);
-    // TODO: Salvar em banco de dados
-}
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
@@ -1716,6 +1677,85 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     }
 
     console.log(`[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`);
+
+   // 🔔 TELEGRAM: pegar última medição KH deste sync
+    try {
+      // pega a última medição do array (a mais recente do lado do ESP)
+      const last = measurements[measurements.length - 1];
+      const deviceId = req.user.deviceId;
+
+      // buscar nome do device
+      const devRows = await conn.query(
+        'SELECT name, kh_target FROM devices WHERE deviceId = ? LIMIT 1',
+        [deviceId]
+      );
+      const devName = devRows[0]?.name || `Device ${deviceId}`;
+      const khTarget = devRows[0]?.kh_target != null ? Number(devRows[0].kh_target) : null;
+
+      // envia valor de KH medido
+      if (typeof last.kh === 'number') {
+          
+          const khVal = last.kh.toFixed(2);
+          const targetPart = khTarget != null ? ` (alvo ${khTarget.toFixed(2)} dKH)` : '';
+
+          await sendTelegram(
+            `📏 KH medido em *${devName}*:\n` +
+            `Valor atual: *${khVal} dKH*${targetPart}`
+          );
+      }
+
+      // --- TENDÊNCIA: últimas 4 medições no banco para este device ---
+      const trendRows = await conn.query(
+        `SELECT kh, timestamp
+           FROM measurements
+          WHERE deviceId = ?
+            AND kh IS NOT NULL
+          ORDER BY timestamp DESC
+          LIMIT 4`,
+        [deviceId]
+      );
+
+      if (trendRows.length >= 2) {
+        const measures = trendRows.slice().reverse(); // mais antigo → mais novo
+        const first = measures[0];
+        const lastDb = measures[measures.length - 1];
+
+        const delta = lastDb.kh - first.kh; // + subiu, - caiu
+
+        const fmt = (v) => Number(v).toFixed(2);
+        const t1 = new Date(first.timestamp).toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo'
+        });
+        const t2 = new Date(lastDb.timestamp).toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo'
+        });
+
+        const targetLine = khTarget != null
+          ? `Alvo: *${khTarget.toFixed(2)} dKH*.\n`
+          : '';
+
+        if (delta <= -THRESH) {
+          await sendTelegram(
+            `🚨 *ALERTA KH CAINDO RÁPIDO* em *${devName}*!\n` +
+            `De *${fmt(first.kh)}* para *${fmt(lastDb.kh)}* dKH ` +
+            `(${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
+            targetLine +
+            `Tendência de queda acentuada, verifique consumo e dosagem.`
+          );
+        } else if (delta >= THRESH) {
+          await sendTelegram(
+            `🚨 *ALERTA KH SUBINDO RÁPIDO* em *${devName}*!\n` +
+            `De *${fmt(first.kh)}* para *${fmt(lastDb.kh)}* dKH ` +
+            `(+${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
+            targetLine +
+            `Tendência de subida acentuada, verifique dosagem e bombas.`
+          );
+        }
+
+      }
+    } catch (teleErr) {
+      console.error('Erro ao enviar alerta Telegram KH:', teleErr.message);
+    }
 
     return res.json({
       success: true,
@@ -2965,11 +3005,6 @@ app.get('/api/v1/status', (req, res) => {
             status: 'online',
             version: '2.0-rev06',
             timestamp: new Date().toISOString(),
-            mqtt: {
-              enabled: false,
-              connected: false,
-              broker: MQTT_BROKER
-            },
             uptime: process.uptime()
         }
     });
@@ -3035,9 +3070,8 @@ app.use((err, req, res, next) => {
 // ============================================================================
 
 function startServer() {
-    // Inicializar MQTT
-    //initMQTT();
     
+   
     // Iniciar servidor HTTP
     app.listen(PORT, () => {
         console.log(`
@@ -3064,7 +3098,6 @@ function startServer() {
   GET    /api/v1/status
   GET    /api/v1/health
 
-[MQTT] Broker: ${MQTT_BROKER}
 [SECURITY] Rate Limiting: Ativo (10 req/min global)
 [SECURITY] CORS: Configurado
 [SECURITY] Compression: Ativo
@@ -3079,6 +3112,5 @@ startServer();
 // Graceful shutdown
 process.on('SIGINT', () => {
     console.log('\n[SERVER] Encerrando servidor...');
-    // MQTT desativado temporariamente
     process.exit(0);
 });
