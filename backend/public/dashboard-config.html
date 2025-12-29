@@ -589,6 +589,44 @@
           </div>
         </div>
 
+        <!-- Card: Alertas por Telegram -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Alertas por Telegram</div>
+          </div>
+          <div class="card-subtitle">
+            Configure seu Chat ID para receber notificações de KH e status do dispositivo.
+          </div>
+
+          <div class="field-row">
+            <label for="telegramChatIdInput">Chat ID do Telegram</label>
+            <input
+              id="telegramChatIdInput"
+              type="text"
+              placeholder="ex: 123456789"
+            />
+            <div class="hint">
+              Envie uma mensagem para o seu bot e use a API <code>getUpdates</code> para descobrir o Chat ID.
+            </div>
+          </div>
+
+          <div class="field-row inline">
+            <label style="display:flex; align-items:center; gap:6px;">
+              <input id="telegramEnabledInput" type="checkbox" />
+              Ativar alertas via Telegram
+            </label>
+          </div>
+
+          <div class="field-row inline">
+            <button id="saveTelegramConfigBtn" class="btn-primary">
+              Salvar Telegram
+            </button>
+            <span id="telegramConfigStatus" class="hint"></span>
+          </div>
+        </div>
+
+        
+
       </div>
     </div>
   </div>
