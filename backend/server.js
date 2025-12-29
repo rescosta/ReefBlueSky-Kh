@@ -85,6 +85,7 @@ async function sendTelegramForUser(userId, text) {
         LIMIT 1`,
       [userId]
     );
+
     if (!rows || rows.length === 0) {
       console.warn('sendTelegramForUser: user não encontrado', userId);
       return;
@@ -104,10 +105,18 @@ async function sendTelegramForUser(userId, text) {
       chat_id: u.telegram_chat_id,
       text,
       parse_mode: 'Markdown',
-    }); // formato aceito pela API Bot. [web:260][web:456]
+    });
   } catch (err) {
     if (err.response) {
-      console.error('sendTelegramForUser HTTP error:', err.response.status, err.response.data);
+      console.error(
+        'sendTelegramForUser HTTP error:',
+        err.response.status,
+        typeof err.response.data === 'object'
+          ? JSON.stringify(err.response.data, (_, v) =>
+              typeof v === 'bigint' ? v.toString() : v
+            )
+          : err.response.data
+      );
     } else {
       console.error('sendTelegramForUser error:', err.message);
     }
@@ -115,7 +124,6 @@ async function sendTelegramForUser(userId, text) {
     if (conn) try { conn.release(); } catch (e) {}
   }
 }
-
 
 // === EMAIL ===
 
@@ -275,8 +283,11 @@ async function checkDevicesOnlineStatus() {
             });
             console.log('[ALERT] E-mail de offline enviado para', row.email, 'device', row.deviceId);
 
+            const deviceLabel = row.name || row.deviceId;
+
             // Telegram OFFLINE
-            await sendTelegram(
+            await sendTelegramForUser(
+              row.userId,
               ` *${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
               `Último sinal em: ${lastSeenBr} (Brasília).`
             );
@@ -290,7 +301,7 @@ async function checkDevicesOnlineStatus() {
 
       // Voltou a ficar online → tenta limpar flag e só manda e-mail se de fato mudou
       if (!isOffline && row.offline_alert_sent) {
-        
+
         console.log('[ALERT DEBUG] Device %s: isOffline=%s, offline_alert_sent=%s → tentando enviar ONLINE',
               row.deviceId, isOffline, row.offline_alert_sent);
 
@@ -332,12 +343,14 @@ async function checkDevicesOnlineStatus() {
               row.deviceId
             );
 
-            // Telegram ONLINE
-            await sendTelegram(
+            // define o label aqui
+            const deviceLabel = row.name || row.deviceId;
+
+            await sendTelegramForUser(
+              row.userId,
               `✅ *${deviceLabel}* voltou *ONLINE*.\n` +
               `Último sinal em: ${nowBr} (Brasília).`
             );
-
           }
         } catch (err) {
           console.error(
@@ -347,7 +360,6 @@ async function checkDevicesOnlineStatus() {
           );
         }
       }
-
     }
 
     // --- NOVO BLOCO: alerta de LCD offline ---
@@ -490,9 +502,6 @@ async function checkLcdStatus() {
     if (conn) conn.release();
   }
 }
-
-
-
 
 setInterval(async () => {
   await checkLcdStatus();
