@@ -19,13 +19,10 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 
-
-
 const mariadb = require('mariadb');
 const nodemailer = require('nodemailer');
 const displayRoutes = require('./display-endpoints');
 const axios = require('axios');
-
 
 dotenv.config();
 
@@ -442,13 +439,22 @@ async function checkDevicesOnlineStatus() {
               text,
             });
             console.log('[ALERT] E-mail de LCD offline enviado para', row.email, 'device', row.deviceId);
+
+            // label amigável
+            const deviceLabel = row.deviceId;
+            await sendTelegramForUser(
+              row.userId,
+              `⚠️ LCD do device *${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+              `Último ping do LCD em: ${lastSeenBr} (Brasília).`
+            );
           }
         } catch (err) {
           console.error('[ALERT] Erro ao enviar alerta de LCD offline para', row.deviceId, err.message);
         }
       }
 
-      // LCD voltou a ficar online → limpa flag
+
+      // LCD voltou a ficar online → limpa flag E avisa ONLINE
       if (!isLcdOffline && row.lcd_offline_alert_sent) {
         try {
           const result = await conn.query(
@@ -457,6 +463,36 @@ async function checkDevicesOnlineStatus() {
           );
           if (result.affectedRows > 0) {
             console.log('[ALERT] LCD voltou online, limpando flag de alerta para device', row.deviceId);
+
+            const nowBr = new Date().toLocaleString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
+
+            const subject = `ReefBlueSky KH - LCD do device ${row.deviceId} voltou ONLINE`;
+            const text =
+              `O display LCD associado ao device ${row.deviceId} voltou a se comunicar com o servidor.\n` +
+              `Último ping agora em: ${nowBr} (horário de Brasília).`;
+
+            await mailTransporter.sendMail({
+              from: ALERT_FROM,
+              to: row.email,
+              subject,
+              text,
+            });
+            console.log('[ALERT] E-mail de LCD ONLINE enviado para', row.email, 'device', row.deviceId);
+
+            const deviceLabel = row.deviceId;
+            await sendTelegramForUser(
+              row.userId,
+              `✅ LCD do device *${deviceLabel}* voltou *ONLINE*.\n` +
+              `Último ping em: ${nowBr} (Brasília).`
+            );
           }
         } catch (err) {
           console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
