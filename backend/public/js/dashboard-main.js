@@ -451,14 +451,38 @@ window.DashboardCommon = {
       ? m.temperature.toFixed(1)
       : (m.temperature ?? '--');
 
+    const khValue = (typeof m.kh === 'number')
+      ? m.kh
+      : (m.kh != null ? Number(m.kh) : null);
+
+    let arrow = '';
+    let trendClass = 'kh-trend equal';
+
+    if (khValue != null && !Number.isNaN(khValue) &&
+        currentKhTarget != null && !Number.isNaN(currentKhTarget)) {
+
+      if (khValue > currentKhTarget + 0.01) {
+        arrow = '▲';
+        trendClass = 'kh-trend up';
+      } else if (khValue < currentKhTarget - 0.01) {
+        arrow = '▼';
+        trendClass = 'kh-trend down';
+      } else {
+        arrow = '◆';
+        trendClass = 'kh-trend equal';
+      }
+    }
+
     tr.innerHTML = `
       <td>${formatDateTime(m.timestamp)}</td>
-      <td>${typeof m.kh === 'number' ? m.kh.toFixed(2) : (m.kh ?? '--')}</td>
+      <td class="${trendClass}">${arrow}</td>
+      <td>${khValue != null && !Number.isNaN(khValue) ? khValue.toFixed(2) : (m.kh ?? '--')}</td>
       <td>${m.phref ?? '--'}</td>
       <td>${m.phsample ?? '--'}</td>
       <td>${tempText}</td>
       <td>${m.status ?? '--'}</td>
     `;
+
 
 
     measurementsBody.appendChild(tr);
