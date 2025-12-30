@@ -297,14 +297,13 @@ async function apiLoadTelegramConfig() {
   }
 }
 
-async function apiSaveTelegramConfig(botToken, chatId, enabled) {
+async function apiSaveTelegramConfig(botToken, enabled) {
   try {
     const res = await fetch('/api/v1/user/telegram-config', {
       method: 'PUT',
       headers: headersAuthCfg,
       body: JSON.stringify({
         telegramBotToken: botToken,
-        telegramChatId: chatId,
         telegramEnabled: enabled,
       }),
     });
@@ -319,6 +318,7 @@ async function apiSaveTelegramConfig(botToken, chatId, enabled) {
     return false;
   }
 }
+
 
 
 
@@ -726,23 +726,16 @@ pumpStartButtons.forEach((btn) => {
 if (saveTelegramConfigBtn) {
   saveTelegramConfigBtn.addEventListener('click', async () => {
     const botToken = (telegramBotTokenInput.value || '').trim();
-    const chatIdStr = (telegramChatIdInput.value || '').trim();
     const enabled = telegramEnabledInput.checked;
-
-    if (chatIdStr && !/^-?\d+$/.test(chatIdStr)) {
-      alert('Chat ID deve ser um número (pode ser negativo para grupos).');
-      return;
-    }
 
     telegramConfigStatus.textContent = 'Salvando config Telegram...';
 
-    const ok = await apiSaveTelegramConfig(botToken, chatIdStr, enabled);
+    const ok = await apiSaveTelegramConfig(botToken, enabled);
     telegramConfigStatus.textContent = ok
-      ? 'Config Telegram salva.'
+      ? 'Config Telegram salva. Envie uma mensagem para o bot e depois use o teste.'
       : 'Erro ao salvar config Telegram.';
   });
 }
-
 
 
 async function initDashboardConfig() {
@@ -754,7 +747,8 @@ async function initDashboardConfig() {
       telegramBotTokenInput.value = teleCfg.telegramBotToken || '';
     }
     if (telegramChatIdInput) {
-      telegramChatIdInput.value = teleCfg.telegramChatId || '';
+      telegramChatIdInput.value =
+      teleCfg.telegramChatId != null ? String(teleCfg.telegramChatId) : '';
     }
     if (telegramEnabledInput) {
       telegramEnabledInput.checked = !!teleCfg.telegramEnabled;
