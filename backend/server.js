@@ -428,7 +428,7 @@ async function checkDevicesOnlineStatus() {
       const second = Number(raw.slice(12, 14));
 
       const lastMs = Date.UTC(year, month, day, hour, minute, second);
-      const isLcdOffline = (now - lastMs) > (2 * MONITOR_INTERVAL_MS);
+      const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
       console.log(
         '[LCD DEBUG]',
@@ -460,7 +460,11 @@ async function checkDevicesOnlineStatus() {
             `Verifique alimentação do display e conexão Wi‑Fi.`;
 
           const result = await conn.query(
-            'UPDATE devices SET lcd_offline_alert_sent = 1 WHERE id = ? AND lcd_offline_alert_sent = 0',
+            `UPDATE devices
+                SET lcd_offline_alert_sent = 1,
+                    lcd_status = 'offline'
+              WHERE id = ?
+                AND lcd_offline_alert_sent = 0`,
             [row.id]
           );
 
@@ -471,9 +475,7 @@ async function checkDevicesOnlineStatus() {
               subject: `ReefBlueSky KH - LCD do device ${row.deviceId} offline`,
               text,
             });
-            console.log('[ALERT] E-mail de LCD offline enviado para', row.email, 'device', row.deviceId);
 
-            // label amigável
             const deviceLabel = row.deviceId;
             await sendTelegramForUser(
               row.userId,
@@ -487,16 +489,19 @@ async function checkDevicesOnlineStatus() {
       }
 
 
-      // LCD voltou a ficar online → limpa flag E avisa ONLINE
+
       if (!isLcdOffline && row.lcd_offline_alert_sent) {
         try {
           const result = await conn.query(
-            'UPDATE devices SET lcd_offline_alert_sent = 0 WHERE id = ? AND lcd_offline_alert_sent = 1',
+            `UPDATE devices
+                SET lcd_offline_alert_sent = 0,
+                    lcd_status = 'online'
+              WHERE id = ?
+                AND lcd_offline_alert_sent = 1`,
             [row.id]
           );
-          if (result.affectedRows > 0) {
-            console.log('[ALERT] LCD voltou online, limpando flag de alerta para device', row.deviceId);
 
+          if (result.affectedRows > 0) {
             const nowBr = new Date().toLocaleString('pt-BR', {
               timeZone: 'America/Sao_Paulo',
               year: 'numeric',
@@ -518,7 +523,6 @@ async function checkDevicesOnlineStatus() {
               subject,
               text,
             });
-            console.log('[ALERT] E-mail de LCD ONLINE enviado para', row.email, 'device', row.deviceId);
 
             const deviceLabel = row.deviceId;
             await sendTelegramForUser(
@@ -531,7 +535,7 @@ async function checkDevicesOnlineStatus() {
           console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
         }
       }
-    }
+
 
 
   } catch (err) {
@@ -589,8 +593,7 @@ async function checkLcdStatus() {
 
 
 setInterval(async () => {
-  await checkLcdStatus();
-  await checkDevicesOnlineStatus();
+  await checkDevicesOnlineStatus(); 
 }, MONITOR_INTERVAL_MS);
 
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
