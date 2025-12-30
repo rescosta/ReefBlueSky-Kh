@@ -462,7 +462,6 @@ async function checkDevicesOnlineStatus() {
           const result = await conn.query(
             `UPDATE devices
                 SET lcd_offline_alert_sent = 1,
-                    lcd_status = 'offline'
               WHERE id = ?
                 AND lcd_offline_alert_sent = 0`,
             [row.id]
@@ -495,7 +494,6 @@ async function checkDevicesOnlineStatus() {
           const result = await conn.query(
             `UPDATE devices
                 SET lcd_offline_alert_sent = 0,
-                    lcd_status = 'online'
               WHERE id = ?
                 AND lcd_offline_alert_sent = 1`,
             [row.id]
