@@ -138,7 +138,7 @@ async function discoverTelegramChatIdForUser(userId, botToken) {
     const res = await axios.get(url);
 
     if (res.status !== 200 || !res.data.ok) {
-      console.warn('getUpdates falhou para user', userId, res.status, res.data); // aqui já mostra o erro da API
+      console.warn('getUpdates falhou para user', userId, res.status, res.data);
       return;
     }
 
@@ -174,6 +174,7 @@ async function discoverTelegramChatIdForUser(userId, botToken) {
     }
   }
 }
+
 
 
 // === EMAIL ===
@@ -1459,10 +1460,11 @@ app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
       [telegramBotToken || null, telegramEnabled ? 1 : 0, userId]
     );
 
-    // tenta descobrir o chatId em background
+    console.log('Telegram config salva para user', userId, 'enabled=', telegramEnabled, 'token=', telegramBotToken ? '***' : null);
+
     if (telegramBotToken) {
       discoverTelegramChatIdForUser(userId, telegramBotToken).catch(err =>
-        console.error('discoverTelegramChatIdForUser error:', err.message)
+        console.error('discoverTelegramChatIdForUser error (outer):', err.message)
       );
     }
 
@@ -1472,6 +1474,7 @@ app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 
 app.post('/api/user/telegram/test', authUserMiddleware, async (req, res) => {
