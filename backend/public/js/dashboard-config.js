@@ -77,7 +77,15 @@ const saveTelegramConfigBtn = document.getElementById('saveTelegramConfigBtn');
 const telegramConfigStatus  = document.getElementById('telegramConfigStatus');
 const telegramBotTokenInput = document.getElementById('telegramBotTokenInput');
 const testTelegramBtn       = document.getElementById('testTelegramBtn');
+const toggleTokenBtn = document.getElementById('toggleTelegramTokenBtn');
 
+if (telegramBotTokenInput && toggleTokenBtn) {
+  toggleTokenBtn.addEventListener('click', () => {
+    const isHidden = telegramBotTokenInput.type === 'password';
+    telegramBotTokenInput.type = isHidden ? 'text' : 'password';
+    toggleTokenBtn.textContent = isHidden ? 'Ocultar' : 'Mostrar';
+  });
+}
 
 
 function fillTelegramConfigFromApi(user) {
