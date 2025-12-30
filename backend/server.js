@@ -108,28 +108,30 @@ async function sendTelegramForUser(userId, text) {
       text,
       parse_mode: 'Markdown',
     });
-    } catch (err) {
-      if (err.response) {
-        let body = err.response.data;
-        if (typeof body === 'object') {
-          body = JSON.stringify(body, (_, v) =>
-            typeof v === 'bigint' ? v.toString() : v
-          );
-        }
-        console.error(
-          'sendTelegramForUser HTTP error:',
-          err.response.status,
-          body
-        );
-      } else {
-        // aqui não passa pelo JSON.stringify, só string pura
-        console.error('sendTelegramForUser error:', err.message);
-      }
-    } finally {
-      if (conn) try { conn.release(); } catch (e) {}
-    }
 
+  } catch (err) {
+    if (err.response) {
+      let body = err.response.data;
+      if (typeof body === 'object') {
+        body = JSON.stringify(body, (_, v) =>
+          typeof v === 'bigint' ? v.toString() : v
+        );
+      }
+      console.error(
+        'sendTelegramForUser HTTP error:',
+        err.response.status,
+        body
+      );
+    } else if (err.request) {
+      console.error('sendTelegramForUser no response:', err.message);
+    } else {
+      console.error('sendTelegramForUser error:', err.message);
+    }
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
 }
+
 
 async function discoverTelegramChatIdForUser(userId, botToken) {
   const url = `https://api.telegram.org/bot${botToken}/getUpdates`;
