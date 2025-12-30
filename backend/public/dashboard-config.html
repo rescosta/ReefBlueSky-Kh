@@ -595,36 +595,38 @@
             <div class="card-title">Alertas por Telegram</div>
           </div>
           <div class="card-subtitle">
-            Configure seu bot e Chat ID para receber notificações de KH e status do dispositivo.
+            Configure seu bot do Telegram para receber notificações de KH e status do dispositivo.
           </div>
 
-        <div class="field-row">
-          <label for="telegramBotTokenInput">Token do bot (BotFather)</label>
-          <div class="inline">
-            <input
-              id="telegramBotTokenInput"
-              type="password"
-              placeholder="ex: 123456789:ABCdef..."
-              style="flex:1;"
-            />
-            <button id="toggleTelegramTokenBtn" type="button" class="btn-small">
-              Mostrar
-            </button>
+          <div class="field-row">
+            <label for="telegramBotTokenInput">Token do bot (BotFather)</label>
+            <div class="inline">
+              <input
+                id="telegramBotTokenInput"
+                type="password"
+                placeholder="ex: 123456789:ABCdef..."
+                style="flex:1;"
+              />
+              <button id="toggleTelegramTokenBtn" type="button" class="btn-small">
+                Mostrar
+              </button>
+            </div>
+            <div class="hint">
+              Crie um bot com o BotFather, copie o token gerado e cole aqui.
+              Em seguida envie qualquer mensagem para o seu bot no Telegram para que o sistema detecte o Chat&nbsp;ID automaticamente.
+            </div>
           </div>
-          <div class="hint">
-            Crie um bot com o BotFather e cole aqui o token gerado.
-          </div>
-        </div>
 
           <div class="field-row">
             <label for="telegramChatIdInput">Chat ID do Telegram</label>
             <input
               id="telegramChatIdInput"
               type="text"
-              placeholder="ex: 123456789"
+              placeholder="Detectado automaticamente após você enviar uma mensagem para o bot"
+              disabled
             />
             <div class="hint">
-              Envie uma mensagem para o seu bot e use a API <code>getUpdates</code> para descobrir o Chat ID. [web:318][web:454]
+              Você não precisa preencher este campo. O servidor descobre o Chat&nbsp;ID usando a API <code>getUpdates</code> assim que o bot recebe uma mensagem sua.
             </div>
           </div>
 
@@ -642,11 +644,12 @@
             <button id="testTelegramBtn" type="button">
               Enviar mensagem de teste
             </button>
-            <span id="telegramConfigStatus" class="hint"></span>
+            <span id="telegramConfigStatus" class="hint">
+              Salve o token, envie uma mensagem para o bot e depois use o teste para validar os alertas.
+            </span>
           </div>
+
         </div>
-
-
 
       </div>
     </div>
