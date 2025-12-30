@@ -535,9 +535,7 @@ async function checkDevicesOnlineStatus() {
           console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
         }
       }
-
-
-
+    }  
   } catch (err) {
     console.error('[ALERT] Erro no monitor de devices online/offline:', err.message);
   } finally {
