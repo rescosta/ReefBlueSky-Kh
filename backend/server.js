@@ -134,8 +134,12 @@ async function sendTelegramForUser(userId, text) {
 async function discoverTelegramChatIdForUser(userId, botToken) {
   const url = `https://api.telegram.org/bot${botToken}/getUpdates`;
 
+  console.log('discoverTelegramChatIdForUser: iniciando para user', userId, 'url=', url);
+
   try {
     const res = await axios.get(url);
+
+    console.log('discoverTelegramChatIdForUser: status=', res.status, 'body=', res.data);
 
     if (res.status !== 200 || !res.data.ok) {
       console.warn('getUpdates falhou para user', userId, res.status, res.data);
@@ -169,11 +173,14 @@ async function discoverTelegramChatIdForUser(userId, botToken) {
         err.response.status,
         err.response.data
       );
+    } else if (err.request) {
+      console.error('discoverTelegramChatIdForUser no response:', err.message);
     } else {
       console.error('discoverTelegramChatIdForUser error:', err.message);
     }
   }
 }
+
 
 
 
