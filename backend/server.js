@@ -395,7 +395,7 @@ async function checkDevicesOnlineStatus() {
       const second = Number(raw.slice(12, 14));
 
       const lastMs = Date.UTC(year, month, day, hour, minute, second);
-      const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
+      const isLcdOffline = (now - lastMs) > (2 * MONITOR_INTERVAL_MS);
 
       console.log(
         '[LCD DEBUG]',
