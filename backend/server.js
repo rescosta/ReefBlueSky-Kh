@@ -505,12 +505,19 @@ async function checkLcdStatus() {
           ['offline', row.id]
         );
         console.log('[LCD] Marcando LCD como OFFLINE para KH', row.deviceId);
+      } else if (!isOffline && row.lcd_status === 'offline') {
+        await conn.query(
+          'UPDATE devices SET lcd_status = ? WHERE id = ?',
+          ['online', row.id]
+        );
+        console.log('[LCD] Marcando LCD como ONLINE para KH', row.deviceId);
       }
     }
   } finally {
     if (conn) conn.release();
   }
 }
+
 
 setInterval(async () => {
   await checkLcdStatus();
