@@ -134,33 +134,45 @@ async function sendTelegramForUser(userId, text) {
 async function discoverTelegramChatIdForUser(userId, botToken) {
   const url = `https://api.telegram.org/bot${botToken}/getUpdates`;
 
-  const res = await axios.get(url);
-  if (res.status !== 200 || !res.data.ok) {
-    console.warn('getUpdates falhou para user', userId, res.status, res.data);
-    return;
+  try {
+    const res = await axios.get(url);
+
+    if (res.status !== 200 || !res.data.ok) {
+      console.warn('getUpdates falhou para user', userId, res.status, res.data); // aqui já mostra o erro da API
+      return;
+    }
+
+    const updates = res.data.result || [];
+    if (!updates.length) {
+      console.log('Nenhum update ainda para user', userId);
+      return;
+    }
+
+    const last = [...updates].reverse().find(u => u.message && u.message.chat);
+    if (!last) {
+      console.log('Sem message.chat nos updates para user', userId);
+      return;
+    }
+
+    const chatId = String(last.message.chat.id);
+
+    await pool.query(
+      'UPDATE users SET telegram_chat_id = ? WHERE id = ?',
+      [chatId, userId]
+    );
+
+    console.log(`Telegram chatId salvo para user ${userId}: ${chatId}`);
+  } catch (err) {
+    if (err.response) {
+      console.error(
+        'discoverTelegramChatIdForUser HTTP error:',
+        err.response.status,
+        err.response.data
+      );
+    } else {
+      console.error('discoverTelegramChatIdForUser error:', err.message);
+    }
   }
-
-  const updates = res.data.result || [];
-  if (!updates.length) {
-    console.log('Nenhum update ainda para user', userId);
-    return;
-  }
-
-  // pega o último update com message.chat
-  const last = [...updates].reverse().find(u => u.message && u.message.chat);
-  if (!last) {
-    console.log('Sem message.chat nos updates para user', userId);
-    return;
-  }
-
-  const chatId = String(last.message.chat.id);
-
-  await pool.query(
-    'UPDATE users SET telegram_chat_id = ? WHERE id = ?',
-    [chatId, userId]
-  );
-
-  console.log(`Telegram chatId salvo para user ${userId}: ${chatId}`);
 }
 
 
