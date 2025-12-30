@@ -583,6 +583,13 @@ async function checkLcdStatus() {
         );
         console.log('[LCD] Marcando LCD como ONLINE para KH', row.deviceId);
       }
+      if (isOffline && row.lcd_status !== 'offline') {
+        await conn.query(
+          'UPDATE devices SET lcd_status = ? WHERE id = ?',
+          ['offline', row.id]
+        );
+        console.log('[LCD] Forçando lcd_status=offline para KH', row.deviceId);
+     }
     }
   } finally {
     if (conn) conn.release();
