@@ -313,6 +313,13 @@ function setLcdStatus(status) {
   }
 }
 
+// Refresh periódico do status (device + LCD)
+setInterval(async () => {
+  const devs = await loadDevicesCommon();
+  if (devs.length) {
+    updateDeviceStatusBadge();
+  }
+}, 30000); // 30s (ajusta se quiser mais rápido)
 
 window.DashboardCommon = {
   initTopbar,
