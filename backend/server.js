@@ -131,6 +131,39 @@ async function sendTelegramForUser(userId, text) {
 
 }
 
+async function discoverTelegramChatIdForUser(userId, botToken) {
+  const url = `https://api.telegram.org/bot${botToken}/getUpdates`;
+
+  const res = await axios.get(url);
+  if (res.status !== 200 || !res.data.ok) {
+    console.warn('getUpdates falhou para user', userId, res.status, res.data);
+    return;
+  }
+
+  const updates = res.data.result || [];
+  if (!updates.length) {
+    console.log('Nenhum update ainda para user', userId);
+    return;
+  }
+
+  // pega o último update com message.chat
+  const last = [...updates].reverse().find(u => u.message && u.message.chat);
+  if (!last) {
+    console.log('Sem message.chat nos updates para user', userId);
+    return;
+  }
+
+  const chatId = String(last.message.chat.id);
+
+  await pool.query(
+    'UPDATE users SET telegram_chat_id = ? WHERE id = ?',
+    [chatId, userId]
+  );
+
+  console.log(`Telegram chatId salvo para user ${userId}: ${chatId}`);
+}
+
+
 // === EMAIL ===
 
 const mailTransporter = nodemailer.createTransport({
@@ -826,6 +859,8 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, 
 });
 
 
+
+
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
 // ============================================================================
@@ -1396,39 +1431,29 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
+app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
   const userId = req.user.userId;
+  const { telegramBotToken, telegramEnabled } = req.body;
+
   try {
-    const rows = await pool.query(
-      'SELECT telegram_bot_token, telegram_chat_id, telegram_enabled FROM users WHERE id = ? LIMIT 1',
-      [userId]
+    await pool.query(
+      'UPDATE users SET telegram_bot_token = ?, telegram_enabled = ?, telegram_chat_id = NULL WHERE id = ?',
+      [telegramBotToken || null, telegramEnabled ? 1 : 0, userId]
     );
 
-    if (!rows.length) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+    // tenta descobrir o chatId em background
+    if (telegramBotToken) {
+      discoverTelegramChatIdForUser(userId, telegramBotToken).catch(err =>
+        console.error('discoverTelegramChatIdForUser error:', err.message)
+      );
     }
 
-    const u = rows[0];
-
-    // garante tipos serializáveis
-    const telegramChatId =
-      u.telegram_chat_id != null ? Number(u.telegram_chat_id) : null;
-    const telegramEnabled = !!u.telegram_enabled;
-
-    return res.json({
-      success: true,
-      data: {
-        telegramBotToken: u.telegram_bot_token || null,
-        telegramChatId,
-        telegramEnabled,
-      },
-    });
+    return res.json({ success: true });
   } catch (err) {
-    console.error('GET /user/telegram-config error', err.message);
+    console.error('PUT /user/telegram-config error', err.message);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
 
 
 app.post('/api/user/telegram/test', authUserMiddleware, async (req, res) => {
@@ -2573,6 +2598,12 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
+
+    await conn.query(
+      'UPDATE devices SET last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
+      [deviceId]
+    );
+
 
     const rows = await conn.query(
       `SELECT id, type, payload
