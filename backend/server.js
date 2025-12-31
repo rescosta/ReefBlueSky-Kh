@@ -1944,10 +1944,14 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
           const khVal = last.kh.toFixed(2);
           const targetPart = khTarget != null ? ` (alvo ${khTarget.toFixed(2)} dKH)` : '';
 
-          await sendTelegram(
+          const userId = req.user.userId;
+
+          await sendTelegramForUser(
+            userId,
             `📏 KH medido em *${devName}*:\n` +
             `Valor atual: *${khVal} dKH*${targetPart}`
           );
+
       }
 
       // --- TENDÊNCIA: últimas 4 medições no banco para este device ---
@@ -1981,7 +1985,8 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
           : '';
 
         if (delta <= -THRESH) {
-          await sendTelegram(
+          await sendTelegramForUser(
+            userId,
             `🚨 *ALERTA KH CAINDO RÁPIDO* em *${devName}*!\n` +
             `De *${fmt(first.kh)}* para *${fmt(lastDb.kh)}* dKH ` +
             `(${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
@@ -1989,7 +1994,8 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
             `Tendência de queda acentuada, verifique consumo e dosagem.`
           );
         } else if (delta >= THRESH) {
-          await sendTelegram(
+          await sendTelegramForUser(
+            userId,
             `🚨 *ALERTA KH SUBINDO RÁPIDO* em *${devName}*!\n` +
             `De *${fmt(first.kh)}* para *${fmt(lastDb.kh)}* dKH ` +
             `(+${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
