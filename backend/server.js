@@ -472,6 +472,19 @@ async function checkDevicesOnlineStatus() {
       const lastMs = Date.UTC(year, month, day, hour, minute, second);
       const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
+
+      // sempre sincroniza lcd_status com cálculo
+    const newStatus = isLcdOffline ? 'offline' : 'online';
+
+    if (row.lcd_status !== newStatus) {
+      await conn.query(
+        'UPDATE devices SET lcd_status = ? WHERE id = ?',
+        [newStatus, row.id]
+      );
+      console.log('[LCD] Atualizando lcd_status para', newStatus, 'device', row.deviceId);
+    }
+
+
       console.log(
         '[LCD DEBUG]',
         row.deviceId,
