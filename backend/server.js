@@ -311,14 +311,14 @@ async function checkDevicesOnlineStatus() {
       `SELECT d.id,
               d.deviceId,
               d.userId,
-              d.name,
-              d.last_seen,
-              d.offline_alert_sent,
+              d.lcd_last_seen,
+              d.lcd_status,
+              d.lcd_offline_alert_sent,
               u.email
          FROM devices d
          JOIN users u ON u.id = d.userId
-        WHERE d.last_seen IS NOT NULL`
-    );
+        WHERE d.type = 'KH'
+          AND d.lcd_last_seen IS NOT NULL`
 
     for (const row of rows) {
       const lastSeenMs = new Date(row.last_seen).getTime();
@@ -457,7 +457,6 @@ async function checkDevicesOnlineStatus() {
           AND d.lcd_last_seen IS NOT NULL`
     );
 
-
     for (const row of lcdRows) {
       const raw = String(row.lcd_last_seen || '');
       if (raw.length !== 14) continue; // formato inválido
@@ -472,28 +471,27 @@ async function checkDevicesOnlineStatus() {
       const lastMs = Date.UTC(year, month, day, hour, minute, second);
       const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
-
       // sempre sincroniza lcd_status com cálculo
-    const newStatus = isLcdOffline ? 'offline' : 'online';
+      const newStatus = isLcdOffline ? 'offline' : 'online';
 
-    if (row.lcd_status !== newStatus) {
-      await conn.query(
-        'UPDATE devices SET lcd_status = ? WHERE id = ?',
-        [newStatus, row.id]
-      );
-      console.log('[LCD] Atualizando lcd_status para', newStatus, 'device', row.deviceId);
-    }
+      if (row.lcd_status !== newStatus) {
+        await conn.query(
+          'UPDATE devices SET lcd_status = ? WHERE id = ?',
+          [newStatus, row.id]
+        );
+        console.log('[LCD] Atualizando lcd_status para', newStatus, 'device', row.deviceId);
+      }
 
 
-      console.log(
-        '[LCD DEBUG]',
-        row.deviceId,
-        'lcd_status=', row.lcd_status,
-        'lcd_last_seen=', raw,
-        'lastMs=', lastMs,
-        'lcd_offline_alert_sent=', row.lcd_offline_alert_sent,
-        'isLcdOffline=', isLcdOffline
-      );
+        console.log(
+          '[LCD DEBUG]',
+          row.deviceId,
+          'lcd_status=', row.lcd_status,
+          'lcd_last_seen=', raw,
+          'lastMs=', lastMs,
+          'lcd_offline_alert_sent=', row.lcd_offline_alert_sent,
+          'isLcdOffline=', isLcdOffline
+        );
 
       // LCD OFFLINE e ainda não mandou alerta
       if (isLcdOffline && !row.lcd_offline_alert_sent) {
@@ -605,7 +603,7 @@ async function checkLcdStatus() {
     const rows = await conn.query(
       `SELECT id, deviceId, lcd_last_seen, lcd_status
          FROM devices
-        WHERE typeDevice = 'KH'    -- <=== mesmo campo
+        WHERE type = 'KH'
           AND lcd_last_seen IS NOT NULL`
     );
 
