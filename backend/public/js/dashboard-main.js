@@ -428,20 +428,6 @@ function updateMeasurementsView(measures) {
     return;
   }
 
-window.DashboardCommon = {
-  initTopbar,
-  loadUserCommon,
-  loadDevicesCommon,
-  updateDeviceStatusBadge,
-  getSelectedDeviceId,
-  getSelectedDeviceIdOrAlert,
-  applyRoleMenuVisibility,
-  setLcdStatus,          
-  currentUserRole: 'user',
-};
-
-
-
   lastCountInfo.textContent = `${measures.length} registros recentes`;
 
   measures.slice(0, 30).forEach((m) => {

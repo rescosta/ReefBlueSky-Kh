@@ -774,7 +774,6 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('deviceChanged', async () => {
   // Recarrega devices e re-renderiza a topbar usando o helper comum
   await DashboardCommon.loadDevicesCommon();
-  DashboardCommon.renderTopbarDevices();
 });
 
 
