@@ -593,6 +593,10 @@ async function checkDevicesOnlineStatus() {
   }
 } 
 
+setInterval(async () => {
+  await checkDevicesOnlineStatus();
+}, MONITOR_INTERVAL_MS);
+
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
 
 
