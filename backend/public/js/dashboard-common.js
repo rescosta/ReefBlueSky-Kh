@@ -146,14 +146,13 @@ async function loadDevicesCommon() {
       select.appendChild(opt);
     });
 
-  
-    const currentId = getSelectedDeviceId();
-    const cur = currentDevices.find((d) => d.deviceId === currentId);
-    if (cur && cur.lcdStatus) {
-      DashboardCommon.setLcdStatus(cur.lcdStatus);
-    } else {
-      DashboardCommon.setLcdStatus('never'); 
-    }
+  const currentId = getSelectedDeviceId();
+  const cur = currentDevices.find((d) => d.deviceId === currentId);
+  if (cur && typeof cur.lcdStatus !== 'undefined') {
+    DashboardCommon.setLcdStatus(cur.lcdStatus); // online ou offline
+  } else {
+    DashboardCommon.setLcdStatus('never');
+  }
 
     return currentDevices;
   } catch (err) {
@@ -240,11 +239,12 @@ async function initTopbar() {
       updateDeviceStatusBadge();
       const currentId = getSelectedDeviceId();
       const cur = currentDevices.find((d) => d.deviceId === currentId);
-      if (cur && cur.lcdStatus) {
+      if (cur && typeof cur.lcdStatus !== 'undefined') {
         DashboardCommon.setLcdStatus(cur.lcdStatus);
       } else {
         DashboardCommon.setLcdStatus('never');
       }
+
       const evt = new CustomEvent('deviceChanged', {
         detail: { deviceId: select.value },
       });
