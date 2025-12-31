@@ -483,7 +483,7 @@ async function checkDevicesOnlineStatus() {
 
           const result = await conn.query(
             `UPDATE devices
-                SET lcd_offline_alert_sent = 1,
+                SET lcd_offline_alert_sent = 1
               WHERE id = ?
                 AND lcd_offline_alert_sent = 0`,
             [row.id]
@@ -515,7 +515,7 @@ async function checkDevicesOnlineStatus() {
         try {
           const result = await conn.query(
             `UPDATE devices
-                SET lcd_offline_alert_sent = 0,
+                SET lcd_offline_alert_sent = 0
               WHERE id = ?
                 AND lcd_offline_alert_sent = 1`,
             [row.id]
@@ -758,7 +758,7 @@ function generateToken(userId, deviceId) {
             iat: Math.floor(Date.now() / 1000)
         },
         JWT_SECRET,
-        { expiresIn: '1h' }
+        { expiresIn: '12h' }
     );
 }
 
