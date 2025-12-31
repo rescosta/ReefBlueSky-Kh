@@ -208,6 +208,24 @@ async function initDashboardGraficos() {
     return;
   }
 
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (deviceId) {
+    try {
+      const resp = await fetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+        { headers: headersAuthCfg }
+      );
+      const json = await resp.json();
+      if (resp.ok && json.success && json.data &&
+          typeof DashboardCommon.setLcdStatus === 'function') {
+        DashboardCommon.setLcdStatus(json.data.lcdStatus);
+      }
+    } catch (e) {
+      console.error('Erro ao carregar lcdStatus na tela Config', e);
+    }
+  }
+  
+
   await loadSeriesForSelected();
 }
 
