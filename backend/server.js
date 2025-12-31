@@ -593,6 +593,8 @@ async function checkDevicesOnlineStatus() {
   }
 } 
 
+checkDevicesOnlineStatus().catch(err => console.error('ERRO monitor inicial:', err));
+
 setInterval(async () => {
   await checkDevicesOnlineStatus();
 }, MONITOR_INTERVAL_MS);
