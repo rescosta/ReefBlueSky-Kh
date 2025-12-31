@@ -5,6 +5,11 @@ if (!chartsToken) {
   window.location.href = 'login';
 }
 
+const headersAuthGraficos = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${chartsToken}`,
+};
+
 const chartInfo = document.getElementById('chartInfo');
 
 let khDailyChart = null;
@@ -213,7 +218,7 @@ async function initDashboardGraficos() {
     try {
       const resp = await fetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-        { headers: headersAuthCfg }
+        { headers: headersAuthGraficos }
       );
       const json = await resp.json();
       if (resp.ok && json.success && json.data &&
@@ -221,10 +226,9 @@ async function initDashboardGraficos() {
         DashboardCommon.setLcdStatus(json.data.lcdStatus);
       }
     } catch (e) {
-      console.error('Erro ao carregar lcdStatus na tela Config', e);
+      console.error('Erro ao carregar lcdStatus na tela Gráficos', e);
     }
   }
-  
 
   await loadSeriesForSelected();
 }
