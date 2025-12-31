@@ -319,7 +319,8 @@ async function checkDevicesOnlineStatus() {
          JOIN users u ON u.id = d.userId
         WHERE d.type = 'KH'
           AND d.lcd_last_seen IS NOT NULL`
-
+    )
+    
     for (const row of rows) {
       const lastSeenMs = new Date(row.last_seen).getTime();
       const isOffline = (now - lastSeenMs) > OFFLINE_THRESHOLD_MS;
