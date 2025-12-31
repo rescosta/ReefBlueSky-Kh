@@ -102,18 +102,25 @@ async function sendTelegramForUser(userId, text) {
       return;
     }
 
+    // normalizar chatId (BigInt, number ou string)
+    let chatId = u.telegram_chat_id;
+    if (typeof chatId === 'bigint') {
+      chatId = chatId.toString();
+    }
+
     const url = `https://api.telegram.org/bot${u.telegram_bot_token}/sendMessage`;
-    console.log('sendTelegramForUser: url=', url, 'chat_id=', u.telegram_chat_id);
+    console.log('sendTelegramForUser: url=', url, 'chat_id=', chatId);
 
     await axios.post(
       url,
       {
-        chat_id: u.telegram_chat_id,
+        chat_id: chatId,
         text,
         parse_mode: 'Markdown',
       },
       { timeout: 10000 }
     );
+
 
     console.log('sendTelegramForUser: mensagem enviada para user', userId);
   } catch (err) {
@@ -1478,12 +1485,15 @@ app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
     conn = await pool.getConnection();
 
     const rows = await conn.query(
-      `SELECT telegram_bot_token, telegram_chat_id, telegram_enabled
+      `SELECT telegram_bot_token,
+              CAST(telegram_chat_id AS CHAR) AS telegram_chat_id,
+              telegram_enabled
          FROM users
         WHERE id = ?
         LIMIT 1`,
       [userId]
     );
+
 
     if (!rows || rows.length === 0) {
       return res.json({
