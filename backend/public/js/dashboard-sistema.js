@@ -411,24 +411,28 @@ async function initDashboardSistema() {
     renderEvents([]);
     return;
   }
+
   const deviceId = DashboardCommon.getSelectedDeviceId();
   if (deviceId) {
     try {
       const resp = await fetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-        { headers: headersAuthSys }
+        { headers: headersAuthSys }            // usa o headers deste arquivo
       );
       const json = await resp.json();
       if (resp.ok && json.success && json.data &&
           typeof DashboardCommon.setLcdStatus === 'function') {
-        DashboardCommon.setLcdStatus(json.data.lcdStatus); // online/offline/never
+        DashboardCommon.setLcdStatus(json.data.lcdStatus);
       }
     } catch (e) {
       console.error('Erro ao carregar lcdStatus na tela Sistema', e);
     }
   }
+  // === FIM BLOCO NOVO ===
+
   await loadSystemForSelected();
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboardSistema().catch((err) =>
