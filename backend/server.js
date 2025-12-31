@@ -339,7 +339,7 @@ async function checkDevicesOnlineStatus() {
           });
 
           const text =
-            `Seu dispositivo ${row.deviceId} parece estar offline há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+            `⚠️Seu dispositivo ${row.deviceId} parece estar offline há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
             `Último sinal recebido em: ${lastSeenBr} (horário de Brasília).\n\n` +
             `Verifique alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
 
@@ -365,7 +365,7 @@ async function checkDevicesOnlineStatus() {
             // Telegram OFFLINE
             await sendTelegramForUser(
               row.userId,
-              ` *${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+              `⚠️*${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
               `Último sinal em: ${lastSeenBr} (Brasília).`
             );
 
