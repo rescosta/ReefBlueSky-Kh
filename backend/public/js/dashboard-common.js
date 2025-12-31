@@ -273,17 +273,28 @@ async function initTopbar() {
       badge.textContent = 'Sem devices';
     }
   }
-    setInterval(async () => {
+  setInterval(async () => {
     const devs2 = await loadDevicesCommon();
-    if (devs2.length) {
-      updateDeviceStatusBadge();
-      const currentId = getSelectedDeviceId();
-      const cur = devs2.find(d => d.deviceId === currentId);
-      if (cur && typeof cur.lcdStatus !== 'undefined') {
-        DashboardCommon.setLcdStatus(cur.lcdStatus);
-      } else {
-        DashboardCommon.setLcdStatus('never');
+    if (!devs2.length) return;
+
+    updateDeviceStatusBadge();
+
+    const currentId = getSelectedDeviceId();
+    if (!currentId) return;
+
+    // Pinga o /kh-config para pegar lcdStatus atualizado
+    try {
+      const resp = await fetch(
+        `/api/v1/user/devices/${encodeURIComponent(currentId)}/kh-config`,
+        { headers: API_HEADERS() }
+      );
+      const json = await resp.json();
+      if (resp.ok && json.success && json.data && typeof DashboardCommon.setLcdStatus === 'function') {
+        DashboardCommon.setLcdStatus(json.data.lcdStatus); // online/offline/never
       }
+    } catch (e) {
+      console.error('Erro ao atualizar lcdStatus periodicamente', e);
+      // em erro, não mexe no estado atual do badge
     }
   }, 30000);
 }
