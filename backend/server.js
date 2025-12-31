@@ -311,14 +311,13 @@ async function checkDevicesOnlineStatus() {
       `SELECT d.id,
               d.deviceId,
               d.userId,
-              d.lcd_last_seen,
-              d.lcd_status,
-              d.lcd_offline_alert_sent,
+              d.name,
+              d.last_seen,
+              d.offline_alert_sent,
               u.email
          FROM devices d
          JOIN users u ON u.id = d.userId
-        WHERE d.type = 'KH'
-          AND d.lcd_last_seen IS NOT NULL`
+        WHERE d.last_seen IS NOT NULL`
     );
 
     for (const row of rows) {
@@ -454,7 +453,7 @@ async function checkDevicesOnlineStatus() {
               u.email
          FROM devices d
          JOIN users u ON u.id = d.userId
-        WHERE d.typeDevice = 'KH'   -- <=== ajustar aqui
+        WHERE d.type = 'KH'
           AND d.lcd_last_seen IS NOT NULL`
     );
 
@@ -594,66 +593,6 @@ async function checkDevicesOnlineStatus() {
     if (conn) conn.release();
   }
 } 
-
-async function checkLcdStatus() {
-  const now = Date.now();
-  let conn;
-  try {
-    conn = await pool.getConnection();
-
-    const rows = await conn.query(
-      `SELECT id, deviceId, lcd_last_seen, lcd_status
-         FROM devices
-        WHERE type = 'KH'
-          AND lcd_last_seen IS NOT NULL`
-    );
-
-
-    for (const row of rows) {
-      const raw = String(row.lcd_last_seen || '');
-      if (raw.length !== 14) continue;
-
-      const year   = Number(raw.slice(0, 4));
-      const month  = Number(raw.slice(4, 6)) - 1;
-      const day    = Number(raw.slice(6, 8));
-      const hour   = Number(raw.slice(8, 10));
-      const minute = Number(raw.slice(10, 12));
-      const second = Number(raw.slice(12, 14));
-
-      const lastMs = Date.UTC(year, month, day, hour, minute, second);
-      const isOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
-
-      if (isOffline && row.lcd_status === 'online') {
-        await conn.query(
-          'UPDATE devices SET lcd_status = ? WHERE id = ?',
-          ['offline', row.id]
-        );
-        console.log('[LCD] Marcando LCD como OFFLINE para KH', row.deviceId);
-      } else if (!isOffline && row.lcd_status === 'offline') {
-        await conn.query(
-          'UPDATE devices SET lcd_status = ? WHERE id = ?',
-          ['online', row.id]
-        );
-        console.log('[LCD] Marcando LCD como ONLINE para KH', row.deviceId);
-      }
-      if (isOffline && row.lcd_status !== 'offline') {
-        await conn.query(
-          'UPDATE devices SET lcd_status = ? WHERE id = ?',
-          ['offline', row.id]
-        );
-        console.log('[LCD] Forçando lcd_status=offline para KH', row.deviceId);
-     }
-    }
-  } finally {
-    if (conn) conn.release();
-  }
-}
-
-
-setInterval(async () => {
-  await checkDevicesOnlineStatus(); 
-  await checkLcdStatus(); 
-}, MONITOR_INTERVAL_MS);
 
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
 
