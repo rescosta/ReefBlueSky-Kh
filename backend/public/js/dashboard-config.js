@@ -737,24 +737,23 @@ if (saveTelegramConfigBtn) {
   });
 }
 
-
 async function initDashboardConfig() {
   DashboardCommon.initTopbar();
 
   const teleCfg = await apiLoadTelegramConfig();
-  if (teleCfg) {
-    if (telegramBotTokenInput) {
-      telegramBotTokenInput.value = teleCfg.telegramBotToken || '';
+    if (teleCfg) {
+      // não preenche o token de volta
+      if (telegramChatIdInput) {
+        telegramChatIdInput.value =
+          teleCfg.telegramChatId != null ? String(teleCfg.telegramChatId) : '';
+      }
+      if (telegramEnabledInput) {
+        telegramEnabledInput.checked = !!teleCfg.telegramEnabled;
+      }
+      if (teleCfg.telegramChatId) {
+        telegramChatIdInput.placeholder = '';
+      }
     }
-    if (telegramChatIdInput) {
-      telegramChatIdInput.value =
-      teleCfg.telegramChatId != null ? String(teleCfg.telegramChatId) : '';
-    }
-    if (telegramEnabledInput) {
-      telegramEnabledInput.checked = !!teleCfg.telegramEnabled;
-    }
-  }
-
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
