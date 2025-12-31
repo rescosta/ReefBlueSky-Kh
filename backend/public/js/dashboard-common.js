@@ -303,28 +303,32 @@ function getSelectedDeviceIdOrAlert() {
   return deviceId;
 }
 
-
 function setLcdStatus(status) {
-  const el = document.getElementById('lcdStatusIcon');
-  if (!el) return;
-
-  if (!status || status === 'never') {
-    el.style.display = 'none';
-    return;
-  }
-
-  el.style.display = 'inline-block';
-
-  if (status === 'online') {
-    el.textContent = 'LCD ON';
-    el.className = 'badge-on';
-    el.title = 'Display remoto conectado';
-  } else if (status === 'offline') {
-    el.textContent = 'LCD OFF';
-    el.className = 'badge-off';
-    el.title = 'Display remoto desconectado';
-  }
+    const el = document.getElementById('lcdStatusIcon');
+    if (!el) return;
+    
+    // Preserva estado se status não definido
+    if (status === undefined || status === null) {
+        return;  // Não esconde se já estava visível
+    }
+    
+    if (status === 'never') {
+        el.style.display = 'none';
+        return;
+    }
+    
+    el.style.display = 'inline-block';
+    if (status === 'online') {
+        el.textContent = 'LCD ON';
+        el.className = 'badge-on';
+        el.title = 'Display remoto conectado';
+    } else if (status === 'offline') {
+        el.textContent = 'LCD OFF';
+        el.className = 'badge-off';
+        el.title = 'Display remoto desconectado';
+    }
 }
+
 
 window.DashboardCommon = {
   initTopbar,

@@ -771,12 +771,6 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-window.addEventListener('deviceChanged', async () => {
-  // Recarrega devices e re-renderiza a topbar usando o helper comum
-  await DashboardCommon.loadDevicesCommon();
-});
-
-
 async function apiStartCalibration(deviceId) {
   // por enquanto usa o mesmo fluxo de test_now
   const res = await fetch(
