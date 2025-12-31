@@ -502,10 +502,6 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      loadDeviceHealth();
-    });
-
     // Se você já tiver um evento global quando seleciona outro device,
     // pode reaproveitar:
     window.addEventListener('reef:selectedDeviceChanged', () => {
@@ -517,6 +513,7 @@
     if (window.DashboardCommon && DashboardCommon.initTopbar) {
       DashboardCommon.initTopbar();
     }
+    loadDeviceHealth();
   });
 </script>
 
