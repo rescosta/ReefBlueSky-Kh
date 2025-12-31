@@ -1870,13 +1870,14 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
   }
 
   for (const m of measurements) {
-    if (!m.timestamp || typeof m.kh !== 'number') {
+    if (!Number.isFinite(m.timestamp) || m.timestamp <= 0 || typeof m.kh !== 'number') {
       return res.status(400).json({
         success: false,
-        message: 'Medição inválida: faltam timestamp ou kh'
+        message: 'Medição inválida: timestamp ou kh inválidos'
       });
     }
   }
+
 
   console.log(`[API] Sincronizando ${measurements.length} medições do deviceId: ${req.user.deviceId}`);
 
