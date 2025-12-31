@@ -442,7 +442,7 @@ async function checkDevicesOnlineStatus() {
       }
     }
 
-    // --- NOVO BLOCO: alerta de LCD offline ---
+    // alerta de LCD offline ---
     const lcdRows = await conn.query(
       `SELECT d.id,
               d.deviceId,
@@ -453,9 +453,10 @@ async function checkDevicesOnlineStatus() {
               u.email
          FROM devices d
          JOIN users u ON u.id = d.userId
-        WHERE d.type = 'KH'
+        WHERE d.typeDevice = 'KH'   -- <=== ajustar aqui
           AND d.lcd_last_seen IS NOT NULL`
     );
+
 
     for (const row of lcdRows) {
       const raw = String(row.lcd_last_seen || '');
@@ -591,9 +592,10 @@ async function checkLcdStatus() {
     const rows = await conn.query(
       `SELECT id, deviceId, lcd_last_seen, lcd_status
          FROM devices
-        WHERE type = 'KH'
+        WHERE typeDevice = 'KH'    -- <=== mesmo campo
           AND lcd_last_seen IS NOT NULL`
     );
+
 
     for (const row of rows) {
       const raw = String(row.lcd_last_seen || '');
