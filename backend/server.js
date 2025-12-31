@@ -41,7 +41,6 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-
 // === TELEGRAM ===
 
 // Carregar variáveis de ambiente
@@ -118,7 +117,7 @@ async function sendTelegramForUser(userId, text) {
         text,
         parse_mode: 'Markdown',
       },
-      { timeout: 10000 }
+      { timeout: 30000 }
     );
 
 
@@ -137,19 +136,18 @@ async function sendTelegramForUser(userId, text) {
         body
       );
     } else if (err.request) {
-      console.error('sendTelegramForUser no response:', err.message);
+      console.error('sendTelegramForUser no response:', err.message, 'code=', err.code);
       console.error(
         'sendTelegramForUser debug url=',
         err.config && err.config.url
       );
     } else {
       console.error('sendTelegramForUser error:', err.message);
-    }
+    } 
   } finally {
     if (conn) try { conn.release(); } catch (e) {}
   }
 }
-
 
 
 async function discoverTelegramChatIdForUser(userId, botToken) {
