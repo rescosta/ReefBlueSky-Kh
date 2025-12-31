@@ -103,12 +103,19 @@ async function sendTelegramForUser(userId, text) {
     }
 
     const url = `https://api.telegram.org/bot${u.telegram_bot_token}/sendMessage`;
-    await axios.post(url, {
-      chat_id: u.telegram_chat_id,
-      text,
-      parse_mode: 'Markdown',
-    });
+    console.log('sendTelegramForUser: url=', url, 'chat_id=', u.telegram_chat_id);
 
+    await axios.post(
+      url,
+      {
+        chat_id: u.telegram_chat_id,
+        text,
+        parse_mode: 'Markdown',
+      },
+      { timeout: 10000 }
+    );
+
+    console.log('sendTelegramForUser: mensagem enviada para user', userId);
   } catch (err) {
     if (err.response) {
       let body = err.response.data;
@@ -124,6 +131,10 @@ async function sendTelegramForUser(userId, text) {
       );
     } else if (err.request) {
       console.error('sendTelegramForUser no response:', err.message);
+      console.error(
+        'sendTelegramForUser debug url=',
+        err.config && err.config.url
+      );
     } else {
       console.error('sendTelegramForUser error:', err.message);
     }
@@ -131,6 +142,7 @@ async function sendTelegramForUser(userId, text) {
     if (conn) try { conn.release(); } catch (e) {}
   }
 }
+
 
 
 async function discoverTelegramChatIdForUser(userId, botToken) {
