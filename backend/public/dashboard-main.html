@@ -6,6 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      max-width: 100%;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
         'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -24,12 +31,21 @@
     /* TOPBAR */
     .topbar {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 10px 24px;
+      /* antes: padding: 10px 24px; */
+      padding: 10px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
+
+    @supports (padding: max(0px)) {
+      .topbar {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+      }
+    }
+
     .topbar-left {
       display: flex;
       align-items: center;
@@ -121,11 +137,13 @@
     /* LAYOUT PRINCIPAL */
     .content {
       flex: 1;
-      padding: 16px 24px 24px;
+      /* antes: padding: 16px 24px 24px; */
+      padding: 12px 10px 16px;
       display: grid;
       grid-template-columns: 2fr 1.5fr;
       gap: 16px;
     }
+
     @media (max-width: 960px) {
       .content {
         grid-template-columns: 1fr;
@@ -342,7 +360,8 @@
     .footer {
       font-size: 11px;
       color: #6b7280;
-      padding: 6px 24px 10px;
+      /* antes: padding: 6px 24px 10px; */
+      padding: 6px 10px 10px;
       display: flex;
       justify-content: space-between;
     }
