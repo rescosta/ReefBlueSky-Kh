@@ -638,6 +638,7 @@ async function checkLcdStatus() {
 
 setInterval(async () => {
   await checkDevicesOnlineStatus(); 
+  await checkLcdStatus(); 
 }, MONITOR_INTERVAL_MS);
 
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
