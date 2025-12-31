@@ -828,23 +828,6 @@ async function initDashboardMain() {
   await loadMeasurementsForSelected();
 }
 
-
-
-// Inicialização da página principal
-async function initDashboardMain() {
-  await DashboardCommon.initTopbar();
-
-  // Se não houver devices, já para por aqui
-  const devs = await DashboardCommon.loadDevicesCommon();
-  if (!devs.length) {
-    lastCountInfo.textContent = 'Nenhum dispositivo associado';
-    updateMeasurementsView([]);
-    return;
-  }
-
-  await loadMeasurementsForSelected();
-}
-
 // Quando o DOM estiver pronto, inicializa
 document.addEventListener('DOMContentLoaded', initDashboardMain);
 
@@ -852,3 +835,4 @@ document.addEventListener('DOMContentLoaded', initDashboardMain);
 window.addEventListener('deviceChanged', async () => {
   await loadMeasurementsForSelected();
 });
+
