@@ -263,7 +263,6 @@ async function sendVerificationEmail(email, code) {
     console.log('Código de verificação enviado para', email);
   } catch (err) {
     console.error('Erro ao enviar email de verificação:', err.message);
-    // Não lança erro para não quebrar o /auth/register
   }
 }
 
@@ -471,10 +470,11 @@ async function checkDevicesOnlineStatus() {
       const lastMs = Date.UTC(year, month, day, hour, minute, second);
       const isLcdOffline = (now - lastMs) > OFFLINE_THRESHOLD_MS;
 
-      // sempre sincroniza lcd_status com cálculo
+      // === SINCRONIZA lcd_status COM O CÁLCULO ===
+      const statusDb  = String(row.lcd_status || '').trim();
       const newStatus = isLcdOffline ? 'offline' : 'online';
 
-      if (row.lcd_status !== newStatus) {
+      if (statusDb !== newStatus) {
         await conn.query(
           'UPDATE devices SET lcd_status = ? WHERE id = ?',
           [newStatus, row.id]
@@ -482,16 +482,15 @@ async function checkDevicesOnlineStatus() {
         console.log('[LCD] Atualizando lcd_status para', newStatus, 'device', row.deviceId);
       }
 
-
-        console.log(
-          '[LCD DEBUG]',
-          row.deviceId,
-          'lcd_status=', row.lcd_status,
-          'lcd_last_seen=', raw,
-          'lastMs=', lastMs,
-          'lcd_offline_alert_sent=', row.lcd_offline_alert_sent,
-          'isLcdOffline=', isLcdOffline
-        );
+      console.log(
+        '[LCD DEBUG]',
+        row.deviceId,
+        'lcd_status=', statusDb,
+        'lcd_last_seen=', raw,
+        'lastMs=', lastMs,
+        'lcd_offline_alert_sent=', row.lcd_offline_alert_sent,
+        'isLcdOffline=', isLcdOffline
+      );
 
       // LCD OFFLINE e ainda não mandou alerta
       if (isLcdOffline && !row.lcd_offline_alert_sent) {
