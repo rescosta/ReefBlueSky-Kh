@@ -674,5 +674,12 @@
   </script>
   <script src="js/dashboard-common.js"></script>
   <script src="js/dashboard-config.js"></script>
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (window.DashboardCommon && DashboardCommon.initTopbar) {
+      DashboardCommon.initTopbar();
+    }
+  });
+</script>
 </body>
 </html>
