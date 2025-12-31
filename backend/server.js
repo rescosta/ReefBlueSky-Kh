@@ -1471,6 +1471,52 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      `SELECT telegram_bot_token, telegram_chat_id, telegram_enabled
+         FROM users
+        WHERE id = ?
+        LIMIT 1`,
+      [userId]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          telegramBotToken: null,
+          telegramChatId: null,
+          telegramEnabled: false,
+        },
+      });
+    }
+
+    const u = rows[0];
+
+    return res.json({
+      success: true,
+      data: {
+        telegramBotToken: null,                // não reexpor o token
+        telegramChatId: u.telegram_chat_id,    // usado pelo dashboard-config.js
+        telegramEnabled: !!u.telegram_enabled,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/v1/user/telegram-config error', err.message);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro ao carregar config Telegram' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
+
+
 app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
   const userId = req.user.userId;
   const { telegramBotToken, telegramEnabled } = req.body;
