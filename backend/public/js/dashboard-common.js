@@ -313,13 +313,21 @@ function setLcdStatus(status) {
   }
 }
 
-// Refresh periódico do status (device + LCD)
 setInterval(async () => {
   const devs = await loadDevicesCommon();
   if (devs.length) {
     updateDeviceStatusBadge();
+
+    const currentId = getSelectedDeviceId();
+    const cur = devs.find(d => d.deviceId === currentId);
+    if (cur && typeof cur.lcdStatus !== 'undefined') {
+      DashboardCommon.setLcdStatus(cur.lcdStatus);
+    } else {
+      DashboardCommon.setLcdStatus('never');
+    }
   }
-}, 30000); // 30s (ajusta se quiser mais rápido)
+}, 30000);
+
 
 window.DashboardCommon = {
   initTopbar,
