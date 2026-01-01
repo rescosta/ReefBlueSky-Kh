@@ -7,6 +7,11 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    html, body {
+      max-width: 100%;
+      width: 100%;
+      overflow-x: hidden;
+    }
     :root {
       --vh: 100vh;
     }
@@ -17,21 +22,31 @@
         sans-serif;
       background: #020617;
       color: #e5e7eb;
-      min-height: calc(var(--vh) * 1);
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
     a { color: inherit; text-decoration: none; }
 
     /* TOPBAR (mesmo CSS das outras telas) */
+    /* TOPBAR */
     .topbar {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 10px 24px;
+      /* antes: padding: 10px 24px; */
+      padding: 10px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
+
+    @supports (padding: max(0px)) {
+      .topbar {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+      }
+    }
+
     .topbar-left {
       display: flex;
       align-items: center;
@@ -355,13 +370,51 @@
       cursor: pointer;
     }
 
-    @media (max-width: 768px) {
-      .nav {
-        display: none;      /* esconde menu textual */
-      }
-      .menu-toggle {
-        display: inline-flex;
-      }
+    .menu-toggle {
+      display: none;        /* desktop */
+      background: none;
+      border: 0;
+      padding: 6px;
+      cursor: pointer;
+    }
+    .menu-toggle span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      margin: 3px 0;
+    }
+
+    .side-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 72%;
+      max-width: 280px;
+      height: 100%;
+      background: #020617;
+      color: #e5e7eb;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease-out;
+      z-index: 40;
+      padding: 24px 16px;
+    }
+    .side-menu.open {
+      transform: translateX(0);
+    }
+    .side-menu a {
+      display: block;
+      padding: 10px 0;
+      font-size: 16px;
+    }
+    .side-close {
+      background: none;
+      border: 0;
+      color: #9ca3af;
+      font-size: 24px;
+      margin-bottom: 16px;
+      cursor: pointer;
     }
 
   </style>
@@ -377,6 +430,7 @@
     <a href="dashboard-config.html">Configurações</a>
     <a href="dashboard-logs.html">Logs</a>
     <a href="dashboard-sistema.html">Sistema</a>
+    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
   </div>
 
   <div class="content">
