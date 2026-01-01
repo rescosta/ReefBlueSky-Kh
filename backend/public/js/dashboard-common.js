@@ -17,7 +17,8 @@ function redirectToLogin() {
   window.location.href = 'login';
 }
 
-// Relógio simples no topo
+
+// Relógio simples no topo (HH:MM, dois pontos piscando)
 function startTopbarClock() {
   const el = document.getElementById('currentTime');
   if (!el) return;
@@ -26,18 +27,19 @@ function startTopbarClock() {
 
   const update = () => {
     const now = new Date();
-    const hours   = now.getHours().toString().padStart(2, '0');
+    const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
 
-    const sep = showColon ? ':' : ' ';  // pisca o separador
+    const sep = showColon ? ':' : ' ';
     el.textContent = `${hours}${sep}${minutes}`;
 
-    showColon = !showColon;             // inverte a cada tick
+    showColon = !showColon;
   };
 
   update();
-  setInterval(update, 1000);            // intervalo de 1 segundo
+  setInterval(update, 1000);
 }
+
 
 
 // HTML padrão da topbar
