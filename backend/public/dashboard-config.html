@@ -414,6 +414,27 @@
         border-radius: 1px;
         margin: 2px 0;
       }
+        /* Quebrar inline em duas linhas no mobile */
+      .inline {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+      }
+
+      /* Ajustar tabela de bombas para caber */
+      .pump-table {
+        font-size: 11px;
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+      }
+      .pump-table table {
+        width: 100%;
+        min-width: 420px; /* permite scroll horizontal só na tabela se precisar */
+
+      .form-row {
+       flex-direction: column;
+      }
     }
 
 
