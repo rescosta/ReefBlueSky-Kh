@@ -58,6 +58,11 @@ function getTopbarHtml() {
           <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
         </div>
         <button id="logoutBtn" class="btn-small">Sair</button>
+
+        <!-- botão hambúrguer (mobile) -->
+        <button id="menuToggle" class="menu-toggle" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   `;
@@ -227,6 +232,27 @@ async function initTopbar() {
   }
 
   root.innerHTML = getTopbarHtml();
+
+  const sideMenu = document.getElementById('sideMenu');
+  const menuToggle = document.getElementById('menuToggle');
+  const closeBtn = document.getElementById('closeMenu');
+
+  if (sideMenu && menuToggle) {
+    const close = () => sideMenu.classList.remove('open');
+
+    menuToggle.addEventListener('click', () => {
+      sideMenu.classList.toggle('open');
+    });
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', close);
+    }
+
+    sideMenu.addEventListener('click', (e) => {
+      if (e.target.tagName === 'A') close();
+    });
+  }
+
 
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
