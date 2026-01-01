@@ -6,6 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      max-width: 100%;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
         'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -16,20 +23,20 @@
       display: flex;
       flex-direction: column;
     }
-    a {
-      color: inherit;
-      text-decoration: none;
+    a { color: inherit;
+     text-decoration: none; 
     }
 
     /* TOPBAR (reutiliza o CSS da main) */
     .topbar {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 10px 24px;
+      padding: 10px 12px;   /* em vez de 10px 24px */
       display: flex;
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
+
     .topbar-left {
       display: flex;
       align-items: center;
@@ -109,11 +116,12 @@
     /* LAYOUT */
     .content {
       flex: 1;
-      padding: 16px 24px 24px;
+      padding: 12px 10px 16px; 
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
+
 
     .card {
       background: #020617;
@@ -214,13 +222,52 @@
     }
 
     @media (max-width: 768px) {
-      .nav {
-        display: none;      /* esconde menu textual */
+      .nav { display: none; }
+
+      .device-selector span:first-child { display: none; }
+      .device-selector { max-width: 150px; }
+      .device-selector select { width: 100%; }
+
+      #lcdStatusIcon { font-size: 10px; padding: 2px 8px; }
+      #logoutBtn { display: none; }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 8px 12px;
+        gap: 4px;
       }
+      .topbar-left {
+        justify-content: center;
+        order: 1;
+      }
+      .logo { font-size: 20px; }
+
+      .topbar-right {
+        order: 2;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+      }
+
       .menu-toggle {
-        display: inline-flex;
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 8px;
+        width: 36px;
+      }
+      .menu-toggle span {
+        width: 20px;
+        height: 2px;
+        background: #e5e7eb;
+        border-radius: 1px;
+        margin: 2px 0;
       }
     }
+
 
 
   </style>
@@ -236,6 +283,7 @@
     <a href="dashboard-config.html">Configurações</a>
     <a href="dashboard-logs.html">Logs</a>
     <a href="dashboard-sistema.html">Sistema</a>
+    <a href="#" id="menuLogout">Sair</a>
   </div>
 
   <div class="content">

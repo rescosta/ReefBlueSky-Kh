@@ -7,6 +7,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      max-width: 100%;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
         'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -21,12 +28,13 @@
 
     .topbar {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 10px 24px;
+      padding: 10px 12px;   /* em vez de 10px 24px */
       display: flex;
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
+
     .topbar-left {
       display: flex;
       align-items: center;
@@ -132,7 +140,7 @@
 
     .content {
       flex: 1;
-      padding: 24px;
+      padding: 12px 10px 16px;      /* igual main/config/graficos */
       display: grid;
       grid-template-columns: 1.4fr 1.6fr;
       gap: 16px;
@@ -140,7 +148,6 @@
     @media (max-width: 960px) {
       .content { grid-template-columns: 1fr; }
     }
-
     .card {
       background: #020617;
       border-radius: 10px;
@@ -296,14 +303,14 @@
       position: fixed;
       top: 0;
       left: 0;
-      width: 40%;
-      max-width: 200px;
+      width: 72%;
+      max-width: 280px;
       height: 100%;
       background: #020617;
       color: #e5e7eb;
       transform: translateX(-100%);
       transition: transform 0.25s ease-out;
-      z-index: 50;
+      z-index: 40;
       padding: 24px 16px;
     }
 
@@ -325,27 +332,52 @@
     }
 
     @media (max-width: 768px) {
-      .nav {
-        display: none;      /* esconde menu textual */
+      .nav { display: none; }
+
+      .device-selector span:first-child { display: none; }
+      .device-selector { max-width: 150px; }
+      .device-selector select { width: 100%; }
+
+      #lcdStatusIcon { font-size: 10px; padding: 2px 8px; }
+      #logoutBtn { display: none; }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 8px 12px;
+        gap: 4px;
       }
-      .menu-toggle {
-        display: inline-flex;
+      .topbar-left {
+        justify-content: center;
+        order: 1;
       }
+      .logo { font-size: 20px; }
 
       .topbar-right {
+        order: 2;
+        justify-content: space-between;
+        flex-wrap: wrap;
         gap: 8px;
         font-size: 12px;
       }
 
-      .device-selector span:first-child {
-        display: none;   /* esconde o texto "Device:" */
+      .menu-toggle {
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 8px;
+        width: 36px;
       }
-
-      #lcdStatusIcon {
-        font-size: 10px;
-        padding: 2px 8px;
+      .menu-toggle span {
+        width: 20px;
+        height: 2px;
+        background: #e5e7eb;
+        border-radius: 1px;
+        margin: 2px 0;
       }
     }
+
   </style>
 </head>
 <body>
@@ -360,6 +392,7 @@
     <a href="dashboard-config.html">Configurações</a>
     <a href="dashboard-logs.html">Logs</a>
     <a href="dashboard-sistema.html">Sistema</a>
+    <a href="#" id="menuLogout">Sair</a>
   </div>
 
   <div class="online-status-card">
