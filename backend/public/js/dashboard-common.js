@@ -21,28 +21,22 @@ function redirectToLogin() {
 function startTopbarClock() {
   const el = document.getElementById('currentTime');
   if (!el) return;
+
+  let showColon = true;
+
   const update = () => {
     const now = new Date();
-    const seconds = now.getSeconds();
-    
-    // piscar os segundos (some no par)
-    const showSeconds = seconds % 2 === 0;
-    
-    if (showSeconds) {
-      el.textContent = now.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    } else {
-      el.textContent = now.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
+    const hours   = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+
+    const sep = showColon ? ':' : ' ';  // pisca o separador
+    el.textContent = `${hours}${sep}${minutes}`;
+
+    showColon = !showColon;             // inverte a cada tick
   };
+
   update();
-  setInterval(update, 500);  // atualiza a cada 500ms para piscar suave
+  setInterval(update, 1000);            // intervalo de 1 segundo
 }
 
 
