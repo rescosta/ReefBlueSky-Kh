@@ -59,7 +59,7 @@ function getTopbarHtml() {
         </div>
         <button id="logoutBtn" class="btn-small">Sair</button>
 
-        <!-- botão hambúrguer (mobile) -->
+        <!-- botão hambúrguer -->
         <button id="menuToggle" class="menu-toggle" aria-label="Menu">
           <span></span><span></span><span></span>
         </button>
@@ -233,9 +233,10 @@ async function initTopbar() {
 
   root.innerHTML = getTopbarHtml();
 
-  const sideMenu = document.getElementById('sideMenu');
+  // MENU LATERAL
+  const sideMenu  = document.getElementById('sideMenu');
   const menuToggle = document.getElementById('menuToggle');
-  const closeBtn = document.getElementById('closeMenu');
+  const closeBtn   = document.getElementById('closeMenu');
 
   if (sideMenu && menuToggle) {
     const close = () => sideMenu.classList.remove('open');
@@ -249,7 +250,9 @@ async function initTopbar() {
     }
 
     sideMenu.addEventListener('click', (e) => {
-      if (e.target.tagName === 'A') close();
+      if (e.target.tagName === 'A') {
+        close();
+      }
     });
   }
 
