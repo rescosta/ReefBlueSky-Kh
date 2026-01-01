@@ -109,11 +109,17 @@
     /* LAYOUT */
     .content {
       flex: 1;
-      padding: 16px 24px 24px;
-      display: flex;
-      flex-direction: column;
+      padding: 12px 10px 16px;
+      display: grid;
+      grid-template-columns: 2fr 1.5fr; /* ou o split que preferir para gráficos */
       gap: 16px;
     }
+    @media (max-width: 960px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+
 
     .card {
       background: #020617;
@@ -256,11 +262,49 @@
     }
 
     @media (max-width: 768px) {
-      .nav {
-        display: none;      /* esconde menu textual */
+      .nav { display: none; }
+
+      .device-selector span:first-child { display: none; }
+      .device-selector { max-width: 150px; }
+      .device-selector select { width: 100%; }
+
+      #lcdStatusIcon { font-size: 10px; padding: 2px 8px; }
+      #logoutBtn { display: none; }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 8px 12px;
+        gap: 4px;
       }
+      .topbar-left {
+        justify-content: center;
+        order: 1;
+      }
+      .logo { font-size: 20px; }
+
+      .topbar-right {
+        order: 2;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+      }
+
       .menu-toggle {
-        display: inline-flex;
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 8px;
+        width: 36px;
+      }
+      .menu-toggle span {
+        width: 20px;
+        height: 2px;
+        background: #e5e7eb;
+        border-radius: 1px;
+        margin: 2px 0;
       }
     }
 
@@ -277,6 +321,7 @@
     <a href="dashboard-config.html">Configurações</a>
     <a href="dashboard-logs.html">Logs</a>
     <a href="dashboard-sistema.html">Sistema</a>
+    <a href="#" id="menuLogout">Sair</a>
   </div>
 
   <div class="content">
