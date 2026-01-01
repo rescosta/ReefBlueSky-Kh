@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>ReefBlueSky - Painel Principal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -28,25 +28,21 @@
       text-decoration: none;
     }
 
-    /* TOPBAR - DESKTOP FIRST */
+    /* TOPBAR */
     .topbar {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      /* antes: padding: 10px 24px; */
       padding: 10px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      min-height: 50px;
-      flex-wrap: wrap;
-      gap: 8px;
     }
 
-    /* Safe area para notch do iPhone */
     @supports (padding: max(0px)) {
       .topbar {
         padding-left: max(10px, env(safe-area-inset-left));
         padding-right: max(10px, env(safe-area-inset-right));
-        padding-top: max(10px, env(safe-area-inset-top));
       }
     }
 
@@ -54,45 +50,32 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      flex: 0 1 auto;
-      min-width: 0;
     }
-
     .logo {
       font-size: 22px;
       font-weight: 700;
       letter-spacing: 0.05em;
-      white-space: nowrap;
     }
-
     .nav {
       display: flex;
       gap: 16px;
       font-size: 14px;
     }
-
     .nav a {
       opacity: 0.8;
       padding-bottom: 2px;
       border-bottom: 2px solid transparent;
-      white-space: nowrap;
     }
-
     .nav a.active {
       opacity: 1;
       border-color: #facc15;
     }
-
     .topbar-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 16px;
       font-size: 14px;
-      flex: 1 1 auto;
-      justify-content: flex-end;
-      flex-wrap: wrap;
     }
-
     .badge-ok,
     .badge-error,
     .badge,
@@ -102,33 +85,27 @@
       border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
-      white-space: nowrap;
     }
-
     .badge-ok {
       background: #16a34a33;
       border: 1px solid #22c55e;
       color: #bbf7d0;
     }
-
     .badge-error {
       background: #b91c1c33;
       border: 1px solid #f97373;
       color: #fecaca;
     }
-
     .badge-on {
       background: #16a34a33;
       border: 1px solid #22c55e;
       color: #bbf7d0;
     }
-
     .badge-off {
       background: #111827;
       border: 1px solid #4b5563;
       color: #9ca3af;
     }
-
     .btn-small {
       border: none;
       border-radius: 6px;
@@ -138,25 +115,16 @@
       cursor: pointer;
       background: #0f172a;
       color: #e5e7eb;
-      white-space: nowrap;
     }
-
     .btn-small:hover {
       background: #111827;
     }
-
     .device-selector {
       display: flex;
       align-items: center;
       gap: 8px;
       font-size: 13px;
-      flex-wrap: wrap;
     }
-
-    .device-selector span:first-child {
-      display: none;
-    }
-
     .device-selector select {
       background: #020617;
       color: #e5e7eb;
@@ -164,27 +132,16 @@
       border: 1px solid #374151;
       padding: 4px 8px;
       font-size: 13px;
-      max-width: 150px;
-    }
-
-    #currentTime {
-      white-space: nowrap;
-      font-size: 13px;
-    }
-
-    #lcdStatusIcon {
-      white-space: nowrap;
-      font-size: 11px !important;
     }
 
     /* LAYOUT PRINCIPAL */
     .content {
       flex: 1;
+      /* antes: padding: 16px 24px 24px; */
       padding: 12px 10px 16px;
       display: grid;
       grid-template-columns: 2fr 1.5fr;
       gap: 16px;
-      overflow-x: hidden;
     }
 
     @media (max-width: 960px) {
@@ -192,37 +149,31 @@
         grid-template-columns: 1fr;
       }
     }
-
     .left-col,
     .right-col {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-
     .card {
       background: #020617;
       border-radius: 10px;
       padding: 14px 16px;
       border: 1px solid #1f2937;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-      overflow-x: hidden;
     }
-
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
-
     .card-title {
       font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: #9ca3af;
     }
-
     .card-subtitle {
       font-size: 12px;
       color: #6b7280;
@@ -235,26 +186,21 @@
       gap: 12px;
       align-items: center;
     }
-
     .kh-value {
       font-size: 60px;
       font-weight: 700;
       color: #e5e7eb;
     }
-
     .kh-diff {
       font-size: 14px;
       margin-top: 4px;
     }
-
     .kh-diff.negative {
       color: #f97373;
     }
-
     .kh-diff.positive {
       color: #4ade80;
     }
-
     .kh-side {
       display: flex;
       flex-direction: column;
@@ -313,7 +259,6 @@
       font-size: 12px;
       color: #9ca3af;
     }
-
     .kh-target-line span.value {
       color: #e5e7eb;
       font-weight: 500;
@@ -324,7 +269,6 @@
       justify-content: space-between;
       align-items: center;
     }
-
     .muted {
       color: #6b7280;
       font-size: 12px;
@@ -336,18 +280,15 @@
       gap: 16px;
       justify-content: space-between;
     }
-
     .status-circle {
       flex: 1;
       text-align: center;
     }
-
     .status-label {
       font-size: 12px;
       color: #9ca3af;
       margin-top: 6px;
     }
-
     .status-badge {
       font-size: 22px;
       font-weight: 600;
@@ -357,7 +298,6 @@
       border: 1px solid #16a34a;
       color: #bbf7d0;
     }
-
     .status-badge.off {
       background: #111827;
       border-color: #4b5563;
@@ -371,11 +311,9 @@
       flex-direction: column;
       gap: 4px;
     }
-
     .measure-info span.label {
       color: #9ca3af;
     }
-
     .measure-info span.value {
       color: #e5e7eb;
     }
@@ -387,32 +325,22 @@
       font-size: 12px;
       margin-top: 4px;
     }
-
     .table-small th,
     .table-small td {
       padding: 4px 6px;
       border-bottom: 1px solid #1f2937;
     }
-
     .table-small th {
       text-align: left;
       color: #9ca3af;
       font-weight: 500;
     }
-
     .table-small tbody tr:hover {
       background: #030712;
     }
 
-    .progress-wrapper { 
-      font-size: 12px; 
-    }
-
-    .progress-label { 
-      margin-bottom: 4px; 
-      color: #9ca3af; 
-    }
-
+    .progress-wrapper { font-size: 12px; }
+    .progress-label { margin-bottom: 4px; color: #9ca3af; }
     .progress-bar {
       width: 100%;
       height: 6px;
@@ -421,7 +349,6 @@
       border: 1px solid #1f2937;
       overflow: hidden;
     }
-
     .progress-fill {
       height: 100%;
       width: 0%;
@@ -433,25 +360,23 @@
     .footer {
       font-size: 11px;
       color: #6b7280;
+      /* antes: padding: 6px 24px 10px; */
       padding: 6px 10px 10px;
       display: flex;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
     }
+
 
     .status-badge.good {
       background: #022c22;
       border-color: #16a34a;
       color: #bbf7d0;
     }
-
     .status-badge.warn {
       background: #451a03;
       border-color: #f59e0b;
       color: #fed7aa;
     }
-
     .status-badge.bad {
       background: #450a0a;
       border-color: #ef4444;
@@ -461,43 +386,37 @@
     .kh-history-container {
       max-height: 260px;
       overflow-y: auto;     
-      overflow-x: auto;
+      overflow-x: hidden;
     }
 
-    /* scrollbar mais discreta (WebKit) */
+    /* opcional: scrollbar mais discreta (WebKit) */
     .kh-history-container::-webkit-scrollbar {
       width: 6px;
-      height: 6px;
     }
-
     .kh-history-container::-webkit-scrollbar-thumb {
       background: #444;
       border-radius: 3px;
     }
-
     .kh-history-container::-webkit-scrollbar-track {
       background: #020617;
     }
 
     .kh-trend {
-      text-align: center;
-      width: 14px;
+    text-align: center;
+    width: 14px;
     }
 
-    .kh-trend.up    { color: #60a5fa; }
-    .kh-trend.down  { color: #60a5fa; }
-    .kh-trend.equal { color: #22c55e; }
+    .kh-trend.up    { color: #60a5fa; }  /* verde: #22c55e - vermelho: #f97373 - azul: #60a5fa */
+    .kh-trend.down  { color: #60a5fa; }  
+    .kh-trend.equal { color: #22c55e; }  
 
-    /* MENU HAMBÚRGUER */
     .menu-toggle {
-      display: none;
+      display: none;        /* desktop */
       background: none;
       border: 0;
       padding: 6px;
       cursor: pointer;
-      flex-shrink: 0;
     }
-
     .menu-toggle span {
       display: block;
       width: 18px;
@@ -520,24 +439,15 @@
       transition: transform 0.25s ease-out;
       z-index: 40;
       padding: 24px 16px;
-      overflow-y: auto;
     }
-
     .side-menu.open {
       transform: translateX(0);
     }
-
     .side-menu a {
       display: block;
       padding: 10px 0;
       font-size: 16px;
-      border-bottom: 1px solid #1f2937;
     }
-
-    .side-menu a:last-child {
-      border-bottom: none;
-    }
-
     .side-close {
       background: none;
       border: 0;
@@ -547,233 +457,46 @@
       cursor: pointer;
     }
 
-    /* MEDIA QUERIES - TABLET (768px) */
     @media (max-width: 768px) {
+      /* menu hambúrguer: some nav textual, mostra botão */
       .nav {
         display: none;
       }
-
       .menu-toggle {
         display: inline-flex;
-        order: 10;
       }
 
+      /* enxugar topbar à direita */
       .topbar-right {
-        order: 5;
-        width: 100%;
-        justify-content: space-between;
-        gap: 4px;
-      }
-
-      .device-selector {
-        order: 4;
-        flex: 1;
-        min-width: 0;
-      }
-
-      .device-selector select {
-        max-width: 120px;
-        font-size: 12px;
-      }
-
-      #currentTime {
-        font-size: 12px;
-      }
-
-      .btn-small {
-        padding: 5px 8px;
-        font-size: 11px;
-      }
-
-      .badge-on,
-      .badge-off {
-        padding: 3px 8px;
-        font-size: 11px;
-      }
-
-      #lcdStatusIcon {
-        font-size: 10px !important;
-      }
-    }
-
-    /* MEDIA QUERIES - MOBILE (480px) */
-    @media (max-width: 480px) {
-      .topbar {
-        padding: 8px 10px;
-        min-height: 44px;
-        gap: 4px;
-      }
-
-      .topbar-left {
         gap: 8px;
-        flex: 0 0 auto;
+        font-size: 12px;
       }
 
-      .logo {
-        font-size: 18px;
-      }
-
-      .topbar-right {
-        gap: 3px;
-      }
-
-      .device-selector {
-        gap: 4px;
-        order: 3;
-      }
-
+      /* esconder texto "Device:" só no mobile */
       .device-selector span:first-child {
         display: none;
       }
 
+      /* estreitar combo do device */
+      .device-selector {
+        max-width: 150px;
+      }
       .device-selector select {
-        max-width: 100px;
-        padding: 3px 6px;
-        font-size: 11px;
+        width: 100%;
       }
 
-      #currentTime {
-        font-size: 11px;
-        order: 1;
-      }
-
+      /* badge de LCD menor */
       #lcdStatusIcon {
-        display: none !important;
-      }
-
-      #deviceStatusBadge {
-        display: none !important;
-      }
-
-      .btn-small {
-        padding: 4px 6px;
         font-size: 10px;
+        padding: 2px 8px;
       }
 
-      .badge-on,
-      .badge-off {
-        padding: 2px 6px;
-        font-size: 10px;
-      }
-
-      .menu-toggle {
-        order: 10;
-        padding: 4px;
-      }
-
-      .menu-toggle span {
-        width: 16px;
-        height: 1.5px;
-        margin: 2.5px 0;
-      }
-
-      .content {
-        padding: 8px 8px 12px;
-        gap: 12px;
-      }
-
-      .card {
-        padding: 10px 12px;
-      }
-
-      .kh-value {
-        font-size: 48px;
-      }
-
-      .kh-metrics-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 4px;
-        font-size: 10px;
-      }
-
-      .kh-window {
-        padding: 3px 4px;
-        font-size: 10px;
-      }
-
-      .status-circles {
-        gap: 8px;
-      }
-
-      .status-badge {
-        font-size: 18px;
-        padding: 12px 0;
-      }
-
-      .status-label {
-        font-size: 11px;
-      }
-
-      .card-title {
-        font-size: 12px;
-      }
-
-      .card-subtitle {
-        font-size: 11px;
-      }
-
-      .footer {
-        font-size: 10px;
-      }
-
-      .table-small {
-        font-size: 11px;
-      }
-
-      .table-small th,
-      .table-small td {
-        padding: 3px 4px;
+      /* esconder botão Sair apenas no mobile */
+      #logoutBtn {
+        display: none;
       }
     }
 
-    /* MEDIA QUERIES - EXTRA SMALL (360px) */
-    @media (max-width: 360px) {
-      .topbar {
-        padding: 6px 8px;
-        min-height: 40px;
-      }
-
-      .logo {
-        font-size: 16px;
-      }
-
-      .device-selector select {
-        max-width: 80px;
-        font-size: 10px;
-      }
-
-      #currentTime {
-        font-size: 10px;
-      }
-
-      .kh-value {
-        font-size: 40px;
-      }
-
-      .kh-main {
-        grid-template-columns: 1fr;
-      }
-
-      .kh-side {
-        gap: 4px;
-        font-size: 12px;
-      }
-
-      .kh-metrics-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 3px;
-        font-size: 9px;
-      }
-
-      .status-circles {
-        gap: 6px;
-      }
-
-      .status-badge {
-        font-size: 16px;
-        padding: 10px 0;
-      }
-    }
 
   </style>
 </head>
@@ -788,7 +511,9 @@
     <a href="dashboard-config.html">Configurações</a>
     <a href="dashboard-logs.html">Logs</a>
     <a href="dashboard-sistema.html">Sistema</a>
+    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
   </div>
+
   
   <div class="content">
     <!-- Coluna esquerda -->
