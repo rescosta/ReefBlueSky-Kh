@@ -23,14 +23,28 @@ function startTopbarClock() {
   if (!el) return;
   const update = () => {
     const now = new Date();
-    el.textContent = now.toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const seconds = now.getSeconds();
+    
+    // piscar os segundos (some no par)
+    const showSeconds = seconds % 2 === 0;
+    
+    if (showSeconds) {
+      el.textContent = now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } else {
+      el.textContent = now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   };
   update();
-  setInterval(update, 1000);
+  setInterval(update, 500);  // atualiza a cada 500ms para piscar suave
 }
+
 
 // HTML padrão da topbar
 function getTopbarHtml() {
