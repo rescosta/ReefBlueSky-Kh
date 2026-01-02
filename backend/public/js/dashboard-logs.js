@@ -28,6 +28,15 @@ async function loadServerConsole() {
   }
 }
 
+function clearServerConsoleUI() {
+  const el = document.getElementById('serverConsole');
+  if (el) {
+    el.textContent = '';
+    el.scrollTop = 0;
+  }
+}
+
+
 async function loadDeviceConsole() {
   try {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
@@ -134,7 +143,14 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     loadServerConsole();
   });
-    
+
+  // NOVO: limpar console do servidor
+  const btnClearSrv = document.getElementById('clearServerConsole');
+  if (btnClearSrv) btnClearSrv.addEventListener('click', (e) => {
+    e.preventDefault();
+    clearServerConsoleUI();
+  });
+
   const sendBtn = document.getElementById('sendDeviceCommand');
   if (sendBtn) sendBtn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -149,8 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-
-  // Reage à troca de device no topo
   window.addEventListener('deviceChanged', () => {
     loadDeviceConsole();
   });
