@@ -846,8 +846,6 @@ app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req
   }
 });
 
-
-
 // Console do device (DEV)
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
   const { deviceId } = req.params;
@@ -862,6 +860,50 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, 
   });
 });
 
+// Comando de console para o device (DEV/usuário logado)
+app.post(
+  '/api/v1/dev/device-command/:deviceId',
+  authUserMiddleware,
+  async (req, res) => {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const { command } = req.body || {};
+
+    if (!command || !command.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'command vazio' });
+    }
+
+    try {
+      // garante que o device pertence ao usuário
+      const rows = await pool.query(
+        'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+        [deviceId, userId]
+      );
+      if (!rows.length) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Device não encontrado' });
+      }
+
+      // Enfileira comando para o ESP via device_commands
+      await enqueueDbCommand(deviceId, 'esp_console', { line: command.trim() });
+
+      // (opcional) logar a linha em arquivo por device
+      const logLine = `[WEB ${new Date().toISOString()}] ${command.trim()}\n`;
+      const devLogPath = `/home/reef/logs/device-${deviceId}.log`; // ajuste caminho se quiser
+      fs.appendFile(devLogPath, logLine, () => {});
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('POST /api/v1/dev/device-command error:', err.message);
+      return res
+        .status(500)
+        .json({ success: false, message: 'Erro ao enviar comando' });
+    }
+  }
+);
 
 
 
