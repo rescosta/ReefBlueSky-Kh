@@ -320,13 +320,19 @@
             Logs recentes do backend Node.
           </div>
         </div>
+
+        <!-- botões de ação do servidor -->
+        <div style="display:flex; gap:8px;">
+          <button id="reloadServerConsole" class="btn-primary">
+            Recarregar servidor
+          </button>
+          <button id="clearServerConsole" class="btn-primary" style="background:#111827;">
+            Limpar linhas
+          </button>
+        </div>
       </div>
 
       <pre id="serverConsole" class="console-box">Carregando...</pre>
-
-      <button id="reloadServerConsole" class="btn-primary" style="margin-top:8px;">
-        Recarregar servidor
-      </button>
     </div>
   </div>
 
