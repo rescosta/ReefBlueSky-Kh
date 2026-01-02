@@ -2093,6 +2093,95 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
   }
 });
 
+// Dashboard: ler últimos logs do device
+app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, res) => {
+  const userId   = req.user.userId;
+  const deviceId = req.params.deviceId;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // garante que o device pertence ao usuário
+    const rowsDev = await conn.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!rowsDev.length) {
+      return res.status(404).json({ success: false, message: 'Device não encontrado' });
+    }
+
+    const logRows = await conn.query(
+      `SELECT ts, level, message
+         FROM device_logs
+        WHERE deviceId = ?
+        ORDER BY ts DESC
+        LIMIT 200`,
+      [deviceId]
+    );
+
+    const lines = logRows
+      .slice()              // cópia
+      .reverse()            // mais antigo → mais novo
+      .map((r) => {
+        const t = new Date(r.ts).toISOString();
+        const lvl = r.level ? `[${r.level}]` : '';
+        return `${t} ${lvl} ${r.message}`;
+      });
+
+    return res.json({ success: true, data: lines });
+  } catch (err) {
+    console.error('Erro ao ler device_logs', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao carregar console do dispositivo',
+    });
+  } finally {
+    if (conn) try { conn.release(); } catch (_) {}
+  }
+});
+
+
+// ESP envia linhas de log
+app.post('/api/v1/device/logs', verifyToken, async (req, res) => {
+  const deviceId = req.user.deviceId;
+  const userId   = req.user.userId || null;
+  const { lines } = req.body;
+
+  if (!Array.isArray(lines) || !lines.length) {
+    return res.status(400).json({
+      success: false,
+      message: 'lines deve ser um array não vazio',
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const sql = `
+      INSERT INTO device_logs (deviceId, userId, ts, level, message)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+
+    for (const l of lines) {
+      if (!l || typeof l.message !== 'string') continue;
+      const ts    = Number.isFinite(l.ts) ? l.ts : Date.now();
+      const level = l.level || null;
+      await conn.query(sql, [deviceId, userId, ts, level, l.message]);
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Erro ao gravar device_logs', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao gravar logs do dispositivo',
+    });
+  } finally {
+    if (conn) try { conn.release(); } catch (_) {}
+  }
+});
 
 /**
  * POST /api/v1/device/health
