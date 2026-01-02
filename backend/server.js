@@ -811,10 +811,15 @@ app.get('/api/v1/dev/logs', authUserMiddleware, requireDev, (req, res) => {
 
 // Console do servidor (DEV)
 app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req, res) => {
-  const logPath = '/home/reef/.pm2/logs/server-out.log'; // caminho do pm2
+  const path = require('path');
+  const logPath = path.join(__dirname, 'server-console.log');
 
   try {
-    // lê no máximo os últimos 200 KB para não explodir memória
+    // garante que o arquivo exista
+    await fs.promises.mkdir(path.dirname(logPath), { recursive: true }).catch(() => {});
+    await fs.promises.appendFile(logPath, ''); // cria se não existir
+
+    // lê no máximo os últimos 200 KB
     const stats = await fs.promises.stat(logPath);
     const maxBytes = 200 * 1024;
     const start = Math.max(0, stats.size - maxBytes);
@@ -827,15 +832,11 @@ app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req
     const text = buffer.toString('utf8');
     let lines = text.split('\n').filter(l => l.trim().length > 0);
 
-    // limita a 200 linhas mais recentes
     if (lines.length > 200) {
       lines = lines.slice(lines.length - 200);
     }
 
-    return res.json({
-      success: true,
-      data: lines
-    });
+    return res.json({ success: true, data: lines });
   } catch (err) {
     console.error('DEV /server-console error:', err);
     return res.json({
@@ -845,6 +846,7 @@ app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req
     });
   }
 });
+
 
 // Console do device (DEV)
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
