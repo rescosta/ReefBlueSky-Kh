@@ -54,6 +54,23 @@ async function loadDeviceConsole() {
   }
 }
 
+let logsPollHandle = null;
+
+async function startLogsPolling() {
+  // evita múltiplos timers
+  if (logsPollHandle) clearInterval(logsPollHandle);
+
+  // primeira carga imediata
+  await loadServerConsole();
+  await loadDeviceConsole();
+
+  // depois fica atualizando
+  logsPollHandle = setInterval(async () => {
+    await loadServerConsole();
+    await loadDeviceConsole();
+  }, 5000); // 5s; ajusta como quiser
+}
+
 
 async function initDashboardLogs() {
   await DashboardCommon.initTopbar();
@@ -65,9 +82,41 @@ async function initDashboardLogs() {
     return;
   }
 
-  await loadServerConsole();
-  await loadDeviceConsole();
+  await startLogsPolling();
+
 }
+
+async function sendDeviceCommand() {
+  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+  if (!deviceId) return;
+
+  const input = document.getElementById('deviceCommandInput');
+  if (!input) return;
+  const cmd = input.value.trim();
+  if (!cmd) return;
+
+  try {
+    const res = await fetch(
+      `/api/v1/dev/device-command/${encodeURIComponent(deviceId)}`,
+      {
+        method: 'POST',
+        headers: API_HEADERS(),
+        body: JSON.stringify({ command: cmd }),
+      },
+    );
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      console.error(json.message || 'Erro ao enviar comando');
+      return;
+    }
+    input.value = '';
+    // força recarregar log pra ver a resposta
+    await loadDeviceConsole();
+  } catch (err) {
+    console.error('sendDeviceCommand error', err);
+  }
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboardLogs().catch((err) =>
@@ -85,6 +134,21 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     loadServerConsole();
   });
+    
+  const sendBtn = document.getElementById('sendDeviceCommand');
+  if (sendBtn) sendBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    sendDeviceCommand();
+  });
+
+  const cmdInput = document.getElementById('deviceCommandInput');
+  if (cmdInput) cmdInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendDeviceCommand();
+    }
+  });
+
 
   // Reage à troca de device no topo
   window.addEventListener('deviceChanged', () => {
