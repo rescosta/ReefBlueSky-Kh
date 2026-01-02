@@ -266,6 +266,14 @@ async function initTopbar() {
     });
   }
 
+  const menuLogout = document.getElementById('menuLogout');
+  if (menuLogout) {
+    menuLogout.addEventListener('click', (e) => {
+      e.preventDefault();
+      redirectToLogin();
+    });
+  }
+
 
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
