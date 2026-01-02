@@ -50,7 +50,6 @@ function getTopbarHtml() {
         <div class="logo">ReefBlueSky</div>
         <nav class="nav">
           <a href="dashboard" id="nav-main">Principal</a>
-          <a href="dashboard-logs.html" id="nav-logs">Logs</a>
           <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
           <a href="dashboard-config.html" id="nav-config">Configurações</a>
           <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
