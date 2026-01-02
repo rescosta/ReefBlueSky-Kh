@@ -348,26 +348,36 @@ async function loadSystemForSelected() {
 
   updateDeviceInfoFromList();
 
-
-  // Atualiza status online / card com o mesmo device
+  // 1) Atualiza status online
   const devs = await DashboardCommon.loadDevicesCommon();
   const dev = devs.find((d) => d.deviceId === deviceId);
   updateOnlineUI(dev);
 
-  if (window.DashboardCommon && typeof DashboardCommon.setLcdStatus === 'function') {
-    if (dev && typeof dev.lcdStatus !== 'undefined') {
-      DashboardCommon.setLcdStatus(dev.lcdStatus);   // online/offline/never
-    }
-  }
-
+  // 2) Carrega health + eventos em paralelo
   const [health, events] = await Promise.all([
     apiLoadDeviceHealth(deviceId),
     apiLoadDeviceEvents(deviceId),
   ]);
-
   renderHealth(health);
   renderEvents(events);
+
+  // 3) AGORA pega lcdStatus via /kh-config (mesmo padrão do main)
+  try {
+    const resp = await fetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+      { headers: headersAuthSys }
+    );
+    const json = await resp.json();
+    if (resp.ok && json.success && json.data &&
+        window.DashboardCommon &&
+        typeof DashboardCommon.setLcdStatus === 'function') {
+      DashboardCommon.setLcdStatus(json.data.lcdStatus);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar lcdStatus na tela Sistema', e);
+  }
 }
+
 
 // Eventos de comandos
 cmdRestartBtn.addEventListener('click', async () => {
@@ -419,17 +429,8 @@ async function initDashboardSistema() {
   }
 
   await loadSystemForSelected();
-
-  // FORÇA LCD DEPOIS DE TODO O CARREGAMENTO
-  const deviceId = DashboardCommon.getSelectedDeviceId();
-  const dev = devs.find((d) => d.deviceId === deviceId);
-  if (dev &&
-      window.DashboardCommon &&
-      typeof DashboardCommon.setLcdStatus === 'function' &&
-      typeof dev.lcdStatus !== 'undefined') {
-    DashboardCommon.setLcdStatus(dev.lcdStatus);
-  }
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboardSistema().catch((err) =>
@@ -437,18 +438,8 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-window.addEventListener('deviceChanged', async () => {
-  await loadSystemForSelected();
-
-  const devs = await DashboardCommon.loadDevicesCommon();
-  const deviceId = DashboardCommon.getSelectedDeviceId();
-  const dev = devs.find((d) => d.deviceId === deviceId);
-
-  if (dev &&
-      window.DashboardCommon &&
-      typeof DashboardCommon.setLcdStatus === 'function' &&
-      typeof dev.lcdStatus !== 'undefined') {
-    DashboardCommon.setLcdStatus(dev.lcdStatus);
-  }
+window.addEventListener('deviceChanged', () => {
+  loadSystemForSelected();
 });
+
 
