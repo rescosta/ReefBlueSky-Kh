@@ -303,6 +303,7 @@ function renderHealth(health) {
 }
 
 
+
 function renderEvents(events) {
   eventsListEl.innerHTML = '';
   if (!events || !events.length) {
@@ -353,6 +354,11 @@ async function loadSystemForSelected() {
   const dev = devs.find((d) => d.deviceId === deviceId);
   updateOnlineUI(dev);
 
+  if (window.DashboardCommon && typeof DashboardCommon.setLcdStatus === 'function') {
+    if (dev && typeof dev.lcdStatus !== 'undefined') {
+      DashboardCommon.setLcdStatus(dev.lcdStatus);   // online/offline/never
+    }
+  }
 
   const [health, events] = await Promise.all([
     apiLoadDeviceHealth(deviceId),
