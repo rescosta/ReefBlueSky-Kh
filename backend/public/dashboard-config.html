@@ -235,11 +235,21 @@
     }
 
     .badge-level {
-      padding: 3px 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 10px;
       border-radius: 999px;
       font-size: 11px;
       font-weight: 600;
-      display: inline-block;
+      min-width: 60px;   
+    }
+    
+    .field-row.inline {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
     }
     .badge-on {
       background: #16a34a33;
@@ -432,7 +442,7 @@
         width: 100%;
         min-width: 420px; /* permite scroll horizontal só na tabela se precisar */
       } 
-      
+
       .form-row {
        flex-direction: column;
       }
