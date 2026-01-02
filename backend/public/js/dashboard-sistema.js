@@ -418,27 +418,18 @@ async function initDashboardSistema() {
     return;
   }
 
-  const deviceId = DashboardCommon.getSelectedDeviceId();
-  if (deviceId) {
-    try {
-      const resp = await fetch(
-        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-        { headers: headersAuthSys }            // usa o headers deste arquivo
-      );
-      const json = await resp.json();
-      if (resp.ok && json.success && json.data &&
-          typeof DashboardCommon.setLcdStatus === 'function') {
-        DashboardCommon.setLcdStatus(json.data.lcdStatus);
-      }
-    } catch (e) {
-      console.error('Erro ao carregar lcdStatus na tela Sistema', e);
-    }
-  }
-  // === FIM BLOCO NOVO ===
-
   await loadSystemForSelected();
-}
 
+  // FORÇA LCD DEPOIS DE TODO O CARREGAMENTO
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  const dev = devs.find((d) => d.deviceId === deviceId);
+  if (dev &&
+      window.DashboardCommon &&
+      typeof DashboardCommon.setLcdStatus === 'function' &&
+      typeof dev.lcdStatus !== 'undefined') {
+    DashboardCommon.setLcdStatus(dev.lcdStatus);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboardSistema().catch((err) =>
@@ -446,6 +437,18 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-window.addEventListener('deviceChanged', () => {
-  loadSystemForSelected();
+window.addEventListener('deviceChanged', async () => {
+  await loadSystemForSelected();
+
+  const devs = await DashboardCommon.loadDevicesCommon();
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  const dev = devs.find((d) => d.deviceId === deviceId);
+
+  if (dev &&
+      window.DashboardCommon &&
+      typeof DashboardCommon.setLcdStatus === 'function' &&
+      typeof dev.lcdStatus !== 'undefined') {
+    DashboardCommon.setLcdStatus(dev.lcdStatus);
+  }
 });
+
