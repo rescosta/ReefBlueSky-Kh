@@ -57,23 +57,25 @@ function getTopbarHtml() {
           <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
         </nav>
       </div>
-      <div class="topbar-right">
-        <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
-          LCD OFF
-        </span>
-        <div id="currentTime">--:--</div>
-        <div class="device-selector">
-          <span>Device:</span>
-          <select id="deviceSelect"></select>
-          <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
-        </div>
-        <button id="logoutBtn" class="btn-small">Sair</button>
+        <div class="topbar-right">
+          <div class="device-selector">
+            <span>Device:</span>
+            <select id="deviceSelect"></select>
+            <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
+          </div>
 
-        <!-- botão hambúrguer -->
-        <button id="menuToggle" class="menu-toggle" aria-label="Menu">
-          <span></span><span></span><span></span>
-        </button>
-      </div>
+          <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
+            LCD OFF
+          </span>
+
+          <div id="currentTime" class="topbar-clock">--:--</div>
+
+          <button id="logoutBtn" class="btn-small">Sair</button>
+
+          <button id="menuToggle" class="menu-toggle" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
     </div>
   `;
 }
@@ -128,7 +130,6 @@ async function loadUserCommon() {
     return null;
   }
 }
-
 
 
 // Carregar lista de devices
