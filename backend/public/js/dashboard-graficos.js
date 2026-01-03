@@ -1,15 +1,5 @@
 // dashboard-graficos.js
 
-const chartsToken = localStorage.getItem('token');
-if (!chartsToken) {
-  window.location.href = 'login';
-}
-
-const headersAuthGraficos = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${chartsToken}`,
-};
-
 const chartInfo = document.getElementById('chartInfo');
 
 let khDailyChart = null;
@@ -120,9 +110,7 @@ async function loadSeriesForSelected() {
   )}/measurements?from=${from30d}&to=${now}`;
 
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${chartsToken}` },
-    });
+    const res = await apiFetch(url);
     const json = await res.json();
     if (!json.success) {
       console.error(json.message || 'Erro ao buscar dados de gráfico');
@@ -216,9 +204,8 @@ async function initDashboardGraficos() {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   if (deviceId) {
     try {
-      const resp = await fetch(
-        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-        { headers: headersAuthGraficos }
+      const resp = await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`
       );
       const json = await resp.json();
       if (resp.ok && json.success && json.data &&

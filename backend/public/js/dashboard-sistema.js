@@ -1,15 +1,5 @@
 // dashboard-sistema.js
 
-const sysToken = localStorage.getItem('token');
-if (!sysToken) {
-  window.location.href = 'login';
-}
-
-const headersAuthSys = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${sysToken}`,
-};
-
 const infoDeviceIdEl = document.getElementById('infoDeviceId');
 const infoDeviceNameEl = document.getElementById('infoDeviceName');
 const infoLocalIpEl = document.getElementById('infoLocalIp');
@@ -184,9 +174,8 @@ async function apiLoadDeviceHealth(deviceId) {
   // Futuro: GET /api/v1/user/devices/:deviceId/health
   console.log('LOAD health', deviceId);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/health`,
-      { headers: headersAuthSys },
     );
     if (res.status === 404) {
       return null; // ainda não implementado ou sem dados
@@ -207,9 +196,8 @@ async function apiLoadDeviceEvents(deviceId) {
   // Futuro: GET /api/v1/user/devices/:deviceId/events
   console.log('LOAD events', deviceId);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/events`,
-      { headers: headersAuthSys },
     );
     if (res.status === 404) {
       return [];
@@ -230,11 +218,10 @@ async function apiSendCommand(deviceId, type) {
   // Futuro: POST /api/v1/user/devices/:deviceId/command
   console.log('SEND command', deviceId, type);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
       {
         method: 'POST',
-        headers: headersAuthSys,
         body: JSON.stringify({ type }),
       },
     );
@@ -363,10 +350,9 @@ async function loadSystemForSelected() {
 
   // 3) AGORA pega lcdStatus via /kh-config (mesmo padrão do main)
   try {
-    const resp = await fetch(
+    const resp = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-      { headers: headersAuthSys }
-    );
+     );
     const json = await resp.json();
     if (resp.ok && json.success && json.data &&
         window.DashboardCommon &&

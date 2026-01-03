@@ -1,17 +1,5 @@
 // dashboard-config.js
 
-const cfgToken = localStorage.getItem('token');
-if (!cfgToken) {
-  window.location.href = 'login';
-}
-
-const headersAuthCfg = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${cfgToken}`,
-};
-
-
-
 const khRefInput = document.getElementById('khRefInput');
 const khRefStatus = document.getElementById('khRefStatus');
 const khTargetInput = document.getElementById('khTargetInput');
@@ -99,9 +87,8 @@ if (testTelegramBtn) {
   testTelegramBtn.addEventListener('click', async () => {
     telegramConfigStatus.textContent = 'Enviando teste...';
 
-    const res = await fetch('/api/user/telegram/test', {
+    const res = await apiFetch('/api/user/telegram/test', {
       method: 'POST',
-      headers: headersAuthCfg,
       body: JSON.stringify({
         text: 'Mensagem de teste do ReefBlueSky KH Monitor.',
       }),
@@ -118,11 +105,10 @@ if (testTelegramBtn) {
 async function sendDeviceCommand(deviceId, type, value = null) {
   const payload = value != null ? { type, value } : { type };
 
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
     {
       method: 'POST',
-      headers: headersAuthCfg,
       body: JSON.stringify(payload),
     }
   );
@@ -169,11 +155,9 @@ function updatePumpStatus(pumpId, running, direction) {
 async function apiLoadDeviceConfig(deviceId) {
   try {
     const [khRes, statusRes] = await Promise.all([
-      fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`, {
-        headers: headersAuthCfg,
+      apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`, {
       }),
-      fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/status`, {
-        headers: headersAuthCfg,
+      apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/status`, {
       }),
     ]);
 
@@ -214,11 +198,10 @@ async function apiSetMeasurementInterval(deviceId, hours) {
   // Futuro: POST /api/v1/user/devices/:deviceId/config/interval
   console.log('SET interval', deviceId, hours);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/config/interval`,
       {
         method: 'POST',
-        headers: headersAuthCfg,
         body: JSON.stringify({ intervalHours: hours }),
       },
     );
@@ -238,11 +221,10 @@ async function apiManualPump(deviceId, pumpId, direction, seconds) {
   // Futuro: POST /api/v1/user/devices/:deviceId/command/pump
   console.log('MANUAL pump', deviceId, pumpId, direction, seconds);
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command/pump`,
       {
         method: 'POST',
-        headers: headersAuthCfg,
         body: JSON.stringify({ pumpId, direction, seconds }),
       },
     );
@@ -282,8 +264,7 @@ async function apiFakeMeasurement(deviceId, khValue) {
 
 async function apiLoadTelegramConfig() {
   try {
-    const res = await fetch('/api/v1/user/telegram-config', {
-      headers: headersAuthCfg,
+    const res = await apiFetch('/api/v1/user/telegram-config', {
     });
     const json = await res.json();
     if (!res.ok || json.success === false) {
@@ -299,9 +280,8 @@ async function apiLoadTelegramConfig() {
 
 async function apiSaveTelegramConfig(botToken, enabled) {
   try {
-    const res = await fetch('/api/v1/user/telegram-config', {
+    const res = await apiFetch('/api/v1/user/telegram-config', {
       method: 'PUT',
-      headers: headersAuthCfg,
       body: JSON.stringify({
         telegramBotToken: botToken,
         telegramEnabled: enabled,
@@ -511,11 +491,10 @@ async function loadConfigForSelected() {
 
 async function apiSetDeviceName(deviceId, name) {
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/name`,
       {
         method: 'PUT',
-        headers: headersAuthCfg,
         body: JSON.stringify({ name }),
       }
     );
@@ -558,11 +537,10 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
   try {
     const body = { khReference, khTarget};
 
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
       {
         method: 'PUT',
-        headers: headersAuthCfg,
         body: JSON.stringify(body),
       },
     );
@@ -653,11 +631,10 @@ if (saveKhHealthBtn) {
     }
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
         {
           method: 'PUT',
-          headers: headersAuthCfg,
           body: JSON.stringify({
             khHealthGreenMaxDev: green,
             khHealthYellowMaxDev: yellow,
@@ -764,9 +741,8 @@ async function initDashboardConfig() {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   if (deviceId) {
     try {
-      const resp = await fetch(
+      const resp = await apiFetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-        { headers: headersAuthCfg }
       );
       const json = await resp.json();
       if (resp.ok && json.success && json.data &&
@@ -790,11 +766,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function apiStartCalibration(deviceId) {
   // por enquanto usa o mesmo fluxo de test_now
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
     {
       method: 'POST',
-      headers: headersAuthCfg,
       body: JSON.stringify({ type: 'test_now' }),
     }
   );
@@ -803,11 +778,10 @@ async function apiStartCalibration(deviceId) {
 }
 
 async function apiAbort(deviceId) {
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
     {
       method: 'POST',
-      headers: headersAuthCfg,
       body: JSON.stringify({ type: 'abort' }),
     }
   );

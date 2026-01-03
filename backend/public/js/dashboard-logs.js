@@ -1,15 +1,9 @@
 // dashboard-logs.js
 
-const logsToken = localStorage.getItem('token');
-if (!logsToken) {
-  window.location.href = 'login';
-}
 
 async function loadServerConsole() {
   try {
-    const res = await fetch('/api/v1/dev/server-console', {
-      headers: API_HEADERS(),
-    });
+    const res = await apiFetch('/api/v1/dev/server-console');
     const json = await res.json();
     const el = document.getElementById('serverConsole');
     if (!el) return;
@@ -42,9 +36,7 @@ async function loadDeviceConsole() {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
     if (!deviceId) return;
 
-    const res = await fetch(`/api/v1/dev/device-console/${encodeURIComponent(deviceId)}`, {
-      headers: API_HEADERS(),
-    });
+    const res = await apiFetch(`/api/v1/dev/device-console/${encodeURIComponent(deviceId)}`);
     const json = await res.json();
     const el = document.getElementById('deviceConsole');
     if (!el) return;
@@ -105,11 +97,10 @@ async function sendDeviceCommand() {
   if (!cmd) return;
 
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/v1/dev/device-command/${encodeURIComponent(deviceId)}`,
       {
         method: 'POST',
-        headers: API_HEADERS(),
         body: JSON.stringify({ command: cmd }),
       },
     );

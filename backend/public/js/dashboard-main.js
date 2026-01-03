@@ -1,16 +1,5 @@
 // dashboard-main.js
 
-// Garante que existe token mínimo; redireciona cedo se não houver
-const token = localStorage.getItem('token');
-if (!token) {
-  window.location.href = 'login';
-}
-
-const headersAuth = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${token}`,
-};
-
 const khValueEl = document.getElementById('khValue');
 const khDiffEl = document.getElementById('khDiff');
 const khPrevEl = document.getElementById('khPrev');
@@ -378,9 +367,6 @@ function updateStatusFromKh(kh, khTarget) {
   }
 }
 
-
-
-
 const khBufferCard = document.getElementById('khBufferCard'); // div do card
 
 if (khBufferCard) {
@@ -390,11 +376,10 @@ if (khBufferCard) {
 
     const newState = !khAutoEnabled;
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
         {
           method: 'PUT',
-          headers: headersAuth,
           body: JSON.stringify({ khAutoEnabled: newState }),
         }
       );
@@ -526,10 +511,7 @@ async function loadMeasurementsForSelected() {
 
     // 3) Por fim, medições (vai usar currentKhTarget já setado)
     
-    const res = await 
-
-fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`, {
     });
 
     const json = await res.json();
@@ -551,8 +533,7 @@ fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`, {
 
 async function loadKhMetrics(deviceId) {
   try {
-    const resp = await fetch(`/api/v1/user/devices/${deviceId}/kh-metrics`, {
-      headers: headersAuth,
+    const resp = await apiFetch(`/api/v1/user/devices/${deviceId}/kh-metrics`, {
     });
     if (!resp.ok) {
       console.error('Erro ao buscar KH metrics', await resp.text());
@@ -593,10 +574,9 @@ let khAutoEnabled = false;
 
 async function loadKhInfo(deviceId) {
   try {
-    const resp = await fetch(
+    const resp = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-      { headers: headersAuth }
-    );
+       );
 
     const json = await resp.json();
     if (!resp.ok || !json.success) {
@@ -681,9 +661,8 @@ if (testModeToggle) {
     if (!deviceId) return;
 
     try {
-      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/test-mode`, {
+      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/test-mode`, {
         method: 'POST',
-        headers: headersAuth,
         body: JSON.stringify({ enabled }),
       });
       applyTestModeUI(enabled);
@@ -699,9 +678,8 @@ if (testNowBtn) {
     if (!deviceId) return;
 
     try {
-      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
+      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
         method: 'POST',
-        headers: headersAuth,
         body: JSON.stringify({ type: 'testnow' }),
       });
 
@@ -734,11 +712,10 @@ if (applyDoseBtn) {
     const totalMs = seconds * 1000;
 
     try {
-      await fetch(
+      await apiFetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
         {
           method: 'POST',
-          headers: headersAuth,
           body: JSON.stringify({
             type: 'khcorrection',
             value: volume, // <<< AQUI, não params
@@ -761,9 +738,8 @@ if (abortBtn) {
     if (!deviceId) return;
 
     try {
-      await fetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
+      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
         method: 'POST',
-        headers: headersAuth,
         body: JSON.stringify({ type: 'abort' }),
       });
 
@@ -784,11 +760,10 @@ if (pump4CalibBtn) {
     if (!deviceId) return;
 
     try {
-      await fetch(
+      await apiFetch(
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
         {
           method: 'POST',
-          headers: headersAuth,
           body: JSON.stringify({ type: 'pump4calibrate' }),
         }
       );

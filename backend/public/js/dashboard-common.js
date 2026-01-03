@@ -1,4 +1,80 @@
 // dashboard-common.js
+
+
+function getAccessToken() {
+  return localStorage.getItem('token');
+}
+
+function getRefreshToken() {
+  return localStorage.getItem('refreshToken');
+}
+
+function saveTokens(token, refreshToken) {
+  if (token) localStorage.setItem('token', token);
+  if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+}
+
+async function tryRefreshToken() {
+  const rt = getRefreshToken();
+  if (!rt) return false;
+
+  try {
+    const res = await fetch('/api/v1/auth/refresh-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: rt }),
+    });
+
+    if (!res.ok) return false;
+
+    const json = await res.json();
+    if (json.success && json.data && json.data.token) {
+      saveTokens(json.data.token, rt);
+      return true;
+    }
+  } catch (e) {
+    console.error('tryRefreshToken error', e);
+  }
+  return false;
+}
+
+async function apiFetch(url, options = {}) {
+  const opts = { ...options };
+  const headers = { ...(opts.headers || {}) };
+
+  const token = getAccessToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (!headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  opts.headers = headers;
+
+  let res = await fetch(url, opts);
+
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (!refreshed) {
+      redirectToLogin();
+      return res;
+    }
+
+    const newToken = getAccessToken();
+    if (!newToken) {
+      redirectToLogin();
+      return res;
+    }
+
+    headers['Authorization'] = `Bearer ${newToken}`;
+    opts.headers = headers;
+    res = await fetch(url, opts);
+  }
+
+  return res;
+}
+
+
 const API_HEADERS = () => {
   const token = localStorage.getItem('token');
   return {
@@ -103,9 +179,7 @@ function highlightActiveNav() {
 // Carregar dados do usuário
 async function loadUserCommon() {
   try {
-    const res = await fetch('/api/v1/auth/me', {
-      headers: API_HEADERS(),
-    });
+    const res = await apiFetch('/api/v1/auth/me');
     const json = await res.json();
     if (!res.ok || !json.success) {
       redirectToLogin();
@@ -134,9 +208,7 @@ async function loadUserCommon() {
 // Carregar lista de devices
 async function loadDevicesCommon() {
   try {
-    const res = await fetch('/api/v1/user/devices', {
-      headers: API_HEADERS(),
-    });
+    const res = await apiFetch('/api/v1/user/devices');
     const json = await res.json();
     if (!json.success) {
       console.error(json.message || 'Erro ao buscar devices');
@@ -331,9 +403,8 @@ async function initTopbar() {
 
     // Pinga o /kh-config para pegar lcdStatus atualizado
     try {
-      const resp = await fetch(
-        `/api/v1/user/devices/${encodeURIComponent(currentId)}/kh-config`,
-        { headers: API_HEADERS() }
+      const resp = await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(currentId)}/kh-config`
       );
       const json = await resp.json();
       if (resp.ok && json.success && json.data && typeof DashboardCommon.setLcdStatus === 'function') {
