@@ -208,9 +208,16 @@ async function loadUserCommon() {
   }
 }
 
+let devicesCache = null;
+let devicesCacheTime = 0;
+const DEVICES_CACHE_MAX_AGE = 15000; // 15s
 
 // Carregar lista de devices
 async function loadDevicesCommon() {
+  const now = Date.now();
+  if (devicesCache && (now - devicesCacheTime) < DEVICES_CACHE_MAX_AGE) {
+    return devicesCache;
+  }
   try {
     const res = await apiFetch('/api/v1/user/devices');
     const json = await res.json();
@@ -221,6 +228,9 @@ async function loadDevicesCommon() {
 
     const allDevices  = json.data || [];
     currentDevices = allDevices.filter((d) => d.type !== 'LCD');
+
+    devicesCache = currentDevices;
+    devicesCacheTime = now;
 
     const select = document.getElementById('deviceSelect');
     if (!select) return currentDevices;
@@ -385,6 +395,8 @@ async function initTopbar() {
   }
 
   await loadUserCommon();
+  await ensureFreshToken();  // ← ADICIONE AQUI
+
   applyRoleMenuVisibility();
   const devs = await loadDevicesCommon();
   if (devs.length) {
