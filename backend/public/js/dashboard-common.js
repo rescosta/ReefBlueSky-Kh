@@ -9,79 +9,83 @@ function getRefreshToken() {
   return localStorage.getItem('refreshToken');
 }
 
+let refreshPromise = null;  // Lock global pra refresh
+
+function decodeJwt(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp ? payload.exp : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function ensureFreshToken() {
+  const token = getAccessToken();
+  if (!token) return false;
+  
+  const exp = decodeJwt(token);
+  const now = Math.floor(Date.now() / 1000);
+  if (exp - now > 300) return true;  // +5min OK
+  
+  // Lock: se já tiver refresh rodando, espera
+  if (refreshPromise) return refreshPromise;
+  
+  refreshPromise = tryRefreshToken();
+  const result = await refreshPromise;
+  refreshPromise = null;
+  return result;
+}
+
+async function tryRefreshToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  
+  try {
+    const res = await fetch('/api/v1/auth/refresh-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    });
+    
+    if (!res.ok) return false;
+    
+    const data = await res.json();
+    saveTokens(data.token, data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function saveTokens(token, refreshToken) {
   if (token) localStorage.setItem('token', token);
   if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
 }
 
-async function tryRefreshToken() {
-  const rt = getRefreshToken();
-  if (!rt) return false;
-
-  try {
-    const res = await fetch('/api/v1/auth/refresh-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: rt }),
-    });
-
-    if (!res.ok) return false;
-
-    const json = await res.json();
-    if (json.success && json.data && json.data.token) {
-      saveTokens(json.data.token, rt);
-      return true;
-    }
-  } catch (e) {
-    console.error('tryRefreshToken error', e);
-  }
-  return false;
-}
-
 async function apiFetch(url, options = {}) {
-  const opts = { ...options };
-  const headers = { ...(opts.headers || {}) };
-
+  await ensureFreshToken();  // Pré-refresh!
+  
   const token = getAccessToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  if (!headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
-  opts.headers = headers;
-
-  let res = await fetch(url, opts);
-
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers
+  };
+  
+  const res = await fetch(url, { ...options, headers });
+  
   if (res.status === 401) {
     const refreshed = await tryRefreshToken();
-    if (!refreshed) {
-      redirectToLogin();
-      return res;
+    if (refreshed && token) {
+      // Retry com novo token
+      const retryHeaders = { ...headers, Authorization: `Bearer ${getAccessToken()}` };
+      return fetch(url, { ...options, headers: retryHeaders });
     }
-
-    const newToken = getAccessToken();
-    if (!newToken) {
-      redirectToLogin();
-      return res;
-    }
-
-    headers['Authorization'] = `Bearer ${newToken}`;
-    opts.headers = headers;
-    res = await fetch(url, opts);
   }
-
+  
   return res;
 }
-
-
-const API_HEADERS = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  };
-};
 
 let currentDevices = [];
 let currentUser = null;
