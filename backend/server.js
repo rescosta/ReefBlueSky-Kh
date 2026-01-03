@@ -783,13 +783,18 @@ function authUserMiddleware(req, res, next) {
 
     next();
   } catch (err) {
-    console.error('authUserMiddleware error:', err.message);
+    if (err.name === 'TokenExpiredError') {
+      console.warn('authUserMiddleware: Token expirado');  // ← MUDE AQUI
+    } else {
+      console.error('authUserMiddleware error:', err.message);  // ← E AQUI
+    }
     return res.status(401).json({
       success: false,
       message: 'Token inválido ou expirado'
     });
   }
 }
+
 
 function requireDev(req, res, next) {
   if (req.user.role !== 'dev') {
@@ -1410,19 +1415,25 @@ app.post('/api/v1/auth/refresh-token', async (req, res) => {
       role: decoded.role || 'user',
     };
 
-    const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+    const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
+    const newRefreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' });  // ← ADICIONE ESTA LINHA
 
     return res.json({
       success: true,
-      data: { token: newAccessToken },
+      data: { 
+        token: newAccessToken,
+        refreshToken: newRefreshToken  // ← E ESTA
+      },
     });
   } catch (err) {
+    console.warn('[Refresh] Token inválido:', err.message);  // ← MUDE pra warn
     return res.status(403).json({
       success: false,
       message: 'Refresh token inválido ou expirado',
     });
   }
 });
+
 
 
 // Dados do usuário autenticado
