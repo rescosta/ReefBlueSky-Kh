@@ -1361,7 +1361,7 @@ app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
     }
 
     const payload = buildTokenPayload(user);
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
     const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
     console.log('API /auth/login - Login OK para usuário', user.email);
