@@ -1,8 +1,5 @@
 // dashboard-logs.js
 
-
-// dashboard-logs.js
-
 const serverHealthStatusEl = document.getElementById('serverHealthStatus');
 
 async function loadServerHealth() {
@@ -19,7 +16,16 @@ async function loadServerHealth() {
       return;
     }
 
-    const { cpuPct, memPct, diskPct } = json.data || {};
+    const {
+      cpuPct,
+      memPct,
+      diskPct,
+      uptimeSeconds,
+      netType,
+      wifiRssi,
+      pendingCommands,
+      version,
+    } = json.data || {};
 
     let label = 'OK';
     let color = '#4ade80';
@@ -32,8 +38,38 @@ async function loadServerHealth() {
       color = '#facc15';
     }
 
+    // Wi‑Fi / LAN
+    let netStr = '';
+    if (netType === 'wifi' && typeof wifiRssi === 'number') {
+      const clamped = Math.max(-90, Math.min(-30, wifiRssi));
+      const wifiPct = Math.round(((clamped + 90) / 60) * 100);
+      netStr = ` / Wi‑Fi ${wifiPct}% (${wifiRssi} dBm)`;
+    } else if (netType === 'lan') {
+      netStr = ' / Rede: LAN';
+    }
+
+    // Uptime
+    let uptimeStr = '';
+    if (typeof uptimeSeconds === 'number') {
+      const s = Math.floor(uptimeSeconds);
+      const d = Math.floor(s / 86400);
+      const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      uptimeStr = ` — Uptime ${d}d ${h}h ${m}m`;
+    }
+
+    // Comandos pendentes
+    let pendStr = '';
+    if (typeof pendingCommands === 'number') {
+      pendStr = ` — ${pendingCommands} cmds pendentes`;
+    }
+
+    // Versão
+    const verStr = version ? ` (v${version})` : '';
+
     serverHealthStatusEl.textContent =
-      `Saúde do servidor: ${label} — CPU ${cpuPct}% / MEM ${memPct}% / DISK ${diskPct}%`;
+      `Saúde do servidor: ${label} — CPU ${cpuPct}% / MEM ${memPct}% / DISK ${diskPct}%` +
+      netStr + uptimeStr + pendStr + verStr;
     serverHealthStatusEl.style.color = color;
   } catch (err) {
     console.error('loadServerHealth error', err);
@@ -42,6 +78,7 @@ async function loadServerHealth() {
     serverHealthStatusEl.style.color = '#f97373';
   }
 }
+
 
 
 async function loadServerConsole() {
