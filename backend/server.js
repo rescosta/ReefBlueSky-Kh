@@ -980,20 +980,6 @@ app.get(
   }
 );
 
-// Console do device (DEV)
-app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
-  const { deviceId } = req.params;
-
-  // TODO: validar se o device pertence ao usuário e ler logs reais
-  const lines = [
-    `[device ${deviceId}] exemplo de log do device...`,
-  ];
-  return res.json({
-    success: true,
-    data: lines
-  });
-});
-
 // Comando de console para o device (DEV/usuário logado)
 app.post(
   '/api/v1/dev/device-command/:deviceId',
@@ -2280,8 +2266,7 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
   }
 });
 
-
-// Dashboard: ler últimos logs do device
+// Dashboard: ler últimos logs do device (via device_logs)
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, res) => {
   const userId   = req.user.userId;
   const deviceId = req.params.deviceId;
@@ -2290,7 +2275,6 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
   try {
     conn = await pool.getConnection();
 
-    // garante que o device pertence ao usuário
     const rowsDev = await conn.query(
       'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
@@ -2309,8 +2293,8 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
     );
 
     const lines = logRows
-      .slice()              // cópia
-      .reverse()            // mais antigo → mais novo
+      .slice()
+      .reverse()
       .map((r) => {
         const t = new Date(r.ts).toISOString();
         const lvl = r.level ? `[${r.level}]` : '';
@@ -2328,6 +2312,7 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
     if (conn) try { conn.release(); } catch (_) {}
   }
 });
+
 
 
 // ESP envia linhas de log
