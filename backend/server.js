@@ -1896,6 +1896,9 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
 // [API] Endpoints de Sincronização (v1) - Protegidos
 // ============================================================================
 
+// Limiar de variação de KH para alerta (em dKH)
+const THRESH = 0.5;  // ajuste se quiser mais/menos sensível
+
 /**
  * GET /api/v1/device/ping
  * [SEGURANÇA] Heartbeat do dispositivo
