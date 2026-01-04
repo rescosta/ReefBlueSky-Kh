@@ -409,29 +409,35 @@ function updateMeasurementsView(measures) {
     lastMeasureTimeEl.textContent = 'Nenhum teste realizado ainda';
     nextMeasureTimeEl.textContent = '--';
     updateKhCard([]);
-    updateStatusFromKh(undefined);
+    updateStatusFromKh(undefined, currentKhTarget);
     return;
   }
 
   lastCountInfo.textContent = `${measures.length} registros recentes`;
 
+  // Tabela (continua mostrando até 30 registros mais recentes)
   measures.slice(0, 30).forEach((m) => {
     const tr = document.createElement('tr');
 
-    const tempText = (typeof m.temperature === 'number')
-      ? m.temperature.toFixed(1)
-      : (m.temperature ?? '--');
+    const tempText =
+      typeof m.temperature === 'number'
+        ? m.temperature.toFixed(1)
+        : (m.temperature ?? '--');
 
-    const khValue = (typeof m.kh === 'number')
-      ? m.kh
-      : (m.kh != null ? Number(m.kh) : null);
+    const khValue =
+      typeof m.kh === 'number'
+        ? m.kh
+        : (m.kh != null ? Number(m.kh) : null);
 
     let arrow = '';
     let trendClass = 'kh-trend equal';
 
-    if (khValue != null && !Number.isNaN(khValue) &&
-        currentKhTarget != null && !Number.isNaN(currentKhTarget)) {
-
+    if (
+      khValue != null &&
+      !Number.isNaN(khValue) &&
+      currentKhTarget != null &&
+      !Number.isNaN(currentKhTarget)
+    ) {
       if (khValue > currentKhTarget + 0.01) {
         arrow = '▲';
         trendClass = 'kh-trend up';
@@ -447,21 +453,39 @@ function updateMeasurementsView(measures) {
     tr.innerHTML = `
       <td>${formatDateTime(m.timestamp)}</td>
       <td class="${trendClass}">${arrow}</td>
-      <td>${khValue != null && !Number.isNaN(khValue) ? khValue.toFixed(2) : (m.kh ?? '--')}</td>
+      <td>${
+        khValue != null && !Number.isNaN(khValue)
+          ? khValue.toFixed(2)
+          : (m.kh ?? '--')
+      }</td>
       <td>${m.phref ?? '--'}</td>
       <td>${m.phsample ?? '--'}</td>
       <td>${tempText}</td>
       <td>${m.status ?? '--'}</td>
     `;
 
-
-
     measurementsBody.appendChild(tr);
   });
 
-  // Estatísticas e horários
-  updateKhCard(measures);
+  // -------- Janela de 24h para min/máx e desvio --------
+  const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
+  const measures24h = measures.filter((m) => {
+    const ts =
+      typeof m.timestamp === 'number'
+        ? m.timestamp
+        : Date.parse(m.timestamp);
+    return ts && (now - ts) <= DAY_MS;
+  });
+
+  // Usa 24h se tiver dado, senão cai para o conjunto completo
+  const windowMeasures = measures24h.length ? measures24h : measures;
+
+  // Atualiza card principal (valor atual, anterior, desvio, min/max)
+  updateKhCard(windowMeasures);
+
+  // Horários (última medição continua sendo a mais recente da lista completa)
   const lastTs = measures[0].timestamp;
   lastMeasureTimeEl.textContent = lastTs
     ? formatDateTime(lastTs)
@@ -478,7 +502,8 @@ function updateMeasurementsView(measures) {
   // Calibração ainda será plugada por API futura
   calibrationDateEl.textContent = '--';
 
-  const stats = computeStats(measures);
+  // Status (100%, amarelo, vermelho) também baseado na janela 24h
+  const stats = computeStats(windowMeasures);
   if (
     stats &&
     typeof stats.last === 'number' &&
@@ -488,8 +513,8 @@ function updateMeasurementsView(measures) {
   } else {
     updateStatusFromKh(undefined, currentKhTarget);
   }
-
 }
+
 
 
 // Carrega medições para o device atualmente selecionado no topo
