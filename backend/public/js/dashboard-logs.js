@@ -83,6 +83,7 @@ async function initDashboardLogs() {
     return;
   }
 
+  // NOVO: espelha comportamento das outras abas
   const currentId = DashboardCommon.getSelectedDeviceId();
   if (currentId) {
     try {
@@ -94,9 +95,11 @@ async function initDashboardLogs() {
         resp.ok &&
         json.success &&
         json.data &&
+        window.DashboardCommon &&
         typeof DashboardCommon.setLcdStatus === 'function'
       ) {
         const st = json.data.lcdStatus;
+        // mesmo filtro da aba Sistema
         if (st === 'online' || st === 'offline') {
           DashboardCommon.setLcdStatus(st);
         }
@@ -107,8 +110,8 @@ async function initDashboardLogs() {
   }
 
   await startLogsPolling();
-
 }
+
 
 async function sendDeviceCommand() {
   const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
