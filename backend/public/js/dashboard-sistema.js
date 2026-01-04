@@ -351,19 +351,30 @@ async function loadSystemForSelected() {
   renderHealth(health);
   renderEvents(events);
 
-  // 3) LCD status
+// 3) LCD status
   try {
     const resp = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
     );
     const json = await resp.json();
-    if (resp.ok && json.success && json.data && window.DashboardCommon &&
-        typeof DashboardCommon.setLcdStatus === 'function') {
-      DashboardCommon.setLcdStatus(json.data.lcdStatus);
+    if (
+      resp.ok &&
+      json.success &&
+      json.data &&
+      window.DashboardCommon &&
+      typeof DashboardCommon.setLcdStatus === 'function'
+    ) {
+      const st = json.data.lcdStatus;
+      // Só aplica se vier 'online' ou 'offline'
+      if (st === 'online' || st === 'offline') {
+        DashboardCommon.setLcdStatus(st);
+      }
+      // se vier 'never' ou undefined, não mexe no ícone
     }
   } catch (e) {
     console.error('Erro ao carregar lcdStatus na tela Sistema', e);
   }
+
 }
 
 
