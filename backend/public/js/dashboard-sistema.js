@@ -154,14 +154,17 @@ function updateOnlineUI(dev) {
 
 
 async function refreshDevicesUI() {
-  const devs = await DashboardCommon.loadDevicesCommon();
   const selectedId = DashboardCommon.getSelectedDeviceId();
-  const dev = devs.find((d) => d.deviceId === selectedId);
+  if (!selectedId) {
+    updateOnlineUI(null);
+    return;
+  }
 
+  // Usa lista já carregada pelo common
+  const devs = await DashboardCommon.loadDevicesCommon();
+  const dev = devs.find((d) => d.deviceId === selectedId);
   updateOnlineUI(dev);
 }
-
-
 
 setInterval(refreshDevicesUI, 30 * 1000);
 document.addEventListener('DOMContentLoaded', refreshDevicesUI);
@@ -330,7 +333,7 @@ async function loadSystemForSelected() {
     infoLastSeenEl.textContent = '--';
     renderHealth(null);
     renderEvents([]);
-    return;
+    return;              // ← importantíssimo
   }
 
   updateDeviceInfoFromList();
@@ -340,7 +343,7 @@ async function loadSystemForSelected() {
   const dev = devs.find((d) => d.deviceId === deviceId);
   updateOnlineUI(dev);
 
-  // 2) Carrega health + eventos em paralelo
+  // 2) Health/events
   const [health, events] = await Promise.all([
     apiLoadDeviceHealth(deviceId),
     apiLoadDeviceEvents(deviceId),
@@ -348,14 +351,13 @@ async function loadSystemForSelected() {
   renderHealth(health);
   renderEvents(events);
 
-  // 3) AGORA pega lcdStatus via /kh-config (mesmo padrão do main)
+  // 3) LCD status
   try {
     const resp = await apiFetch(
       `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-     );
+    );
     const json = await resp.json();
-    if (resp.ok && json.success && json.data &&
-        window.DashboardCommon &&
+    if (resp.ok && json.success && json.data && window.DashboardCommon &&
         typeof DashboardCommon.setLcdStatus === 'function') {
       DashboardCommon.setLcdStatus(json.data.lcdStatus);
     }
@@ -363,6 +365,7 @@ async function loadSystemForSelected() {
     console.error('Erro ao carregar lcdStatus na tela Sistema', e);
   }
 }
+
 
 
 // Eventos de comandos
