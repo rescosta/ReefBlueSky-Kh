@@ -251,9 +251,9 @@ async function loadDevicesCommon() {
   const cur = currentDevices.find((d) => d.deviceId === currentId);
   if (cur && typeof cur.lcdStatus !== 'undefined') {
     DashboardCommon.setLcdStatus(cur.lcdStatus); // online ou offline
-  } else {
+  } /*else {
     DashboardCommon.setLcdStatus('never');
-  }
+  }*/
 
     return currentDevices;
   } catch (err) {
@@ -374,9 +374,9 @@ async function initTopbar() {
       const cur = currentDevices.find((d) => d.deviceId === currentId);
       if (cur && typeof cur.lcdStatus !== 'undefined') {
         DashboardCommon.setLcdStatus(cur.lcdStatus);
-      } else {
+      } /*else {
         DashboardCommon.setLcdStatus('never');
-      }
+      }*/
 
       const evt = new CustomEvent('deviceChanged', {
         detail: { deviceId: select.value },
@@ -395,7 +395,7 @@ async function initTopbar() {
   }
 
   await loadUserCommon();
-  await ensureFreshToken();  // ← ADICIONE AQUI
+  await ensureFreshToken(); 
 
   applyRoleMenuVisibility();
   const devs = await loadDevicesCommon();
