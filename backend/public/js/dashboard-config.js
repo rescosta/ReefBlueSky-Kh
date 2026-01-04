@@ -136,7 +136,7 @@ intervalRange.addEventListener('input', () => {
 
 // Helpers visuais
 function updateLevelBadge(el, on) {
-  el.className = 'badge-level ' + (on ? 'badge-on' : 'badge-off');
+  el.className = 'badge-level ' + (on ? 'badge-level-on' : 'badge-evel-off');
   el.textContent = on ? 'ON' : 'OFF';
 }
 
@@ -145,7 +145,7 @@ function updatePumpStatus(pumpId, running, direction) {
   const dirEl = pumpDirEls[pumpId];
   if (!statusEl || !dirEl) return;
 
-  statusEl.className = 'badge-level ' + (running ? 'badge-on' : 'badge-off');
+  statusEl.className = 'badge-level ' + (running ? 'badge-level-on' : 'badge-level-off');
   statusEl.textContent = running ? 'RODANDO' : 'PARADA';
   dirEl.textContent = direction === 'reverse' ? 'Reverso' : 'Normal';
 }
