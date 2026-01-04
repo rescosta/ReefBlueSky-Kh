@@ -41,6 +41,40 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
+const os = require('os');
+const { exec } = require('child_process');
+
+const APP_VERSION = process.env.APP_VERSION || 'dev';
+
+function detectNetType() {
+  const ifaces = os.networkInterfaces();
+  const eth = (ifaces.eth0 || ifaces.enp3s0 || []).some(
+    (i) => !i.internal && i.family === 'IPv4'
+  );
+  const wifi = (ifaces.wlan0 || ifaces.wlp3s0 || []).some(
+    (i) => !i.internal && i.family === 'IPv4'
+  );
+
+  if (wifi && !eth) return 'wifi';
+  if (eth && !wifi) return 'lan';
+  if (eth && wifi) return 'both';
+  return 'unknown';
+}
+
+function readWifiRssi(cb) {
+  exec(
+    "iwconfig wlan0 2>/dev/null | grep -i --color=never 'Signal level'",
+    (err, stdout) => {
+      if (err || !stdout) return cb(null);
+      const m = stdout.match(/Signal level=([-0-9]+)\s*dBm/i);
+      if (!m) return cb(null);
+      const rssi = parseInt(m[1], 10);
+      cb(Number.isFinite(rssi) ? rssi : null);
+    }
+  );
+}
+
+
 // === TELEGRAM ===
 
 // Carregar variáveis de ambiente
@@ -859,35 +893,69 @@ app.get(
   requireDev,
   async (req, res) => {
     try {
-      const os = require('os');
-      const { exec } = require('child_process');
-
-      // CPU (média rápida usando loadavg de 1 min / nº de cores)
+      // CPU
       const cores = os.cpus().length || 1;
       const load1 = os.loadavg()[0] || 0;
-      const cpuPct = Math.round((load1 / cores) * 100);
+      let cpuPct = Math.round((load1 / cores) * 100);
+      cpuPct = Math.min(100, Math.max(0, cpuPct));
 
       // Memória
       const totalMem = os.totalmem();
       const freeMem  = os.freemem();
       const usedMem  = totalMem - freeMem;
-      const memPct   = Math.round((usedMem / totalMem) * 100);
+      let memPct = null;
+      if (totalMem > 0) {
+        memPct = Math.round((usedMem / totalMem) * 100);
+        memPct = Math.min(100, Math.max(0, memPct));
+      }
 
-      // Disco (usa df -h /, simples para Linux)
-      exec("df -P / | awk 'NR==2 {print $5}'", (err, stdout) => {
+      // Uptime do host
+      const uptimeSeconds = Math.floor(os.uptime());
+
+      // Tipo de rede
+      const netType = detectNetType();
+
+      // Comandos pendentes na fila
+      let pendingCommands = null;
+      try {
+        const rows = await pool.query(
+          'SELECT COUNT(*) AS cnt FROM device_commands WHERE processed = 0'
+        );
+        pendingCommands = rows[0]?.cnt ?? 0;
+      } catch (e) {
+        console.error('server-health: erro ao contar device_commands', e.message);
+      }
+
+      // Disco (df -P /)
+      exec("df -P / | awk 'NR==2 {print $5}'", (errDf, stdoutDf) => {
         let diskPct = null;
-        if (!err && stdout) {
-          const m = stdout.trim().match(/(\d+)%/);
-          if (m) diskPct = parseInt(m[1], 10);
+        if (!errDf && stdoutDf) {
+          const m = stdoutDf.trim().match(/(\d+)%/);  // um só backslash aqui
+          if (m) {
+            diskPct = parseInt(m[1], 10);
+            if (Number.isFinite(diskPct)) {
+              diskPct = Math.min(100, Math.max(0, diskPct));
+            } else {
+              diskPct = null;
+            }
+          }
         }
 
-        return res.json({
-          success: true,
-          data: {
-            cpuPct: isNaN(cpuPct) ? null : cpuPct,
-            memPct: isNaN(memPct) ? null : memPct,
-            diskPct: diskPct,
-          },
+        // Wi‑Fi RSSI (se houver)
+        readWifiRssi((wifiRssi) => {
+          return res.json({
+            success: true,
+            data: {
+              cpuPct: Number.isFinite(cpuPct) ? cpuPct : null,
+              memPct: Number.isFinite(memPct) ? memPct : null,
+              diskPct: Number.isFinite(diskPct) ? diskPct : null,
+              uptimeSeconds,
+              netType,
+              wifiRssi,          // dBm ou null
+              pendingCommands,
+              version: APP_VERSION,
+            },
+          });
         });
       });
     } catch (err) {
