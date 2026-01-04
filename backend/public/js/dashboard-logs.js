@@ -44,11 +44,19 @@ async function loadServerHealth() {
     // Rede
     if (netType === 'lan') {
       text += ' / Rede: LAN';
-    } else if (netType === 'wifi' && typeof wifiRssi === 'number') {
-      const clamped = Math.max(-90, Math.min(-30, wifiRssi));
-      const wifiPct = Math.round(((clamped + 90) / 60) * 100);
-      text += ` / Wi‑Fi ${wifiPct}% (${wifiRssi} dBm)`;
+    } else if (netType === 'wifi') {
+      if (typeof wifiRssi === 'number') {
+        const clamped = Math.max(-90, Math.min(-30, wifiRssi));
+        const wifiPct = Math.round(((clamped + 90) / 60) * 100);
+        text += ` / Rede: Wi‑Fi ${wifiPct}% (${wifiRssi} dBm)`;
+      } else {
+        text += ' / Rede: Wi‑Fi';
+      }
+    } else if (netType === 'both') {
+      text += ' / Rede: LAN+Wi‑Fi';
     }
+
+
 
     // Uptime
     if (typeof uptimeSeconds === 'number') {
