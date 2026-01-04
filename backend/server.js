@@ -852,6 +852,54 @@ app.get('/api/v1/dev/server-console', authUserMiddleware, requireDev, async (req
   }
 });
 
+// Saúde do servidor (DEV)
+app.get(
+  '/api/v1/dev/server-health',
+  authUserMiddleware,
+  requireDev,
+  async (req, res) => {
+    try {
+      const os = require('os');
+      const { exec } = require('child_process');
+
+      // CPU (média rápida usando loadavg de 1 min / nº de cores)
+      const cores = os.cpus().length || 1;
+      const load1 = os.loadavg()[0] || 0;
+      const cpuPct = Math.round((load1 / cores) * 100);
+
+      // Memória
+      const totalMem = os.totalmem();
+      const freeMem  = os.freemem();
+      const usedMem  = totalMem - freeMem;
+      const memPct   = Math.round((usedMem / totalMem) * 100);
+
+      // Disco (usa df -h /, simples para Linux)
+      exec("df -P / | awk 'NR==2 {print $5}'", (err, stdout) => {
+        let diskPct = null;
+        if (!err && stdout) {
+          const m = stdout.trim().match(/(\d+)%/);
+          if (m) diskPct = parseInt(m[1], 10);
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            cpuPct: isNaN(cpuPct) ? null : cpuPct,
+            memPct: isNaN(memPct) ? null : memPct,
+            diskPct: diskPct,
+          },
+        });
+      });
+    } catch (err) {
+      console.error('DEV /server-health error:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Erro ao obter saúde do servidor',
+      });
+    }
+  }
+);
+
 
 // Console do device (DEV)
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
