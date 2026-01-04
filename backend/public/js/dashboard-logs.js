@@ -1,6 +1,47 @@
 // dashboard-logs.js
 
 
+const serverHealthStatusEl = document.getElementById('serverHealthStatus');
+
+async function loadServerHealth() {
+  if (!serverHealthStatusEl) return;
+
+  try {
+    const res = await apiFetch('/api/v1/dev/server-health');
+    const json = await res.json();
+
+    if (!res.ok || !json.success) {
+      serverHealthStatusEl.textContent =
+        'Saúde do servidor: erro ao carregar.';
+      serverHealthStatusEl.style.color = '#f97373';
+      return;
+    }
+
+    const { cpuPct, memPct, diskPct } = json.data || {};
+
+    let label = 'OK';
+    let color = '#4ade80';
+
+    if (cpuPct > 90 || memPct > 90 || diskPct > 90) {
+      label = 'Crítico';
+      color = '#f97373';
+    } else if (cpuPct > 70 || memPct > 70 || diskPct > 70) {
+      label = 'Atenção';
+      color = '#facc15';
+    }
+
+    serverHealthStatusEl.textContent =
+      `Saúde do servidor: ${label} — CPU ${cpuPct}% / MEM ${memPct}% / DISK ${diskPct}%`;
+    serverHealthStatusEl.style.color = color;
+  } catch (err) {
+    console.error('loadServerHealth error', err);
+    serverHealthStatusEl.textContent =
+      'Saúde do servidor: erro ao carregar.';
+    serverHealthStatusEl.style.color = '#f97373';
+  }
+}
+
+
 async function loadServerConsole() {
   try {
     const res = await apiFetch('/api/v1/dev/server-console');
@@ -58,18 +99,19 @@ async function loadDeviceConsole() {
 let logsPollHandle = null;
 
 async function startLogsPolling() {
-  // evita múltiplos timers
   if (logsPollHandle) clearInterval(logsPollHandle);
 
   // primeira carga imediata
+  await loadServerHealth(); 
   await loadServerConsole();
   await loadDeviceConsole();
 
   // depois fica atualizando
   logsPollHandle = setInterval(async () => {
+    await loadServerHealth();
     await loadServerConsole();
     await loadDeviceConsole();
-  }, 5000); // 5s; ajusta como quiser
+  }, 5000); // 5s
 }
 
 
