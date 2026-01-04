@@ -266,7 +266,12 @@ function computeStats(measures) {
 
   const last = khs[0];
   const prev = khs[1] ?? null;
-  const diff = prev !== null ? last - prev : 0;
+
+  // desvio em relação ao alvo, não à medição anterior
+  const diff = (typeof currentKhTarget === 'number' && currentKhTarget > 0)
+    ? last - currentKhTarget
+    : 0;
+
 
   const min = Math.min(...khs);
   const max = Math.max(...khs);
