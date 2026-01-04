@@ -71,16 +71,20 @@ console.log('netType =', detectNetType());
 
 function readWifiRssi(cb) {
   exec(
-    "iwconfig wlan0 2>/dev/null | grep -i --color=never 'Signal level'",
+    "iwconfig wlan1 2>/dev/null | grep -i --color=never 'Signal level'",
     (err, stdout) => {
       if (err || !stdout) return cb(null);
-      const m = stdout.match(/Signal level=([-0-9]+)\s*dBm/i);
+
+      // casa '-69/100' ou '-69 dBm' se algum driver usar
+      const m = stdout.match(/Signal level=([-\d]+)\s*(?:\/\d+|dBm)?/i);
       if (!m) return cb(null);
+
       const rssi = parseInt(m[1], 10);
       cb(Number.isFinite(rssi) ? rssi : null);
     }
   );
 }
+
 
 
 // === TELEGRAM ===
