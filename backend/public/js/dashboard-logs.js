@@ -1,6 +1,8 @@
 // dashboard-logs.js
 
 
+// dashboard-logs.js
+
 const serverHealthStatusEl = document.getElementById('serverHealthStatus');
 
 async function loadServerHealth() {
@@ -40,6 +42,7 @@ async function loadServerHealth() {
     serverHealthStatusEl.style.color = '#f97373';
   }
 }
+
 
 
 async function loadServerConsole() {
