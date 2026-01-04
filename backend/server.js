@@ -3682,10 +3682,10 @@ function startServer() {
     
    
     // Iniciar servidor HTTP
-    app.listen(PORT, () => {
-        console.log(`
+app.listen(PORT, () => {
+  console.log(`
 ╔════════════════════════════════════════════════════════════╗
-║     ReefBlueSky KH Monitor - Backend Node.js (Rev06)      ║
+║     ReefBlueSky KH Monitor - Backend Node.js (Rev07)       ║
 ╚════════════════════════════════════════════════════════════╝
 
 [SERVER] Servidor iniciado com sucesso
@@ -3696,7 +3696,7 @@ function startServer() {
 [CLOUDFLARE] Tunnel: https://seu-dominio.com
 [CLOUDFLARE] Status: Aguardando configuração
 
-[ENDPOINTS] Disponíveis:
+[ENDPOINTS] Device:
   POST   /api/v1/device/register
   POST   /api/v1/device/refresh-token
   GET    /api/v1/device/ping
@@ -3704,16 +3704,30 @@ function startServer() {
   POST   /api/v1/device/health
   GET    /api/v1/device/commands
   POST   /api/v1/device/command-result
-  GET    /api/v1/status
-  GET    /api/v1/health
 
-[SECURITY] Rate Limiting: Ativo (10 req/min global)
+[ENDPOINTS] Web:
+  POST   /api/v1/auth/login
+  POST   /api/v1/auth/refresh
+  GET    /api/v1/user/me
+  GET    /api/v1/user/devices
+
+[ENDPOINTS] Display:
+  POST   /api/display/ping
+
+[ENDPOINTS] Dev:
+  GET    /api/v1/dev/server-health
+  GET    /api/v1/dev/server-console
+  GET    /api/v1/dev/device-console/:deviceId
+  POST   /api/v1/dev/device-command/:deviceId
+
+[SECURITY] Rate Limiting: Global 1000 req/min, login 5 tentativas/15min
 [SECURITY] CORS: Configurado
 [SECURITY] Compression: Ativo
 
 Pressione Ctrl+C para parar o servidor
-        `);
-    });
+  `);
+});
+
 }
 
 startServer();
