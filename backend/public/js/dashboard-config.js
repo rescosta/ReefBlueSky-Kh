@@ -22,9 +22,9 @@ const pumpStatusEls = {
   3: document.getElementById('pumpStatus3'),
 };
 const pumpDirEls = {
-  1: document.getElementById('pumpDir1'),
-  2: document.getElementById('pumpDir2'),
-  3: document.getElementById('pumpDir3'),
+  1: document.getElementById('pumpDirSelect1'),
+  2: document.getElementById('pumpDirSelect2'),
+  3: document.getElementById('pumpDirSelect3'),
 };
 const pumpProgEls = {
   1: document.getElementById('pumpProg1'),
@@ -142,13 +142,19 @@ function updateLevelBadge(el, on) {
 
 function updatePumpStatus(pumpId, running, direction) {
   const statusEl = pumpStatusEls[pumpId];
-  const dirEl = pumpDirEls[pumpId];
-  if (!statusEl || !dirEl) return;
+  const dirEl    = pumpDirEls[pumpId];
+  if (!statusEl) return;
 
-  statusEl.className = 'badge-level ' + (running ? 'badge-level-on' : 'badge-level-off');
+  statusEl.className =
+    'badge-level ' + (running ? 'badge-level-on' : 'badge-level-off');
   statusEl.textContent = running ? 'RODANDO' : 'PARADA';
-  dirEl.textContent = direction === 'reverse' ? 'Reverso' : 'Normal';
+
+  // Se quiser refletir sentido no select:
+  if (dirEl) {
+    dirEl.value = direction || 'forward';
+  }
 }
+
 
 // Stubs de API (para você ligar no server.js depois)
 
