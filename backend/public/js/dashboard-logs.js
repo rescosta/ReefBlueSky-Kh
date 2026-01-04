@@ -44,7 +44,6 @@ async function loadServerHealth() {
 }
 
 
-
 async function loadServerConsole() {
   try {
     const res = await apiFetch('/api/v1/dev/server-console');
