@@ -136,7 +136,7 @@ intervalRange.addEventListener('input', () => {
 
 // Helpers visuais
 function updateLevelBadge(el, on) {
-  el.className = 'badge-level ' + (on ? 'badge-level-on' : 'badge-evel-off');
+  el.className = 'badge-level ' + (on ? 'badge-level-on' : 'badge-level-off');
   el.textContent = on ? 'ON' : 'OFF';
 }
 
