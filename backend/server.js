@@ -1911,14 +1911,14 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
   if (!Array.isArray(measurements)) {
     return res.status(400).json({
       success: false,
-      message: 'Medições devem ser um array'
+      message: 'Medições devem ser um array',
     });
   }
 
   if (measurements.length === 0) {
     return res.status(400).json({
       success: false,
-      message: 'Array de medições vazio'
+      message: 'Array de medições vazio',
     });
   }
 
@@ -1926,13 +1926,14 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     if (!Number.isFinite(m.timestamp) || m.timestamp <= 0 || typeof m.kh !== 'number') {
       return res.status(400).json({
         success: false,
-        message: 'Medição inválida: timestamp ou kh inválidos'
+        message: 'Medição inválida: timestamp ou kh inválidos',
       });
     }
   }
 
-
-  console.log(`[API] Sincronizando ${measurements.length} medições do deviceId: ${req.user.deviceId}`);
+  console.log(
+    `[API] Sincronizando ${measurements.length} medições do deviceId: ${req.user.deviceId}`
+  );
 
   let conn;
   try {
@@ -1966,45 +1967,57 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
             m.temperature || null,
             m.timestamp,
             m.status || null,
-            m.confidence || null
+            m.confidence || null,
           ]
         );
         insertedCount++;
       } catch (insertErr) {
-        console.error(`[DB] Erro ao inserir medição ${m.timestamp}:`, insertErr.message);
+        console.error(
+          `[DB] Erro ao inserir medição ${m.timestamp}:`,
+          insertErr.message
+        );
       }
     }
 
-    console.log(`[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`);
+    console.log(
+      `[DB] ✅ ${insertedCount}/${measurements.length} medições gravadas`
+    );
 
-   // 🔔 TELEGRAM: pegar última medição KH deste sync
+    // 🔔 TELEGRAM: pegar última medição KH deste sync
     try {
-      // pega a última medição do array (a mais recente do lado do ESP)
       const last = measurements[measurements.length - 1];
       const deviceId = req.user.deviceId;
+      const userId = req.user.userId;
 
-      // buscar nome do device
+      // buscar nome do device + kh_target
       const devRows = await conn.query(
         'SELECT name, kh_target FROM devices WHERE deviceId = ? LIMIT 1',
         [deviceId]
       );
-      const devName = devRows[0]?.name || `Device ${deviceId}`;
-      const khTarget = devRows[0]?.kh_target != null ? Number(devRows[0].kh_target) : null;
+      const devRow = devRows[0] || {};
+      const devName = devRow.name || `Device ${deviceId}`;
+
+      // normaliza kh_target (pode vir string/BigInt/number)
+      let khTarget = null;
+      if (devRow.kh_target != null) {
+        const rawTarget = devRow.kh_target;
+        const n = typeof rawTarget === 'bigint'
+          ? Number(rawTarget)
+          : Number(rawTarget);
+        khTarget = Number.isFinite(n) ? n : null;
+      }
 
       // envia valor de KH medido
       if (typeof last.kh === 'number') {
-          
-          const khVal = last.kh.toFixed(2);
-          const targetPart = khTarget != null ? ` (alvo ${khTarget.toFixed(2)} dKH)` : '';
+        const khVal = last.kh.toFixed(2);
+        const targetPart =
+          khTarget != null ? ` (alvo ${khTarget.toFixed(2)} dKH)` : '';
 
-          const userId = req.user.userId;
-
-          await sendTelegramForUser(
-            userId,
-            `📏 KH medido em *${devName}*:\n` +
+        await sendTelegramForUser(
+          userId,
+          `📏 KH medido em *${devName}*:\n` +
             `Valor atual: *${khVal} dKH*${targetPart}`
-          );
-
+        );
       }
 
       // --- TENDÊNCIA: últimas 4 medições no banco para este device ---
@@ -2020,46 +2033,80 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
 
       if (trendRows.length >= 2) {
         const measures = trendRows.slice().reverse(); // mais antigo → mais novo
-        const first = measures[0];
+        const firstDb = measures[0];
         const lastDb = measures[measures.length - 1];
 
-        const delta = lastDb.kh - first.kh; // + subiu, - caiu
+        // normaliza KH (BigInt/string/number → number)
+        const firstKhRaw = firstDb.kh;
+        const lastKhRaw = lastDb.kh;
 
-        const fmt = (v) => Number(v).toFixed(2);
-        const t1 = new Date(first.timestamp).toLocaleTimeString('pt-BR', {
-          timeZone: 'America/Sao_Paulo'
-        });
-        const t2 = new Date(lastDb.timestamp).toLocaleTimeString('pt-BR', {
-          timeZone: 'America/Sao_Paulo'
-        });
+        const firstKh =
+          typeof firstKhRaw === 'bigint'
+            ? Number(firstKhRaw)
+            : Number(firstKhRaw);
+        const lastKh =
+          typeof lastKhRaw === 'bigint'
+            ? Number(lastKhRaw)
+            : Number(lastKhRaw);
 
-        const targetLine = khTarget != null
-          ? `Alvo: *${khTarget.toFixed(2)} dKH*.\n`
-          : '';
+        // se der NaN, aborta tendência
+        if (Number.isFinite(firstKh) && Number.isFinite(lastKh)) {
+          const delta = lastKh - firstKh; // + subiu, - caiu
 
-        if (delta <= -THRESH) {
-          await sendTelegramForUser(
-            userId,
-            `🚨 *ALERTA KH CAINDO RÁPIDO* em *${devName}*!\n` +
-            `De *${fmt(first.kh)}* para *${fmt(lastDb.kh)}* dKH ` +
-            `(${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
-            targetLine +
-            `Tendência de queda acentuada, verifique consumo e dosagem.`
-          );
-        } else if (delta >= THRESH) {
-          await sendTelegramForUser(
-            userId,
-            `🚨 *ALERTA KH SUBINDO RÁPIDO* em *${devName}*!\n` +
-            `De *${fmt(first.kh)}* para *${fmt(lastDb.kh)}* dKH ` +
-            `(+${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
-            targetLine +
-            `Tendência de subida acentuada, verifique dosagem e bombas.`
-          );
+          const fmt = (v) =>
+            Number.isFinite(v) ? v.toFixed(2) : '--';
+
+          // normaliza timestamps
+          const firstTsRaw = firstDb.timestamp;
+          const lastTsRaw = lastDb.timestamp;
+
+          const firstTs =
+            typeof firstTsRaw === 'bigint'
+              ? Number(firstTsRaw)
+              : Number(firstTsRaw);
+          const lastTs =
+            typeof lastTsRaw === 'bigint'
+              ? Number(lastTsRaw)
+              : Number(lastTsRaw);
+
+          const t1 = new Date(firstTs).toLocaleTimeString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+          });
+          const t2 = new Date(lastTs).toLocaleTimeString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+          });
+
+          const targetLine =
+            khTarget != null
+              ? `Alvo: *${khTarget.toFixed(2)} dKH*.\n`
+              : '';
+
+          if (delta <= -THRESH) {
+            await sendTelegramForUser(
+              userId,
+              `🚨 *ALERTA KH CAINDO RÁPIDO* em *${devName}*!\n` +
+                `De *${fmt(firstKh)}* para *${fmt(lastKh)}* dKH ` +
+                `(${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
+                targetLine +
+                `Tendência de queda acentuada, verifique consumo e dosagem.`
+            );
+          } else if (delta >= THRESH) {
+            await sendTelegramForUser(
+              userId,
+              `🚨 *ALERTA KH SUBINDO RÁPIDO* em *${devName}*!\n` +
+                `De *${fmt(firstKh)}* para *${fmt(lastKh)}* dKH ` +
+                `(+${fmt(delta)} dKH) entre ${t1} e ${t2}.\n` +
+                targetLine +
+                `Tendência de subida acentuada, verifique dosagem e bombas.`
+            );
+          }
         }
-
       }
     } catch (teleErr) {
-      console.error('Erro ao enviar alerta Telegram KH:', teleErr.message);
+      console.error(
+        'Erro ao enviar alerta Telegram KH:',
+        teleErr.message
+      );
     }
 
     return res.json({
@@ -2068,10 +2115,9 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
       data: {
         synced: insertedCount,
         failed: measurements.length - insertedCount,
-        nextSyncTime: Date.now() + 300000
-      }
+        nextSyncTime: Date.now() + 300000,
+      },
     });
-
   } catch (err) {
     console.error('[DB] Erro crítico ao sincronizar:', err.message, err.code);
 
@@ -2089,20 +2135,23 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       message: errorMsg,
-      error: err.message
+      error: err.message,
     });
-
   } finally {
     if (conn) {
       try {
         conn.release();
         console.log('[DB] Conexão liberada');
       } catch (releaseErr) {
-        console.error('[DB] Erro ao liberar conexão:', releaseErr.message);
+        console.error(
+          '[DB] Erro ao liberar conexão:',
+          releaseErr.message
+        );
       }
     }
   }
 });
+
 
 // Dashboard: ler últimos logs do device
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, res) => {
