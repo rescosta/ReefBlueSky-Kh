@@ -48,18 +48,26 @@ const APP_VERSION = process.env.APP_VERSION || 'dev';
 
 function detectNetType() {
   const ifaces = os.networkInterfaces();
-  const eth = (ifaces.eth0 || ifaces.enp3s0 || []).some(
-    (i) => !i.internal && i.family === 'IPv4'
-  );
-  const wifi = (ifaces.wlan0 || ifaces.wlp3s0 || []).some(
-    (i) => !i.internal && i.family === 'IPv4'
+
+  const hasEth = Object.entries(ifaces).some(([name, addrs]) =>
+    /^e(n|th)/.test(name) &&
+    addrs.some((i) => !i.internal && i.family === 'IPv4')
   );
 
-  if (wifi && !eth) return 'wifi';
-  if (eth && !wifi) return 'lan';
-  if (eth && wifi) return 'both';
+  const hasWifi = Object.entries(ifaces).some(([name, addrs]) =>
+    /^wl/.test(name) &&
+    addrs.some((i) => !i.internal && i.family === 'IPv4')
+  );
+
+  if (hasWifi && !hasEth) return 'wifi';
+  if (hasEth && !hasWifi) return 'lan';
+  if (hasEth && hasWifi) return 'both';
   return 'unknown';
 }
+
+console.log('ifaces =', os.networkInterfaces());
+console.log('netType =', detectNetType());
+
 
 function readWifiRssi(cb) {
   exec(
@@ -968,7 +976,6 @@ app.get(
   }
 );
 
-
 // Console do device (DEV)
 app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, requireDev, async (req, res) => {
   const { deviceId } = req.params;
@@ -1027,8 +1034,6 @@ app.post(
     }
   }
 );
-
-
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
