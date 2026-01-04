@@ -2993,7 +2993,11 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         khHealthGreenMaxDev: cfg.kh_health_green_max_dev,
         khHealthYellowMaxDev: cfg.kh_health_yellow_max_dev,
         khAutoEnabled: !!cfg.kh_auto_enabled,
-        lcdStatus: cfg.lcd_status || 'never',
+        lcdStatus:
+          cfg.lcd_status === 'online' || cfg.lcd_status === 'offline'
+            ? cfg.lcd_status
+            : 'offline',
+
       },
     });
   } catch (err) {
