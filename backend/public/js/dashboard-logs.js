@@ -83,6 +83,29 @@ async function initDashboardLogs() {
     return;
   }
 
+  const currentId = DashboardCommon.getSelectedDeviceId();
+  if (currentId) {
+    try {
+      const resp = await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(currentId)}/kh-config`,
+      );
+      const json = await resp.json();
+      if (
+        resp.ok &&
+        json.success &&
+        json.data &&
+        typeof DashboardCommon.setLcdStatus === 'function'
+      ) {
+        const st = json.data.lcdStatus;
+        if (st === 'online' || st === 'offline') {
+          DashboardCommon.setLcdStatus(st);
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao carregar lcdStatus na aba Logs', e);
+    }
+  }
+
   await startLogsPolling();
 
 }
