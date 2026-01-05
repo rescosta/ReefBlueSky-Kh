@@ -32,9 +32,10 @@ CREATE TABLE `device_commands` (
   `errorMessage` text DEFAULT NULL,
   `createdAt` datetime NOT NULL DEFAULT current_timestamp(),
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `processed` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_device_status` (`deviceId`,`status`,`createdAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=75 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=177 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -76,7 +77,28 @@ CREATE TABLE `device_health` (
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_dev_user` (`deviceId`,`userId`,`updatedAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=219 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1795 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `device_logs`
+--
+
+DROP TABLE IF EXISTS `device_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `device_logs` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `deviceId` varchar(64) NOT NULL,
+  `userId` bigint(20) unsigned DEFAULT NULL,
+  `ts` bigint(20) NOT NULL,
+  `level` varchar(16) DEFAULT NULL,
+  `message` text NOT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_device_ts` (`deviceId`,`ts` DESC),
+  KEY `idx_user_ts` (`userId`,`ts` DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -139,11 +161,12 @@ CREATE TABLE `devices` (
   `kh_auto_enabled` tinyint(1) DEFAULT NULL,
   `type` varchar(10) NOT NULL DEFAULT 'KH',
   `lcd_offline_alert_sent` tinyint(1) NOT NULL DEFAULT 0,
+  `parentDeviceId` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_devices_deviceId` (`deviceId`),
   KEY `idx_devices_userId` (`userId`),
   CONSTRAINT `fk_devices_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=188 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=345 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -166,7 +189,7 @@ CREATE TABLE `measurements` (
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_measurements_device_ts` (`deviceId`,`timestamp`)
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=86 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -186,6 +209,9 @@ CREATE TABLE `users` (
   `verificationExpiresAt` datetime DEFAULT NULL,
   `isVerified` tinyint(1) NOT NULL DEFAULT 0,
   `role` varchar(50) NOT NULL DEFAULT 'user',
+  `telegram_chat_id` bigint(20) DEFAULT NULL,
+  `telegram_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `telegram_bot_token` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_users_email` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -200,4 +226,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-12-21 18:32:51
+-- Dump completed on 2026-01-05 13:55:21
