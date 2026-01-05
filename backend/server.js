@@ -3414,6 +3414,11 @@ return res.json({
   }
 });
 
+// Dashboard de Gráficos
+
+app.get('/dashboard-graficos', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard-graficos.html'));
+});
 
 
 // Saúde do device (stub funcional)
