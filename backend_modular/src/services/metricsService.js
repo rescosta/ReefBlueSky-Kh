@@ -94,35 +94,50 @@ class MetricsService {
   /**
    * Obtém saúde geral do sistema
    */
+  // Obtém saúde geral do sistema
+ 
   async getSystemHealth() {
     let conn;
+
     try {
       conn = await pool.getConnection();
 
-      // Contar devices online/offline
-      const deviceStats = await conn.query(
-        `SELECT status, COUNT(*) as count FROM devices GROUP BY status`
-      );
+      // Contar devices online/offline usando last_seen
+      const [deviceStats] = await conn.query(`
+        SELECT 
+          SUM(CASE 
+                WHEN last_seen IS NOT NULL 
+                 AND last_seen > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+              THEN 1 ELSE 0 END) AS online,
+          SUM(CASE 
+                WHEN last_seen IS NULL 
+                 OR last_seen <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+              THEN 1 ELSE 0 END) AS offline
+        FROM devices
+      `);
 
-      // Contar medições recentes
-      const measurementStats = await conn.query(
-        `SELECT COUNT(*) as total, 
-                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
-                SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN 1 ELSE 0 END) as lastHour
-         FROM measurements`
-      );
+      // Contar medições recentes (usa createdAt, que é o nome da coluna)
+      const [measurementStats] = await conn.query(`
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
+               SUM(CASE WHEN createdAt >= DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN 1 ELSE 0 END) as lastHour
+        FROM measurements
+      `);
 
       // Contar usuários
-      const userStats = await conn.query(
-        `SELECT COUNT(*) as total FROM users`
-      );
+      const [userStats] = await conn.query(`
+        SELECT COUNT(*) as total FROM users
+      `);
 
-      const onlineDevices = deviceStats.find(d => d.status === 'online')?.count || 0;
-      const offlineDevices = deviceStats.find(d => d.status === 'offline')?.count || 0;
+      const onlineDevices = deviceStats.online || 0;
+      const offlineDevices = deviceStats.offline || 0;
       const totalDevices = onlineDevices + offlineDevices;
 
-      const measurements = measurementStats[0];
-      const successRate = measurements.total > 0 ? (measurements.success / measurements.total * 100).toFixed(2) : 0;
+      const measurements = measurementStats;
+      const successRate =
+        measurements.total > 0
+          ? parseFloat(((measurements.success / measurements.total) * 100).toFixed(2))
+          : 0;
 
       return {
         success: true,
@@ -134,11 +149,11 @@ class MetricsService {
           },
           measurements: {
             total: measurements.total,
-            successRate: parseFloat(successRate),
+            successRate,
             lastHour: measurements.lastHour || 0
           },
           users: {
-            total: userStats[0].total
+            total: userStats.total
           },
           timestamp: new Date()
         }
@@ -150,6 +165,7 @@ class MetricsService {
       if (conn) conn.release();
     }
   }
+
 
   /**
    * Obtém métricas de KH

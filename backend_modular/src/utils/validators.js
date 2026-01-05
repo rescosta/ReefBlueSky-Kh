@@ -7,7 +7,7 @@ const { ValidationError } = require('../middleware/errorHandler');
 • Valida email
 */
 function validateEmail(email) {
-  const re = /[\s@]+@[\s@]+.[\s@]+$/;
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!re.test(email)) {
     throw new ValidationError('Email inválido', { email: 'Formato inválido' });
   }
@@ -130,20 +130,21 @@ function validateMeasurements(measurements) {
 function validateCommand(type, params = {}) {
   const validTypes = ['pump', 'kh_correction', 'calibration', 'test', 'restart'];
   if (!validTypes.includes(type)) {
-    throw new ValidationError(Tipo inválido: ${type});
+    throw new ValidationError('Tipo inválido: ' + type);
   }
   // Validação por tipo
   switch (type) {
     case 'pump':
     if (typeof params.volume !== 'number' || params.volume <= 0) {
       throw new ValidationError('Pump requer volume > 0');
-  }
-  break;
+    }
+    break;
+
     case 'kh_correction':
       if (typeof params.target !== 'number') {
         throw new ValidationError('KH correction requer target');
-  }
-  break;
+      }
+      break;
   }
   return true;
 }

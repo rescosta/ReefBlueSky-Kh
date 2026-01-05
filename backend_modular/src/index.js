@@ -10,6 +10,7 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
+const helmet = require('helmet');
 
 // Imports de configuração
 const { PORT, NODE_ENV } = require('./config/environment');
@@ -60,10 +61,6 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
-
-
-const helmet = require('helmet'); // npm install helmet
-
 
 // ===== ROTAS API =====
 
