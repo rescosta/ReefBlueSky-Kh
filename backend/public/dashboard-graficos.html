@@ -139,14 +139,8 @@
       flex: 1;
       padding: 12px 10px 16px;
       display: grid;
-      grid-template-columns: 2fr 1.5fr;
+      grid-template-columns: 1fr;
       gap: 16px;
-    }
-
-    @media (max-width: 960px) {
-      .content {
-        grid-template-columns: 1fr;
-      }
     }
 
     .card {
@@ -161,7 +155,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
     .card-title {
@@ -180,7 +174,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
       font-size: 13px;
       align-items: flex-end;
     }
@@ -216,11 +210,55 @@
       filter: brightness(1.05);
     }
 
-    /* Canvas para gráficos */
+    /* ===== CHARTS CONTAINER ===== */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .chart-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 280px;
+    }
+
+    .chart-label {
+      font-size: 11px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      flex: 1;
+      min-height: 200px;
+    }
+
     canvas {
-      width: 100%;
-      height: 200px;
-      margin-bottom: 8px;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Responsivo */
+    @media (max-width: 1200px) {
+      .charts-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-box {
+        min-height: 250px;
+      }
     }
 
     .muted {
@@ -384,46 +422,34 @@
       </div>
 
       <div class="filters">
-        <span id="chartInfo" class="muted">Carregando dados de KH diário, semanal e mensal...</span>
+        <span id="chartInfo" class="muted">Carregando dados...</span>
       </div>
 
-      <!-- Canvas para gráfico diário -->
-      <div style="margin-bottom: 16px;">
-        <h4 style="font-size: 12px; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">
-          Último Dia
-        </h4>
-        <canvas id="khDailyChart"></canvas>
-      </div>
+      <!-- Grid com 3 gráficos lado a lado -->
+      <div class="charts-grid">
+        <!-- Gráfico 1: Último dia -->
+        <div class="chart-box">
+          <div class="chart-label">📅 Último Dia</div>
+          <div class="chart-wrapper">
+            <canvas id="khDailyChart"></canvas>
+          </div>
+        </div>
 
-      <!-- Canvas para gráfico semanal -->
-      <div style="margin-bottom: 16px;">
-        <h4 style="font-size: 12px; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">
-          Últimos 7 Dias
-        </h4>
-        <canvas id="khWeeklyChart"></canvas>
-      </div>
+        <!-- Gráfico 2: Últimos 7 dias -->
+        <div class="chart-box">
+          <div class="chart-label">📊 Últimos 7 Dias</div>
+          <div class="chart-wrapper">
+            <canvas id="khWeeklyChart"></canvas>
+          </div>
+        </div>
 
-      <!-- Canvas para gráfico mensal -->
-      <div style="margin-bottom: 16px;">
-        <h4 style="font-size: 12px; color: #9ca3af; margin-bottom: 8px; text-transform: uppercase;">
-          Últimos 30 Dias
-        </h4>
-        <canvas id="khMonthlyChart"></canvas>
-      </div>
-    </div>
-
-    <!-- Sidebar info -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Informações</div>
-      </div>
-
-      <div id="userInfo" style="font-size: 12px; line-height: 1.6; color: #d1d5db;">
-        Usuário: --
-      </div>
-
-      <div style="margin-top: 12px; font-size: 11px; color: #6b7280;">
-        ReefBlueSky KH Monitor - Gráficos
+        <!-- Gráfico 3: Últimos 30 dias -->
+        <div class="chart-box">
+          <div class="chart-label">📈 Últimos 30 Dias</div>
+          <div class="chart-wrapper">
+            <canvas id="khMonthlyChart"></canvas>
+          </div>
+        </div>
       </div>
     </div>
   </div>
