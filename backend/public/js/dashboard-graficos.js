@@ -1,7 +1,6 @@
 // dashboard-graficos.js
 
 const chartInfo = document.getElementById('chartInfo');
-
 let khDailyChart = null;
 let khWeeklyChart = null;
 let khMonthlyChart = null;
@@ -9,13 +8,43 @@ let khMonthlyChart = null;
 function formatDate(ms) {
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return '--';
-  return d.toLocaleDateString();
+  return d.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+function formatDateFull(ms) {
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return '--';
+  return d.toLocaleDateString('pt-BR');
+}
+
+// ===== FUNÇÃO PARA ÚLTIMAS 24 HORAS (SEM AGRUPAR) =====
+// Pega todas as medições das últimas 24 horas sem agrupar por dia
+function getLast24Hours(measures) {
+  const now = Date.now();
+  const last24hMs = 24 * 60 * 60 * 1000;
+  
+  // Filtra medições das últimas 24 horas
+  const filtered = measures
+    .filter((m) => {
+      if (typeof m.kh !== 'number' || !m.timestamp) return false;
+      const ts = Number(m.timestamp);
+      return ts > now - last24hMs && ts <= now;
+    })
+    .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+  
+  return filtered.map((m) => ({
+    timestamp: Number(m.timestamp),
+    kh: m.kh,
+  }));
 }
 
 // Agrupa medições por dia (chave yyyy-mm-dd) pegando o último KH do dia
 function groupByDay(measures) {
   const byDay = new Map();
-
   measures.forEach((m) => {
     if (typeof m.kh !== 'number' || !m.timestamp) return;
     const d = new Date(m.timestamp);
@@ -32,7 +61,6 @@ function groupByDay(measures) {
   const entries = Array.from(byDay.entries()).sort((a, b) =>
     a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
   );
-
   return entries.map(([key, v]) => ({
     dateStr: key,
     ts: v.timestamp,
@@ -45,6 +73,7 @@ function createBarChart(existingChart, ctx, label, labels, data, color) {
   if (existingChart) {
     existingChart.destroy();
   }
+
   return new Chart(ctx, {
     type: 'bar',
     data: {
@@ -104,7 +133,6 @@ async function loadSeriesForSelected() {
 
   const now = Date.now();
   const from30d = now - 30 * 24 * 60 * 60 * 1000;
-
   const url = `/api/v1/user/devices/${encodeURIComponent(
     deviceId,
   )}/measurements?from=${from30d}&to=${now}`;
@@ -128,33 +156,35 @@ async function loadSeriesForSelected() {
       return;
     }
 
-    const byDay = groupByDay(measures);
+    // ===== GRÁFICO DIÁRIO: ÚLTIMAS 24 HORAS (SEM AGRUPAR) =====
+    const last24h = getLast24Hours(measures);
 
-    // Últimos 1, 7 e 30 dias (limitando pelo que existir)
+    // ===== GRÁFICOS SEMANAIS E MENSAIS: AGRUPADOS POR DIA =====
+    const byDay = groupByDay(measures);
     const last30 = byDay.slice(-30);
     const last7 = byDay.slice(-7);
-    const last1 = byDay.slice(-1);
 
     const dailyCtx = document.getElementById('khDailyChart')?.getContext('2d');
     const weeklyCtx = document.getElementById('khWeeklyChart')?.getContext('2d');
-    const monthlyCtx =
-      document.getElementById('khMonthlyChart')?.getContext('2d');
+    const monthlyCtx = document.getElementById('khMonthlyChart')?.getContext('2d');
 
-    if (dailyCtx && last1.length) {
-      const labels = last1.map((d) => formatDate(d.ts));
-      const data = last1.map((d) => d.kh);
+    // ===== GRÁFICO 1: ÚLTIMAS 24 HORAS COM TIMESTAMP =====
+    if (dailyCtx && last24h.length) {
+      const labels = last24h.map((d) => formatDate(d.timestamp));
+      const data = last24h.map((d) => d.kh);
       khDailyChart = createBarChart(
         khDailyChart,
         dailyCtx,
-        'KH diário (último dia)',
+        'KH últimas 24 horas',
         labels,
         data,
         '#60a5fa',
       );
     }
 
+    // ===== GRÁFICO 2: ÚLTIMOS 7 DIAS (AGRUPADO) =====
     if (weeklyCtx && last7.length) {
-      const labels = last7.map((d) => formatDate(d.ts));
+      const labels = last7.map((d) => formatDateFull(d.ts));
       const data = last7.map((d) => d.kh);
       khWeeklyChart = createBarChart(
         khWeeklyChart,
@@ -166,8 +196,9 @@ async function loadSeriesForSelected() {
       );
     }
 
+    // ===== GRÁFICO 3: ÚLTIMOS 30 DIAS (AGRUPADO) =====
     if (monthlyCtx && last30.length) {
-      const labels = last30.map((d) => formatDate(d.ts));
+      const labels = last30.map((d) => formatDateFull(d.ts));
       const data = last30.map((d) => d.kh);
       khMonthlyChart = createBarChart(
         khMonthlyChart,
@@ -180,7 +211,7 @@ async function loadSeriesForSelected() {
     }
 
     if (chartInfo) {
-      chartInfo.textContent = `Total de ${byDay.length} dias com medições nos últimos 30 dias.`;
+      chartInfo.textContent = `Últimas 24h: ${last24h.length} medições | Últimos 7 dias: ${last7.length} dias | Últimos 30 dias: ${last30.length} dias`;
     }
   } catch (err) {
     console.error('loadSeriesForSelected error', err);
@@ -192,7 +223,6 @@ async function loadSeriesForSelected() {
 
 async function initDashboardGraficos() {
   await DashboardCommon.initTopbar();
-
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
     if (chartInfo) {
@@ -205,11 +235,15 @@ async function initDashboardGraficos() {
   if (deviceId) {
     try {
       const resp = await apiFetch(
-        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
       );
       const json = await resp.json();
-      if (resp.ok && json.success && json.data &&
-          typeof DashboardCommon.setLcdStatus === 'function') {
+      if (
+        resp.ok &&
+        json.success &&
+        json.data &&
+        typeof DashboardCommon.setLcdStatus === 'function'
+      ) {
         DashboardCommon.setLcdStatus(json.data.lcdStatus);
       }
     } catch (e) {
