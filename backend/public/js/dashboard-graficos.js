@@ -157,7 +157,12 @@ async function loadSeriesForSelected() {
     }
 
     // ===== GRÁFICO DIÁRIO: ÚLTIMAS 24 HORAS (SEM AGRUPAR) =====
-    const last24h = getLast24Hours(measures);
+    const last24h = measures
+      .filter(m => typeof m.kh === 'number' && m.timestamp)
+      .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+      .slice(-48)               // últimas 48 medições, por exemplo
+      .map(m => ({ timestamp: Number(m.timestamp), kh: m.kh }));
+
 
     // ===== GRÁFICOS SEMANAIS E MENSAIS: AGRUPADOS POR DIA =====
     const byDay = groupByDay(measures);
