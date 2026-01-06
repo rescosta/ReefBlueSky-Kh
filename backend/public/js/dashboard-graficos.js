@@ -173,10 +173,14 @@ async function loadSeriesForSelected() {
     const weeklyCtx = document.getElementById('khWeeklyChart')?.getContext('2d');
     const monthlyCtx = document.getElementById('khMonthlyChart')?.getContext('2d');
 
-    // ===== GRÁFICO 1: ÚLTIMAS 24 HORAS COM TIMESTAMP =====
+    // ===== GRÁFICO 1: ÚLTIMAS 24 HORAS (N MEDIÇÕES REAIS) =====
     if (dailyCtx && last24h.length) {
-      const labels = last24h.map((d) => formatDate(d.timestamp));
-      const data = last24h.map((d) => d.kh);
+      // pega no máximo as últimas 24 medições reais
+      const lastPoints = last24h.slice(-24);
+
+      const labels = lastPoints.map((d) => formatDate(d.timestamp));
+      const data   = lastPoints.map((d) => d.kh);
+
       khDailyChart = createBarChart(
         khDailyChart,
         dailyCtx,
@@ -186,6 +190,7 @@ async function loadSeriesForSelected() {
         '#60a5fa',
       );
     }
+
 
     // ===== GRÁFICO 2: ÚLTIMOS 7 DIAS (AGRUPADO) =====
     if (weeklyCtx && last7.length) {
