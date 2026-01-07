@@ -313,13 +313,6 @@ async function sendVerificationEmail(email, code) {
   }
 }
 
-initDosingModule({
-  pool,
-  mailTransporter,
-  ALERT_FROM,
-  sendTelegramForUser,
-  authUserMiddleware,
-});
 
 // ============================================================================
 // Monitoramento periódico de devices (online/offline + alertas por e-mail)
@@ -1036,6 +1029,15 @@ app.post(
     }
   }
 );
+
+initDosingModule({
+  pool,
+  mailTransporter,
+  ALERT_FROM,
+  sendTelegramForUser,
+  authUserMiddleware,
+});
+
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
