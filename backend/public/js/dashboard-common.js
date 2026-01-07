@@ -233,7 +233,10 @@ async function loadDevicesCommon() {
     }
 
     const allDevices  = json.data || [];
-    currentDevices = allDevices.filter((d) => d.type !== 'LCD');
+    
+    currentDevices = allDevices.filter(
+      (d) => d.type === 'KH' || d.type === 'LCD'
+    );
 
     devicesCache = currentDevices;
     devicesCacheTime = now;
