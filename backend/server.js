@@ -680,6 +680,10 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(__dirname + '/public/dashboard-main.html');
 });
 
+app.get('/dashboard', (req, res) => {
+  res.sendFile(__dirname + '/public/dashboard-dosing.html');
+});
+
 
 // ============================================================================
 // [SEGURANÇA] Middlewares de Proteção
