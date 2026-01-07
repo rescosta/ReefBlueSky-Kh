@@ -22,7 +22,7 @@ const fs = require('fs');
 const mariadb = require('mariadb');
 const nodemailer = require('nodemailer');
 const displayRoutes = require('./display-endpoints');
-const { router: dosingApiRoutes, initDosingModule } = require('./dosing-api-routes');
+const { router: dosingRouter, initDosingModule } = require('./dosing-api-routes');
 
 const axios = require('axios');
 
@@ -730,10 +730,6 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/api/display', displayRoutes);
-app.use('/api', dosingApiRoutes);
-
-
-
 
 // ============================================================================
 // [SEGURANÇA] Autenticação JWT
@@ -1036,16 +1032,16 @@ app.post(
 );
 
 
-
 initDosingModule({
   pool,
   mailTransporter,
   ALERT_FROM,
   sendTelegramForUser,
-  authUserMiddleware: authenticateToken, 
+  authUserMiddleware,  
 });
 
 app.use('/api', dosingRouter);
+
 
 
 // ============================================================================
