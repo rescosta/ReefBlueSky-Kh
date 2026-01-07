@@ -1,875 +1,463 @@
-<!-- 
-  ReefBlueSky Dosing Dashboard
-  Cole isto em um arquivo dashboard-dosing.html
-  Chamado via menu principal
--->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dosadora Balling - ReefBlueSky</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚰 ReefBlueSky - Dosadora Balling</title>
   <style>
+    :root {
+      --primary: #2196F3;
+      --success: #4CAF50;
+      --danger: #f44336;
+      --warning: #ff9800;
+      --dark: #212121;
+      --light: #f5f5f5;
+      --border: #e0e0e0;
+    }
+    
     * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
     }
-
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: #f5f5f5;
-      color: #333;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--light);
+      color: var(--dark);
+      line-height: 1.6;
     }
-
+    
     .container {
       max-width: 1200px;
       margin: 0 auto;
+      padding: 20px;
     }
-
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
       color: white;
       padding: 20px;
+      margin-bottom: 30px;
       border-radius: 8px;
-      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    header h1 {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      gap: 10px;
+      font-size: 28px;
     }
-
-    .header h1 {
-      margin: 0;
-      font-size: 24px;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .status-badge.online {
-      background: rgba(0, 255, 0, 0.3);
-      color: #00cc00;
-    }
-
-    .status-badge.offline {
-      background: rgba(255, 0, 0, 0.3);
-      color: #ff6666;
-    }
-
+    
     .nav-tabs {
       display: flex;
-      border-bottom: 2px solid #ddd;
+      gap: 10px;
       margin-bottom: 20px;
-      gap: 0;
+      border-bottom: 2px solid var(--border);
+      flex-wrap: wrap;
     }
-
-    .nav-tabs button {
+    
+    .tab-btn {
       padding: 12px 20px;
       background: none;
       border: none;
-      border-bottom: 3px solid transparent;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 500;
       color: #666;
-      transition: all 0.2s;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s;
     }
-
-    .nav-tabs button.active {
-      color: #667eea;
-      border-bottom-color: #667eea;
+    
+    .tab-btn:hover {
+      color: var(--primary);
     }
-
-    .nav-tabs button:hover {
-      color: #667eea;
+    
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
     }
-
+    
     .tab-content {
       display: none;
     }
-
-    .tab-content.active {
+    
+    .tab-content:not(.hidden) {
       display: block;
     }
-
-    .card {
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    /* CARDS */
+    .device-card, .pump-card, .schedule-card {
       background: white;
       border-radius: 8px;
       padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .card h2 {
-      margin-top: 0;
       margin-bottom: 15px;
-      font-size: 18px;
-      border-bottom: 1px solid #eee;
+      border-left: 4px solid var(--primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .device-card:hover, .pump-card:hover, .schedule-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .device-card.status-online {
+      border-left-color: var(--success);
+    }
+    
+    .device-card.status-offline {
+      border-left-color: var(--danger);
+    }
+    
+    .pump-card.pump-low {
+      border-left-color: var(--warning);
+    }
+    
+    .device-header, .pump-header, .schedule-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid var(--border);
       padding-bottom: 10px;
     }
-
-    .form-group {
-      margin-bottom: 15px;
+    
+    .device-header h3, .pump-header h4, .schedule-header h4 {
+      margin: 0;
+      flex: 1;
     }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 500;
-      font-size: 13px;
-      color: #555;
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
     }
-
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #ddd;
+    
+    .status-badge.status-online {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+    
+    .status-badge.status-offline {
+      background: #ffcdd2;
+      color: #b71c1c;
+    }
+    
+    .device-info p, .pump-info p {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+    
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
       border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    
+    /* VOLUME BAR */
+    .volume-bar {
+      width: 100%;
+      height: 24px;
+      background: #f0f0f0;
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 10px 0;
+      position: relative;
+    }
+    
+    .volume-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .volume-text {
       font-size: 13px;
-      font-family: inherit;
+      color: #666;
+      margin: 5px 0 0 0;
     }
-
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-    }
-
+    
+    /* BUTTONS */
     .btn {
-      padding: 8px 16px;
+      padding: 10px 16px;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 500;
       transition: all 0.2s;
+      display: inline-block;
     }
-
+    
     .btn-primary {
-      background: #667eea;
+      background: var(--primary);
       color: white;
     }
-
+    
     .btn-primary:hover {
-      background: #5568d3;
+      background: #1976d2;
     }
-
+    
     .btn-secondary {
-      background: #f0f0f0;
-      color: #333;
-    }
-
-    .btn-secondary:hover {
       background: #e0e0e0;
+      color: var(--dark);
     }
-
+    
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+    
     .btn-danger {
-      background: #ff6b6b;
+      background: var(--danger);
       color: white;
     }
-
+    
     .btn-danger:hover {
-      background: #ee5a5a;
+      background: #d32f2f;
     }
-
+    
     .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    
+    .pump-status {
+      font-size: 12px;
+      font-weight: 600;
       padding: 4px 8px;
-      font-size: 12px;
-    }
-
-    .pump-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .pump-card {
-      background: #fafafa;
-      border: 1px solid #eee;
-      border-radius: 6px;
-      padding: 15px;
-    }
-
-    .pump-card h3 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-    }
-
-    .pump-info {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 10px;
-      line-height: 1.6;
-    }
-
-    .volume-bar {
-      width: 100%;
-      height: 6px;
-      background: #eee;
-      border-radius: 3px;
-      overflow: hidden;
-      margin-bottom: 5px;
-    }
-
-    .volume-bar-fill {
-      height: 100%;
-      background: #667eea;
-      border-radius: 3px;
-    }
-
-    .volume-bar-fill.low {
-      background: #ff6b6b;
-    }
-
-    .volume-bar-fill.warning {
-      background: #ffd93d;
-    }
-
-    .schedule-item {
-      background: #f9f9f9;
-      border-left: 3px solid #667eea;
-      padding: 10px 12px;
-      margin-bottom: 10px;
       border-radius: 4px;
+    }
+    
+    .pump-status.enabled {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+    
+    .pump-status.disabled {
+      background: #ffcccc;
+      color: #8b0000;
+    }
+    
+    .schedule-status {
       font-size: 12px;
-    }
-
-    .schedule-item.disabled {
-      opacity: 0.6;
-      border-left-color: #ccc;
-    }
-
-    .execution-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-
-    .execution-table th,
-    .execution-table td {
-      padding: 8px;
-      text-align: left;
-      border-bottom: 1px solid #eee;
-    }
-
-    .execution-table th {
-      background: #f5f5f5;
       font-weight: 600;
-      color: #555;
+      padding: 4px 8px;
+      border-radius: 4px;
     }
-
-    .status-ok {
-      color: #00cc00;
-      font-weight: 600;
+    
+    .schedule-status.enabled {
+      background: #c8e6c9;
+      color: #1b5e20;
     }
-
-    .status-failed {
-      color: #ff6666;
-      font-weight: 600;
+    
+    .schedule-status.disabled {
+      background: #ffcccc;
+      color: #8b0000;
     }
-
-    .status-skipped {
-      color: #999;
+    
+    .device-actions, .pump-actions, .schedule-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      flex-wrap: wrap;
     }
-
+    
+    .device-info {
+      font-size: 13px;
+      color: #666;
+    }
+    
+    /* ALERTS */
     .alert {
-      padding: 12px 15px;
+      padding: 15px;
       border-radius: 4px;
       margin-bottom: 15px;
-      font-size: 13px;
     }
-
+    
     .alert-info {
       background: #e3f2fd;
-      color: #1976d2;
-      border-left: 3px solid #1976d2;
+      color: #01579b;
     }
-
-    .alert-warning {
-      background: #fff3e0;
-      color: #f57c00;
-      border-left: 3px solid #f57c00;
-    }
-
+    
     .alert-danger {
       background: #ffebee;
-      color: #c62828;
-      border-left: 3px solid #c62828;
+      color: #b71c1c;
     }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
+    
+    .alert-success {
+      background: #f1f8e9;
+      color: #33691e;
     }
-
-    .form-row.full {
-      grid-template-columns: 1fr;
+    
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      border-radius: 4px;
+      color: white;
+      font-weight: 500;
+      animation: slideIn 0.3s ease;
+      z-index: 1000;
     }
-
+    
+    .toast-success {
+      background: var(--success);
+    }
+    
+    .toast-error {
+      background: var(--danger);
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    /* RESPONSIVE */
     @media (max-width: 768px) {
-      .form-row {
-        grid-template-columns: 1fr;
+      .container {
+        padding: 10px;
       }
       
-      .header {
+      header h1 {
+        font-size: 20px;
+      }
+      
+      .nav-tabs {
         flex-direction: column;
-        gap: 10px;
       }
       
-      .pump-grid {
-        grid-template-columns: 1fr;
+      .tab-btn {
+        width: 100%;
+        text-align: left;
+      }
+      
+      .device-header, .pump-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .status-badge {
+        margin-top: 10px;
+      }
+      
+      .device-actions, .pump-actions, .schedule-actions {
+        width: 100%;
+      }
+      
+      .btn {
+        flex: 1;
+        min-width: 100px;
       }
     }
   </style>
 </head>
 <body>
-
-<div class="container">
-  <!-- HEADER -->
-  <div class="header">
-    <div>
-      <h1>🚰 Dosadora Balling</h1>
-      <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Gerenciador de doses automáticas</p>
-    </div>
-    <div>
-      <select id="deviceSelect" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-        <option value="">Selecionar device...</option>
-      </select>
-    </div>
-  </div>
-
-  <!-- TABS -->
-  <div class="nav-tabs">
-    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-    <button class="tab-btn" data-tab="devices">Devices</button>
-    <button class="tab-btn" data-tab="pumps">Bombas</button>
-    <button class="tab-btn" data-tab="schedules">Agendas</button>
-    <button class="tab-btn" data-tab="executions">Histórico</button>
-  </div>
-
-  <!-- TAB: DASHBOARD -->
-  <div id="dashboard" class="tab-content active">
-    <div class="pump-grid" id="pumpGridDashboard"></div>
-
-    <div class="card">
-      <h2>Alertas Recentes</h2>
-      <div id="alertsList"></div>
-    </div>
-
-    <div class="card">
-      <h2>Status do Sistema</h2>
-      <div id="systemStatus"></div>
-    </div>
-  </div>
-
-  <!-- TAB: DEVICES -->
-  <div id="devices" class="tab-content">
-    <div class="card">
-      <h2>Meus Devices</h2>
-      <div id="devicesList"></div>
-      <hr style="margin: 20px 0;">
-      <h3 style="margin-top: 0;">Adicionar Novo Device</h3>
-      <form id="formAddDevice">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Nome do Device</label>
-            <input type="text" id="newDeviceName" placeholder="Ex: Dosadora Principal" required>
-          </div>
-          <div class="form-group">
-            <label>Tipo de Hardware</label>
-            <select id="newDeviceType" required>
-              <option value="ESP8266">ESP8266 (NodeMCU)</option>
-              <option value="ESP32">ESP32</option>
-            </select>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Criar Device</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- TAB: PUMPS -->
-  <div id="pumps" class="tab-content">
-    <div class="card">
-      <h2>Configurar Bombas</h2>
-      <div id="pumpsList"></div>
-      <hr style="margin: 20px 0;">
-      <h3 style="margin-top: 0;">Adicionar Nova Bomba</h3>
-      <form id="formAddPump">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Nome da Bomba</label>
-            <input type="text" id="newPumpName" placeholder="Ex: KH" required>
-          </div>
-          <div class="form-group">
-            <label>Índice (0-3)</label>
-            <input type="number" id="newPumpIndex" min="0" max="3" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Volume Recipiente (mL)</label>
-            <input type="number" id="newPumpContainer" value="500" required>
-          </div>
-          <div class="form-group">
-            <label>Taxa Calibração (mL/s)</label>
-            <input type="number" id="newPumpCalibration" step="0.001" value="1.0" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Limite Alarme (%)</label>
-            <input type="number" id="newPumpAlarmPct" value="10" required>
-          </div>
-          <div class="form-group">
-            <label>Máximo Diário (mL)</label>
-            <input type="number" id="newPumpMaxDaily" value="100" required>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Adicionar Bomba</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- TAB: SCHEDULES -->
-  <div id="schedules" class="tab-content">
-    <div class="card">
-      <h2>Agendas de Dose</h2>
-      <div id="schedulesList"></div>
-      <hr style="margin: 20px 0;">
-      <h3 style="margin-top: 0;">Adicionar Nova Agenda</h3>
-      <form id="formAddSchedule">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Selecionar Bomba</label>
-            <select id="schedulePumpId" required>
-              <option value="">-- Selecione uma bomba --</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Doses por Dia</label>
-            <input type="number" id="scheduleDosesPerDay" min="1" max="24" value="1" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Horário Início</label>
-            <input type="time" id="scheduleStartTime" required>
-          </div>
-          <div class="form-group">
-            <label>Horário Fim</label>
-            <input type="time" id="scheduleEndTime" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Volume Total Diário (mL)</label>
-            <input type="number" id="scheduleVolumePerDay" value="36" required>
-          </div>
-        </div>
-        <div class="form-group full">
-          <label>Dias da Semana</label>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-            <label><input type="checkbox" name="dayOfWeek" value="0" checked> Segunda</label>
-            <label><input type="checkbox" name="dayOfWeek" value="1" checked> Terça</label>
-            <label><input type="checkbox" name="dayOfWeek" value="2" checked> Quarta</label>
-            <label><input type="checkbox" name="dayOfWeek" value="3" checked> Quinta</label>
-            <label><input type="checkbox" name="dayOfWeek" value="4" checked> Sexta</label>
-            <label><input type="checkbox" name="dayOfWeek" value="5" checked> Sábado</label>
-            <label><input type="checkbox" name="dayOfWeek" value="6" checked> Domingo</label>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Criar Agenda</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- TAB: EXECUTIONS -->
-  <div id="executions" class="tab-content">
-    <div class="card">
-      <h2>Histórico de Doses</h2>
-      <div style="margin-bottom: 15px;">
-        <button class="btn btn-secondary btn-small" id="btnExportHistory">Exportar (CSV)</button>
-      </div>
-      <table class="execution-table" id="executionsTable">
-        <thead>
-          <tr>
-            <th>Data/Hora</th>
-            <th>Bomba</th>
-            <th>Volume (mL)</th>
-            <th>Status</th>
-            <th>Origem</th>
-          </tr>
-        </thead>
-        <tbody id="executionsBody">
-          <tr><td colspan="5" style="text-align: center; color: #999;">Carregando...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
-
-<script>
-// ===== STATE =====
-let currentDevice = null;
-let devicesList = [];
-let pumpsList = [];
-let schedulesList = [];
-
-// ===== INIT =====
-document.addEventListener('DOMContentLoaded', () => {
-  setupEventListeners();
-  loadDevices();
-});
-
-// ===== TAB SWITCHING =====
-function setupEventListeners() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabName = btn.dataset.tab;
-      switchTab(tabName);
-    });
-  });
-
-  document.getElementById('deviceSelect').addEventListener('change', (e) => {
-    currentDevice = e.target.value;
-    refreshAllData();
-  });
-
-  document.getElementById('formAddDevice').addEventListener('submit', handleAddDevice);
-  document.getElementById('formAddPump').addEventListener('submit', handleAddPump);
-  document.getElementById('formAddSchedule').addEventListener('submit', handleAddSchedule);
-  document.getElementById('btnExportHistory').addEventListener('click', exportExecutions);
-}
-
-function switchTab(tabName) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  
-  document.getElementById(tabName).classList.add('active');
-  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-  
-  // Atualizar dados da aba
-  if (tabName === 'pumps') loadPumps();
-  if (tabName === 'schedules') loadSchedules();
-  if (tabName === 'executions') loadExecutions();
-}
-
-// ===== API CALLS =====
-async function apiCall(endpoint, method = 'GET', body = null) {
-  const token = localStorage.getItem('token');
-  const options = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    }
-  };
-  
-  if (body) options.body = JSON.stringify(body);
-  
-  const res = await fetch(endpoint, options);
-  if (res.status === 401) {
-    alert('Sessão expirada. Faça login novamente.');
-    window.location.href = '/login';
-    return null;
-  }
-  
-  return res.json();
-}
-
-// ===== LOAD DEVICES =====
-async function loadDevices() {
-  const data = await apiCall('/api/v1/user/dosing/devices');
-  if (!data || !data.success) return;
-  
-  devicesList = data.data || [];
-  
-  const select = document.getElementById('deviceSelect');
-  select.innerHTML = '<option value="">Selecionar device...</option>';
-  devicesList.forEach(d => {
-    const opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = `${d.name} (${d.online ? '🟢 online' : '🔴 offline'})`;
-    select.appendChild(opt);
-  });
-  
-  renderDeviceList();
-}
-
-function renderDeviceList() {
-  const html = devicesList.map(d => `
-    <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-      <div>
-        <h3 style="margin: 0 0 5px 0;">${d.name}</h3>
-        <small style="color: #999;">
-          ${d.hw_type} • ${d.pump_count} bomba(s) • ${d.alert_count} alerta(s)
-        </small>
-      </div>
-      <div>
-        <span class="status-badge ${d.online ? 'online' : 'offline'}">
-          ${d.online ? 'ONLINE' : 'OFFLINE'}
-        </span>
-        <button class="btn btn-secondary btn-small" onclick="editDevice(${d.id})">Editar</button>
-        <button class="btn btn-danger btn-small" onclick="deleteDevice(${d.id})">Remover</button>
-      </div>
-    </div>
-  `).join('');
-  
-  document.getElementById('devicesList').innerHTML = html;
-}
-
-// ===== LOAD PUMPS =====
-async function loadPumps() {
-  if (!currentDevice) {
-    alert('Selecione um device primeiro.');
-    return;
-  }
-  
-  const data = await apiCall(`/api/v1/user/dosing/pumps?deviceId=${currentDevice}`);
-  if (!data || !data.success) return;
-  
-  pumpsList = data.data || [];
-  
-  const html = pumpsList.map(p => `
-    <div class="pump-card">
-      <h3>${p.name} <small style="color: #999;">Índice ${p.index_on_device}</small></h3>
-      <div class="pump-info">
-        <div>Volume atual: <strong>${p.current_volume_ml} / ${p.container_volume_ml} mL</strong></div>
-        <div class="volume-bar">
-          <div class="volume-bar-fill ${p.current_volume_ml < (p.container_volume_ml * 0.15) ? 'low' : 'warning'}"
-               style="width: ${(p.current_volume_ml / p.container_volume_ml) * 100}%"></div>
-        </div>
-        <div>Taxa: <strong>${p.calibration_rate_ml_s.toFixed(3)} mL/s</strong></div>
-        <div>Status: ${p.enabled ? '✅ Ativada' : '⏸️ Desativada'}</div>
-      </div>
-      <div style="margin-top: 10px; display: flex; gap: 5px;">
-        <button class="btn btn-primary btn-small" onclick="editPump(${p.id})">Editar</button>
-        <button class="btn btn-secondary btn-small" onclick="manualDose(${p.id})">Dose Manual</button>
-        <button class="btn btn-danger btn-small" onclick="deletePump(${p.id})">Remover</button>
-      </div>
-    </div>
-  `).join('');
-  
-  document.getElementById('pumpsList').innerHTML = html;
-  
-  // Preencher select de bombas na aba de agendas
-  const select = document.getElementById('schedulePumpId');
-  select.innerHTML = '<option value="">-- Selecione uma bomba --</option>';
-  pumpsList.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    select.appendChild(opt);
-  });
-}
-
-// ===== LOAD SCHEDULES =====
-async function loadSchedules() {
-  if (!currentDevice || !pumpsList.length) return;
-  
-  const html = (await Promise.all(
-    pumpsList.map(async p => {
-      const data = await apiCall(`/api/v1/user/dosing/schedules?pumpId=${p.id}`);
-      const scheds = data?.data || [];
-      return {
-        pump: p,
-        schedules: scheds
-      };
-    })
-  )).map(item => {
-    const { pump, schedules } = item;
-    if (!schedules.length) return '';
+  <div class="container">
+    <header>
+      <h1>🚰 ReefBlueSky - Dosadora Balling</h1>
+      <p>Gerenciador inteligente de doses automáticas com sincronização em tempo real</p>
+    </header>
     
-    return `
-      <div style="margin-bottom: 20px;">
-        <h3>${pump.name}</h3>
-        ${schedules.map(s => `
-          <div class="schedule-item ${!s.enabled ? 'disabled' : ''}">
-            <strong>${s.doses_per_day}x/dia</strong> • ${s.start_time} - ${s.end_time} •
-            ${s.volume_per_day_ml} mL/dia
-            <div style="margin-top: 5px; font-size: 11px; color: #999;">
-              ${getDaysLabel(s.days_mask)}
-            </div>
-            <div style="margin-top: 8px; display: flex; gap: 5px;">
-              <button class="btn btn-secondary btn-small" onclick="editSchedule(${s.id})">Editar</button>
-              <button class="btn btn-danger btn-small" onclick="deleteSchedule(${s.id})">Remover</button>
-            </div>
-          </div>
-        `).join('')}
+    <!-- NAVIGATION TABS -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" data-tab="devices-tab">📱 Meus Devices</button>
+      <button class="tab-btn" data-tab="pumps-tab">💧 Bombas</button>
+      <button class="tab-btn" data-tab="schedules-tab">⏰ Agendas</button>
+      <button class="tab-btn" data-tab="history-tab">📋 Histórico</button>
+      <button class="tab-btn" data-tab="alerts-tab">🔔 Alertas</button>
+    </div>
+    
+    <!-- DEVICES TAB -->
+    <div id="devices-tab" class="tab-content">
+      <h2>Meus Devices Dosadora</h2>
+      <div id="devices-list" style="margin-top: 20px;">
+        <p>⏳ Carregando devices...</p>
       </div>
-    `;
-  }).join('');
+      <button class="btn btn-primary" style="margin-top: 20px;" onclick="showCreateDeviceDialog()">
+        ➕ Adicionar Novo Device
+      </button>
+    </div>
+    
+    <!-- PUMPS TAB -->
+    <div id="pumps-tab" class="tab-content hidden">
+      <h2>Configurar Bombas</h2>
+      <p style="color: #666; margin-bottom: 15px;">
+        ℹ️ Selecione um device na aba "Meus Devices" para gerenciar suas bombas
+      </p>
+      <div id="pumps-list" style="margin-top: 20px;">
+        <p>Selecione um device primeiro</p>
+      </div>
+      <button class="btn btn-primary" id="create-pump-btn" style="margin-top: 20px; display: none;">
+        ➕ Adicionar Nova Bomba
+      </button>
+    </div>
+    
+    <!-- SCHEDULES TAB -->
+    <div id="schedules-tab" class="tab-content hidden">
+      <h2>Agendas de Dose</h2>
+      <p style="color: #666; margin-bottom: 15px;">
+        ℹ️ Selecione uma bomba em "Bombas" para criar agendas automáticas
+      </p>
+      <div id="schedules-list" style="margin-top: 20px;">
+        <p>Selecione uma bomba primeiro</p>
+      </div>
+      <button class="btn btn-primary" id="create-schedule-btn" style="margin-top: 20px; display: none;">
+        ➕ Adicionar Nova Agenda
+      </button>
+    </div>
+    
+    <!-- HISTORY TAB -->
+    <div id="history-tab" class="tab-content hidden">
+      <h2>Histórico de Doses</h2>
+      <div id="history-list" style="margin-top: 20px;">
+        <p>⏳ Carregando histórico...</p>
+      </div>
+      <button class="btn btn-secondary" style="margin-top: 20px;">
+        📥 Exportar (CSV)
+      </button>
+    </div>
+    
+    <!-- ALERTS TAB -->
+    <div id="alerts-tab" class="tab-content hidden">
+      <h2>Alertas e Notificações</h2>
+      <p style="color: #666; margin-bottom: 15px;">
+        🔔 Alertas pendentes de seus devices
+      </p>
+      <div id="alerts-list" style="margin-top: 20px;">
+        <p>Carregando alertas...</p>
+      </div>
+    </div>
+  </div>
   
-  document.getElementById('schedulesList').innerHTML = html || '<p style="color: #999;">Nenhuma agenda configurada.</p>';
-}
-
-function getDaysLabel(mask) {
-  const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
-  return days.filter((_, i) => mask & (1 << i)).join(', ');
-}
-
-// ===== LOAD EXECUTIONS =====
-async function loadExecutions() {
-  if (!currentDevice || !pumpsList.length) return;
-  
-  // TODO: implementar endpoint de histórico
-  const rows = [];
-  document.getElementById('executionsBody').innerHTML = rows.length 
-    ? rows.map(r => `
-      <tr>
-        <td>${new Date(r.executed_at).toLocaleString('pt-BR')}</td>
-        <td>${r.pump_name}</td>
-        <td>${r.volume_ml}</td>
-        <td class="status-${r.status.toLowerCase()}">${r.status}</td>
-        <td>${r.origin}</td>
-      </tr>
-    `).join('')
-    : '<tr><td colspan="5" style="text-align: center; color: #999;">Nenhuma execução registrada.</td></tr>';
-}
-
-// ===== FORM HANDLERS =====
-async function handleAddDevice(e) {
-  e.preventDefault();
-  const name = document.getElementById('newDeviceName').value;
-  const hw_type = document.getElementById('newDeviceType').value;
-  
-  const data = await apiCall('/api/v1/user/dosing/devices', 'POST', { name, hw_type });
-  if (data?.success) {
-    alert('Device criado! Configure o ESP com as credenciais e esp_uid fornecido.');
-    loadDevices();
-    document.getElementById('formAddDevice').reset();
-  } else {
-    alert('Erro ao criar device: ' + (data?.error || 'desconhecido'));
-  }
-}
-
-async function handleAddPump(e) {
-  e.preventDefault();
-  const device_id = currentDevice;
-  const name = document.getElementById('newPumpName').value;
-  const index_on_device = parseInt(document.getElementById('newPumpIndex').value);
-  const container_volume_ml = parseInt(document.getElementById('newPumpContainer').value);
-  const calibration_rate_ml_s = parseFloat(document.getElementById('newPumpCalibration').value);
-  const alarm_threshold_pct = parseInt(document.getElementById('newPumpAlarmPct').value);
-  const max_daily_ml = parseInt(document.getElementById('newPumpMaxDaily').value);
-  
-  const data = await apiCall('/api/v1/user/dosing/pumps', 'POST', {
-    device_id, name, index_on_device, container_volume_ml, 
-    calibration_rate_ml_s, alarm_threshold_pct, max_daily_ml
-  });
-  
-  if (data?.success) {
-    alert('Bomba criada!');
-    loadPumps();
-    document.getElementById('formAddPump').reset();
-  } else {
-    alert('Erro: ' + (data?.error || 'desconhecido'));
-  }
-}
-
-async function handleAddSchedule(e) {
-  e.preventDefault();
-  const pump_id = parseInt(document.getElementById('schedulePumpId').value);
-  const doses_per_day = parseInt(document.getElementById('scheduleDosesPerDay').value);
-  const start_time = document.getElementById('scheduleStartTime').value;
-  const end_time = document.getElementById('scheduleEndTime').value;
-  const volume_per_day_ml = parseInt(document.getElementById('scheduleVolumePerDay').value);
-  
-  const dayCheckboxes = document.querySelectorAll('input[name="dayOfWeek"]:checked');
-  let days_mask = 0;
-  dayCheckboxes.forEach(cb => {
-    days_mask |= (1 << parseInt(cb.value));
-  });
-  
-  const data = await apiCall('/api/v1/user/dosing/schedules', 'POST', {
-    pump_id, enabled: 1, days_mask, doses_per_day, 
-    start_time, end_time, volume_per_day_ml
-  });
-  
-  if (data?.success) {
-    alert('Agenda criada!');
-    loadSchedules();
-    document.getElementById('formAddSchedule').reset();
-  } else {
-    alert('Erro: ' + (data?.error || 'desconhecido'));
-  }
-}
-
-// ===== UTILITIES =====
-function refreshAllData() {
-  loadPumps().then(() => loadSchedules());
-}
-
-async function manualDose(pumpId) {
-  const volumeStr = prompt('Volume em mL:');
-  if (!volumeStr) return;
-  const volume_ml = parseFloat(volumeStr);
-  if (!volume_ml || volume_ml <= 0) {
-    alert('Volume inválido.');
-    return;
-  }
-  
-  const data = await apiCall(`/api/v1/user/dosing/pumps/${pumpId}/dose`, 'POST', { volume_ml });
-  if (data?.success) {
-    alert('Dose manual enviada!');
-  } else {
-    alert('Erro: ' + (data?.error || 'desconhecido'));
-  }
-}
-
-async function deleteDevice(id) {
-  if (!confirm('Remover device?')) return;
-  const data = await apiCall(`/api/v1/user/dosing/devices/${id}`, 'DELETE');
-  if (data?.success) {
-    loadDevices();
-  }
-}
-
-async function deletePump(id) {
-  if (!confirm('Remover bomba?')) return;
-  const data = await apiCall(`/api/v1/user/dosing/pumps/${id}`, 'DELETE');
-  if (data?.success) {
-    loadPumps();
-  }
-}
-
-async function deleteSchedule(id) {
-  if (!confirm('Remover agenda?')) return;
-  const data = await apiCall(`/api/v1/user/dosing/schedules/${id}`, 'DELETE');
-  if (data?.success) {
-    loadSchedules();
-  }
-}
-
-function editDevice(id) {
-  alert('Edição de device em desenvolvimento.');
-}
-
-function editPump(id) {
-  alert('Edição de bomba em desenvolvimento.');
-}
-
-function editSchedule(id) {
-  alert('Edição de agenda em desenvolvimento.');
-}
-
-function exportExecutions() {
-  alert('Export em desenvolvimento.');
-}
-</script>
-
+  <!-- Load common JS first, then dosing JS -->
+  <script src="dashboard-common.js"></script>
+  <script src="dashboard-dosing-v2.js"></script>
 </body>
 </html>
