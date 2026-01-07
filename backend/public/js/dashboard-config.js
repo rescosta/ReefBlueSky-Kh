@@ -408,7 +408,6 @@ function startPump4CalibProgress() {
 
 
 // Calibração bomba 4: salvar mL/s (setpump4mlpersec)
-// Calibração bomba 4: salvar mL/s (setpump4mlpersec)
 if (pump4SaveCalibBtn) {
   pump4SaveCalibBtn.addEventListener('click', async () => {
     const deviceId = DashboardCommon.getSelectedDeviceId();
@@ -737,6 +736,13 @@ async function initDashboardConfig() {
         telegramChatIdInput.placeholder = '';
       }
     }
+
+  const dosingBtn = document.getElementById('dosingBtn');
+  if (dosingBtn) {
+    dosingBtn.addEventListener('click', () => {
+      window.location.href = 'dashboard-dosing.html';
+    });
+  }
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {

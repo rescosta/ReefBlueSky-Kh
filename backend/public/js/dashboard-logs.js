@@ -117,7 +117,6 @@ function clearServerConsoleUI() {
   }
 }
 
-
 async function loadDeviceConsole() {
   try {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
@@ -163,6 +162,13 @@ async function startLogsPolling() {
 
 async function initDashboardLogs() {
   await DashboardCommon.initTopbar();
+
+  const dosingBtn = document.getElementById('dosingBtn');
+  if (dosingBtn) {
+    dosingBtn.addEventListener('click', () => {
+      window.location.href = 'dashboard-dosing.html';
+    });
+  }
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {

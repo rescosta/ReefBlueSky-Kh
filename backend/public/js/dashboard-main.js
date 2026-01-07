@@ -267,7 +267,7 @@ function computeStats(measures) {
   const last = khs[0];
   const prev = khs[1] ?? null;
 
-  // desvio em relação ao alvo, não à medição anterior
+  // desvio em relação ao alvo
   const diff = (typeof currentKhTarget === 'number' && currentKhTarget > 0)
     ? last - currentKhTarget
     : 0;
@@ -808,6 +808,13 @@ if (pump4CalibBtn) {
 
 async function initDashboardMain() {
   await DashboardCommon.initTopbar();
+
+  const dosingBtn = document.getElementById('dosingBtn');
+  if (dosingBtn) {
+    dosingBtn.addEventListener('click', () => {
+      window.location.href = 'dashboard-dosing.html';
+    });
+  }
 
   const devs = await DashboardCommon.loadDevicesCommon(); // usa a global
   if (!devs.length) {

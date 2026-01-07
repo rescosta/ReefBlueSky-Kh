@@ -233,6 +233,14 @@ async function loadSeriesForSelected() {
 
 async function initDashboardGraficos() {
   await DashboardCommon.initTopbar();
+
+  const dosingBtn = document.getElementById('dosingBtn');
+  if (dosingBtn) {
+    dosingBtn.addEventListener('click', () => {
+      window.location.href = 'dashboard-dosing.html';
+    });
+  }
+
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
     if (chartInfo) {

@@ -136,28 +136,34 @@ function getTopbarHtml() {
           <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
         </nav>
       </div>
-        <div class="topbar-right">
-          <div class="device-selector">
-            <span>Device:</span>
-            <select id="deviceSelect"></select>
-            <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
-          </div>
-
-          <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
-            LCD OFF
-          </span>
-
-          <div id="currentTime" class="topbar-clock">--:--</div>
-
-          <button id="logoutBtn" class="btn-small">Sair</button>
-
-          <button id="menuToggle" class="menu-toggle" aria-label="Menu">
-            <span></span><span></span><span></span>
-          </button>
+      <div class="topbar-right">
+        <div class="device-selector">
+          <span>Device:</span>
+          <select id="deviceSelect"></select>
+          <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
         </div>
+
+        <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
+          LCD OFF
+        </span>
+
+        <!-- NOVO: atalho para dosadora -->
+        <button id="dosingBtn" class="btn-small" style="margin-left:8px;">
+          Dosadora
+        </button>
+
+        <div id="currentTime" class="topbar-clock">--:--</div>
+
+        <button id="logoutBtn" class="btn-small">Sair</button>
+
+        <button id="menuToggle" class="menu-toggle" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
     </div>
   `;
 }
+
 
 
 // Destacar aba ativa
