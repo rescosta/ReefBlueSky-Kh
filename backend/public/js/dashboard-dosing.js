@@ -21,21 +21,33 @@ let lastStatusUpdate = {};
 
 // INIT idêntico ao main/config
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1) Guard local: se não tiver token, manda para login
-  const token = localStorage.getItem('token');
-  if (!token) {
-    window.location.href = '/login.html';
+  try {
+    // 1) valida token no servidor
+    const res = await apiFetch('/api/v1/auth/me');
+    if (!res.ok) {
+      redirectToLogin();
+      return;
+    }
+    const me = await res.json();
+    if (!me || !me.success) {
+      redirectToLogin();
+      return;
+    }
+  } catch (err) {
+    // qualquer erro na auth cai pro login
+    redirectToLogin();
     return;
   }
 
-  // 2) Usa o mesmo fluxo das outras telas
-  await DashboardCommon.initTopbar();   // aqui ele valida /auth/me etc.
+  // 2) fluxo normal da dosing
+  await DashboardCommon.initTopbar();
   console.log('[Dosing] Iniciando dashboard...');
   await loadDevices();
   setupEventListeners();
   setupTabs();
   startPolling();
 });
+
 
 
 
