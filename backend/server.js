@@ -318,7 +318,7 @@ initDosingModule({
   mailTransporter,
   ALERT_FROM,
   sendTelegramForUser,
-  authenticateToken
+  authUserMiddleware,
 });
 
 // ============================================================================
