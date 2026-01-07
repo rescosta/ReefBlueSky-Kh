@@ -10,6 +10,13 @@
 const DOSING_API = '/api/v1/user/dosing';
 const POLL_INTERVAL = 5000; // 5s (como JoyReef)
 const COMMAND_QUEUE_KEY = 'dosing_command_queue';
+const token = localStorage.getItem('token');
+if (!token) {
+  redirectToLogin();  // função definida em dashboard-common.js
+}
+
+let currentUserId = getUserFromJWT();
+
 
 let currentUserId = getUserFromJWT();
 let selectedDeviceId = null;
@@ -22,12 +29,14 @@ let lastStatusUpdate = {};
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
+  await DashboardCommon.initTopbar(); 
   console.log('[Dosing] Iniciando dashboard...');
   await loadDevices();
   setupEventListeners();
   setupTabs();
   startPolling();
 });
+
 
 // ===== POLLING (como JoyReef) =====
 function startPolling() {
