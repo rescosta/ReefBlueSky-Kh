@@ -8,17 +8,16 @@
  */
 
 const DOSING_API = '/api/v1/user/dosing';
-const POLL_INTERVAL = 5000; // 5s (como JoyReef)
+const POLL_INTERVAL = 5000;
 const COMMAND_QUEUE_KEY = 'dosing_command_queue';
+
+// Proteção de login: mesma lógica do restante do app
 const token = localStorage.getItem('token');
 if (!token) {
-  redirectToLogin();  // função definida em dashboard-common.js
+  redirectToLogin();   // definida em dashboard-common.js
 }
 
-let currentUserId = getUserFromJWT();
-
-
-let currentUserId = getUserFromJWT();
+// NÃO chame getUserFromJWT aqui, não existe nessa versão
 let selectedDeviceId = null;
 let selectedPumpId = null;
 let devices = [];
@@ -27,15 +26,17 @@ let schedules = [];
 let pollIntervalId = null;
 let lastStatusUpdate = {};
 
+
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
-  await DashboardCommon.initTopbar(); 
+  await DashboardCommon.initTopbar();  // também redireciona se token inválido
   console.log('[Dosing] Iniciando dashboard...');
   await loadDevices();
   setupEventListeners();
   setupTabs();
   startPolling();
 });
+
 
 
 // ===== POLLING (como JoyReef) =====
