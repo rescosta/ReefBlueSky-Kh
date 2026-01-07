@@ -11,13 +11,6 @@ const DOSING_API = '/api/v1/user/dosing';
 const POLL_INTERVAL = 5000;
 const COMMAND_QUEUE_KEY = 'dosing_command_queue';
 
-// Proteção de login: mesma lógica do restante do app
-const token = localStorage.getItem('token');
-if (!token) {
-  redirectToLogin();   // definida em dashboard-common.js
-}
-
-// NÃO chame getUserFromJWT aqui, não existe nessa versão
 let selectedDeviceId = null;
 let selectedPumpId = null;
 let devices = [];
@@ -26,16 +19,16 @@ let schedules = [];
 let pollIntervalId = null;
 let lastStatusUpdate = {};
 
-
-// ===== INIT =====
+// INIT idêntico ao main/config
 document.addEventListener('DOMContentLoaded', async () => {
-  await DashboardCommon.initTopbar();  // também redireciona se token inválido
+  await DashboardCommon.initTopbar();   // aqui faz o check de token + /auth/me
   console.log('[Dosing] Iniciando dashboard...');
   await loadDevices();
   setupEventListeners();
   setupTabs();
   startPolling();
 });
+
 
 
 
@@ -496,28 +489,25 @@ function formatTime(timestamp) {
 
 // ===== API CALLS COM TRATAMENTO DE ERRO =====
 async function apiCall(url, method = 'GET', body = null) {
-  const token = localStorage.getItem('token');
   const options = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    }
+    headers: { 'Content-Type': 'application/json' },
   };
-  
+
   if (body) {
     options.body = JSON.stringify(body);
   }
-  
-  const res = await fetch(url, options);
-  
+
+  const res = await apiFetch(url, options);  // mesmo helper de main/config
+
   if (!res.ok) {
     const errData = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(errData.error || `HTTP ${res.status}`);
   }
-  
+
   return res.json();
 }
+
 
 // ===== UI HELPERS =====
 function showLoading(elementId) {
