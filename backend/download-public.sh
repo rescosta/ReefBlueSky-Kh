@@ -25,6 +25,8 @@ FILES_HTML=(
   "dashboard-logs.html"
   "dashboard-main.html"
   "dashboard-sistema.html"
+  "dashboard-dosing.html"
+
 )
 
 # JS dentro de public/js (conforme pasta js do Git)
@@ -35,6 +37,7 @@ FILES_JS=(
   "dashboard-logs.js"
   "dashboard-sistema.js"
   "dashboard-common.js"
+  "dashboard-dosing.js"
 )
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
