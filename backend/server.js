@@ -734,6 +734,7 @@ app.use('/api', dosingApiRoutes);
 
 
 
+
 // ============================================================================
 // [SEGURANÇA] Autenticação JWT
 // ============================================================================
@@ -1034,13 +1035,17 @@ app.post(
   }
 );
 
+
+
 initDosingModule({
   pool,
   mailTransporter,
   ALERT_FROM,
   sendTelegramForUser,
-  authUserMiddleware,
+  authUserMiddleware: authenticateToken, 
 });
+
+app.use('/api', dosingRouter);
 
 
 // ============================================================================
