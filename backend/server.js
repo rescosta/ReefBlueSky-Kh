@@ -1852,7 +1852,7 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
  * POST /api/v1/device/register
  * [SEGURANÇA] Registrar novo dispositivo
  */
-app.post('/api/v1/device/register', /*authLimiter*/, async (req, res) => {
+app.post('/api/v1/device/register', async (req, res) => {
     console.log('[API] POST /api/v1/device/register');
     
     const { deviceId, username, password, local_ip, type } = req.body;
