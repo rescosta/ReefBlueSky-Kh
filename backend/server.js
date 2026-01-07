@@ -313,8 +313,13 @@ async function sendVerificationEmail(email, code) {
   }
 }
 
-initDosingModule({ pool, mailTransporter, ALERT_FROM, sendTelegramForUser });
-
+initDosingModule({
+  pool,
+  mailTransporter,
+  ALERT_FROM,
+  sendTelegramForUser,
+  authenticateToken
+});
 
 // ============================================================================
 // Monitoramento periódico de devices (online/offline + alertas por e-mail)
