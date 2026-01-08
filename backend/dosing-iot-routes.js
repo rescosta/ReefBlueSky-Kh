@@ -92,19 +92,22 @@ async function updateDosingDeviceStatus(deviceId, online, lastIp = null) {
 router.post('/v1/iot/dosing/handshake', async (req, res) => {
   let conn;
   try {
-    const { esp_uid, hw_type, firmware_version } = req.body;
+    const body = req.body || {};
+    const esp_uid          = body.esp_uid || body.espUid;
+    const hw_type          = body.hw_type || body.hwType || 'ESP32';
+    const firmware_version = body.firmware_version || body.firmwareVersion || '1.0.0';
 
     if (!esp_uid) {
+      console.warn('[DOSING IOT] handshake sem esp_uid. Body=', body);
       return res.status(400).json({ success: false, error: 'Missing esp_uid' });
     }
 
     conn = await pool.getConnection();
     
-  // Buscar device por esp_uid
-  let device = await conn.query(
-    `SELECT id, user_id, online FROM dosing_devices WHERE esp_uid = ? LIMIT 1`,
-    [esp_uid]
-  );
+    let device = await conn.query(
+      `SELECT id, user_id, online FROM dosing_devices WHERE esp_uid = ? LIMIT 1`,
+      [esp_uid]
+    );
 
   if (!device || device.length === 0) {
     // tentar descobrir dono na tabela principal (devices)
