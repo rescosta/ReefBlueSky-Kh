@@ -750,11 +750,107 @@
         </table>
       </div>
     </section>
-
+  
     <!-- BOMBAS -->
     <section id="dosingPumpsView" class="dosing-view" style="display:none;">
-      <!-- depois plugamos com a API /bombas, layout igual ao antigo -->
+      <div class="dosing-card">
+        <h2 class="dosing-card-title">Configurar Bombas</h2>
+        <h3 class="dosing-card-subtitle">Adicionar Nova Bomba</h3>
+
+        <div class="dosing-form-grid">
+          <div>
+            <label class="dosing-label" for="pumpNameInput">Nome da Bomba</label>
+            <input
+              type="text"
+              id="pumpNameInput"
+              class="dosing-input"
+              placeholder="Ex: KH"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="pumpIndexInput">Índice (0-3)</label>
+            <input
+              type="number"
+              id="pumpIndexInput"
+              class="dosing-input"
+              min="0"
+              max="3"
+              step="1"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="pumpVolumeInput">Volume Recipiente (mL)</label>
+            <input
+              type="number"
+              id="pumpVolumeInput"
+              class="dosing-input"
+              min="0"
+              step="1"
+              value="500"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="pumpRateInput">Taxa Calibração (mL/s)</label>
+            <input
+              type="number"
+              id="pumpRateInput"
+              class="dosing-input"
+              min="0"
+              step="0.1"
+              value="1.0"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="pumpAlarmInput">Limite Alarme (%)</label>
+            <input
+              type="number"
+              id="pumpAlarmInput"
+              class="dosing-input"
+              min="0"
+              max="100"
+              step="1"
+              value="10"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="pumpDailyMaxInput">Máximo Diário (mL)</label>
+            <input
+              type="number"
+              id="pumpDailyMaxInput"
+              class="dosing-input"
+              min="0"
+              step="1"
+              value="100"
+            />
+          </div>
+        </div>
+
+        <button id="addPumpBtn" class="dosing-btn-primary">Adicionar Bomba</button>
+      </div>
+
+      <div class="dosing-card">
+        <table class="dosing-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Índice</th>
+              <th>Taxa (mL/s)</th>
+              <th>Máx. Diário (mL)</th>
+              <th>Volume (mL)</th>
+              <th>Alarme (%)</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="pumpsTableBody"></tbody>
+        </table>
+      </div>
     </section>
+
 
     <!-- AGENDAS -->
     <section id="dosingSchedulesView" class="dosing-view" style="display:none;">
