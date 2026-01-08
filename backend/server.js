@@ -19,25 +19,15 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 
-const mariadb = require('mariadb');
+const pool = require('./db-pool');
 const nodemailer = require('nodemailer');
-const displayRoutes = require('./display-endpoints');
-const { router: dosingRouter, initDosingModule } = require('./dosing-api-routes');
+const displayRoutes    = require('./display-endpoints');
+const dosingUserRoutes = require('./dosing-user-routes');
+const dosingIotRoutes  = require('./dosing-iot-routes');
 
 const axios = require('axios');
 
 dotenv.config();
-
-const pool = mariadb.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  user: process.env.DB_USER || 'reefapp',
-  password: process.env.DB_PASSWORD || 'reef',
-  database: process.env.DB_NAME || 'reefbluesky',
-  connectionLimit: 5,
-  acquireTimeout: 10000,
-  connectTimeout: 10000,
-  idleTimeout: 60000
-});
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
@@ -655,6 +645,63 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || '...';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...';
 
+
+// ===== Middleware de autenticação de usuário (JWT - web) =====
+function authUserMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+
+  console.log('[AUTH] authUserMiddleware chamado em', req.method, req.originalUrl);
+  console.log('[AUTH] Authorization header =', authHeader || '<nenhum>');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn('[AUTH] Sem Bearer header');
+    return res
+      .status(401)
+      .json({ success: false, message: 'Token não fornecido' });
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (!decoded.userId) {
+      console.warn('[AUTH] Token sem userId', decoded);
+      return res
+        .status(401)
+        .json({ success: false, message: 'Token inválido para usuário' });
+    }
+
+    req.user = {
+      userId: decoded.userId,
+      deviceId: decoded.deviceId || null,
+      role: decoded.role || 'user',
+    };
+
+    console.log('[AUTH] OK userId=', req.user.userId, 'role=', req.user.role);
+    next();
+  } catch (err) {
+    console.warn('[AUTH] Erro ao verificar token', err.message);
+    return res
+      .status(401)
+      .json({ success: false, message: 'Token inválido ou expirado' });
+  }
+}
+
+function requireDev(req, res, next) {
+  if (req.user.role !== 'dev') {
+    return res.status(403).json({ success: false, message: 'Acesso apenas para dev' });
+  }
+  next();
+}
+
+// Web (JWT) – dosing
+app.use('/api/v1/user/dosing', authUserMiddleware, dosingUserRoutes);
+
+// IoT (esp_uid) – dosing
+app.use('/api', dosingIotRoutes);
+
+
 function buildTokenPayload(userRow) {
   return {
     userId: userRow.id,
@@ -800,49 +847,6 @@ function generateRefreshToken(userId, deviceId) {
         { expiresIn: '30d' }
     );
 }
-
-// ===== Middleware de autenticação de usuário (JWT - web) =====
-function authUserMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-
-  console.log('[AUTH] authUserMiddleware chamado em', req.method, req.originalUrl);
-  console.log('[AUTH] Authorization header =', authHeader || '<nenhum>');
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.warn('[AUTH] Sem Bearer header');
-    return res
-      .status(401)
-      .json({ success: false, message: 'Token não fornecido' });
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    if (!decoded.userId) {
-      console.warn('[AUTH] Token sem userId', decoded);
-      return res
-        .status(401)
-        .json({ success: false, message: 'Token inválido para usuário' });
-    }
-
-    req.user = {
-      userId: decoded.userId,
-      deviceId: decoded.deviceId || null,
-      role: decoded.role || 'user',
-    };
-
-    console.log('[AUTH] OK userId=', req.user.userId, 'role=', req.user.role);
-    next();
-  } catch (err) {
-    console.warn('[AUTH] Erro ao verificar token', err.message);
-    return res
-      .status(401)
-      .json({ success: false, message: 'Token inválido ou expirado' });
-  }
-}
-
 
 
 function requireDev(req, res, next) {
@@ -1027,19 +1031,6 @@ app.post(
     }
   }
 );
-
-initDosingModule({
-  pool,
-  mailTransporter,
-  ALERT_FROM,
-  sendTelegramForUser,
-  authUserMiddleware,
-});
-
-app.use('/api', dosingRouter);
-console.log('[Dosing] Router montado em /api');
-
-
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
