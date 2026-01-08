@@ -854,8 +854,102 @@
 
     <!-- AGENDAS -->
     <section id="dosingSchedulesView" class="dosing-view" style="display:none;">
-      <!-- depois trazemos o formulário de Agendas do HTML antigo -->
+      <div class="dosing-card">
+        <h2 class="dosing-card-title">Agendas de Dose</h2>
+        <p class="dosing-card-subtitle">Defina os horários e dias para cada bomba.</p>
+
+        <div class="dosing-form-grid">
+          <div>
+            <label class="dosing-label" for="schedulePumpSelect">Selecionar Bomba</label>
+            <select id="schedulePumpSelect" class="dosing-input">
+              <option value="">-- Selecione uma bomba --</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="dosing-label" for="scheduleDosesPerDay">Doses por dia</label>
+            <input
+              type="number"
+              id="scheduleDosesPerDay"
+              class="dosing-input"
+              min="1"
+              max="24"
+              value="1"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="scheduleStartTime">Horário início</label>
+            <input
+              type="time"
+              id="scheduleStartTime"
+              class="dosing-input"
+              value="12:00"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="scheduleEndTime">Horário fim</label>
+            <input
+              type="time"
+              id="scheduleEndTime"
+              class="dosing-input"
+              value="12:00"
+            />
+          </div>
+
+          <div>
+            <label class="dosing-label" for="scheduleVolumePerDay">Volume diário (mL)</label>
+            <input
+              type="number"
+              id="scheduleVolumePerDay"
+              class="dosing-input"
+              min="0"
+              step="1"
+              value="36"
+            />
+          </div>
+        </div>
+
+        <div style="margin-top: 8px;">
+          <label class="dosing-label">Dias da semana</label>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+            <label><input type="checkbox" class="schedule-day" value="1"  checked> Seg</label>
+            <label><input type="checkbox" class="schedule-day" value="2"  checked> Ter</label>
+            <label><input type="checkbox" class="schedule-day" value="4"  checked> Qua</label>
+            <label><input type="checkbox" class="schedule-day" value="8"  checked> Qui</label>
+            <label><input type="checkbox" class="schedule-day" value="16" checked> Sex</label>
+            <label><input type="checkbox" class="schedule-day" value="32" checked> Sáb</label>
+            <label><input type="checkbox" class="schedule-day" value="64" checked> Dom</label>
+          </div>
+        </div>
+
+        <button id="addScheduleBtn" class="dosing-btn-primary">Criar agenda</button>
+      </div>
+
+      <div class="dosing-card">
+        <h3 class="dosing-card-subtitle">Agendas cadastradas</h3>
+        <table class="dosing-table">
+          <thead>
+            <tr>
+              <th>Bomba</th>
+              <th>Ativa</th>
+              <th>Dias</th>
+              <th>Doses/dia</th>
+              <th>Janela</th>
+              <th>Volume (mL/dia)</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="schedulesTableBody">
+            <tr>
+              <td colspan="7">Nenhuma agenda para esta bomba.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
+
 
     <!-- HISTÓRICO -->
     <section id="dosingHistoryView" class="dosing-view" style="display:none;">
