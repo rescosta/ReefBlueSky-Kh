@@ -21,12 +21,25 @@ let lastStatusUpdate = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    // 1) Inicializa topbar + valida token via DashboardCommon
-    await DashboardCommon.initTopbar(); // já faz /auth/me e redirectToLogin se falhar
+    // 1) tenta validar o token chamando /auth/me
+    const res = await apiFetch('/api/v1/auth/me');
+
+    if (!res.ok) {
+      redirectToLogin();
+      return;
+    }
+
+    const json = await res.json().catch(() => null);
+    if (!json || !json.success) {
+      redirectToLogin();
+      return;
+    }
+
+    currentUser = json.data; // mesma global usada no main
 
     console.log('[Dosing] Iniciando dashboard...');
 
-    // 2) Fluxo normal da dosadora
+    // 2) fluxo normal da dosadora
     await loadDevices();
     setupEventListeners();
     setupTabs();
@@ -36,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     redirectToLogin();
   }
 });
+
 
 
 // ===== POLLING (como JoyReef) =====
