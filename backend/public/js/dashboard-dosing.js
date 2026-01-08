@@ -4,6 +4,16 @@ const dosingDevicesBody = document.getElementById('dosingDevicesBody');
 const dosingDevicesError = document.getElementById('dosingDevicesError');
 const addDosingDeviceBtn = document.getElementById('addDosingDeviceBtn');
 
+const pumpsTableBody     = document.getElementById('pumpsTableBody');
+const addPumpBtn         = document.getElementById('addPumpBtn');
+const pumpNameInput      = document.getElementById('pumpNameInput');
+const pumpIndexInput     = document.getElementById('pumpIndexInput');
+const pumpVolumeInput    = document.getElementById('pumpVolumeInput');
+const pumpRateInput      = document.getElementById('pumpRateInput');
+const pumpAlarmInput     = document.getElementById('pumpAlarmInput');
+const pumpDailyMaxInput  = document.getElementById('pumpDailyMaxInput');
+
+
 function showDosingError(msg) {
   if (!dosingDevicesError) return;
   dosingDevicesError.textContent = `Erro ao carregar devices: ${msg}`;
@@ -112,6 +122,146 @@ function initDosingTabs() {
   });
 }
 
+function renderPumps(pumps) {
+  if (!pumpsTableBody) return;
+  pumpsTableBody.innerHTML = '';
+
+  if (!pumps || !pumps.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 7;
+    td.textContent = 'Nenhuma bomba configurada para este device.';
+    tr.appendChild(td);
+    pumpsTableBody.appendChild(tr);
+    return;
+  }
+
+  for (const p of pumps) {
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td>${p.name ?? '--'}</td>
+      <td>${p.index ?? '--'}</td>
+      <td>${p.calibration_rate_ml_s?.toFixed?.(2) ?? p.calibration_rate_ml_s ?? '--'}</td>
+      <td>${p.daily_max_ml ?? '--'}</td>
+      <td>${p.reservoir_volume_ml ?? '--'}</td>
+      <td>${p.alarm_threshold_percent ?? '--'}</td>
+      <td>
+        <button class="btn-small" data-pump-id="${p.id}" data-action="delete">Remover</button>
+      </td>
+    `;
+
+    pumpsTableBody.appendChild(tr);
+  }
+
+  // listeners de remover
+  pumpsTableBody.querySelectorAll('button[data-action="delete"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const pumpId = btn.getAttribute('data-pump-id');
+      if (!pumpId) return;
+      if (!confirm('Remover esta bomba?')) return;
+
+      try {
+        const token = localStorage.getItem('jwtToken');
+        await fetch(`/api/v1/user/dosing/pumps/${encodeURIComponent(pumpId)}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        await loadPumpsForSelected();
+      } catch (err) {
+        console.error('Erro ao remover bomba:', err);
+      }
+    });
+  });
+}
+
+async function loadPumpsForSelected() {
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (!deviceId || !pumpsTableBody) return;
+
+  const token = localStorage.getItem('jwtToken');
+  if (!token) return;
+
+  try {
+    const res = await fetch(
+      `/api/v1/user/dosing/pumps?device_id=${encodeURIComponent(deviceId)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Erro ao carregar bombas:', data?.error);
+      renderPumps([]);
+      return;
+    }
+    renderPumps(data.data || []);
+  } catch (err) {
+    console.error('Erro ao carregar bombas:', err);
+    renderPumps([]);
+  }
+}
+
+if (addPumpBtn) {
+  addPumpBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) {
+      alert('Selecione um device de dosadora no topo.');
+      return;
+    }
+
+    const name  = pumpNameInput?.value?.trim();
+    const index = Number(pumpIndexInput?.value);
+    const volume  = Number(pumpVolumeInput?.value);
+    const rate    = Number(pumpRateInput?.value);
+    const alarm   = Number(pumpAlarmInput?.value);
+    const dailyMax = Number(pumpDailyMaxInput?.value);
+
+    if (!name || Number.isNaN(index)) {
+      alert('Informe ao menos Nome e Índice da bomba.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('jwtToken');
+      const res = await fetch('/api/v1/user/dosing/pumps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          device_id: deviceId,
+          name,
+          index,
+          reservoir_volume_ml: Number.isNaN(volume) ? null : volume,
+          calibration_rate_ml_s: Number.isNaN(rate) ? null : rate,
+          alarm_threshold_percent: Number.isNaN(alarm) ? null : alarm,
+          daily_max_ml: Number.isNaN(dailyMax) ? null : dailyMax,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        console.error('Erro ao criar bomba:', data);
+        alert(data.error || 'Erro ao criar bomba.');
+        return;
+      }
+
+      // limpa nome/índice se quiser
+      if (pumpNameInput) pumpNameInput.value = '';
+      if (pumpIndexInput) pumpIndexInput.value = '';
+
+      await loadPumpsForSelected();
+    } catch (err) {
+      console.error('Erro ao criar bomba:', err);
+      alert('Falha de comunicação ao criar bomba.');
+    }
+  });
+}
+
 
 async function initDashboardDosing() {
   await DashboardCommon.initTopbar();
@@ -145,6 +295,7 @@ async function initDashboardDosing() {
   }
   initDosingTabs();
   await loadDosingDevices();
+  await loadPumpsForSelected();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -152,3 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('initDashboardDosing error', err),
   );
 });
+
+window.addEventListener('deviceChanged', async () => {
+  await loadDosingDevices();
+  await loadPumpsForSelected();
+});
+
