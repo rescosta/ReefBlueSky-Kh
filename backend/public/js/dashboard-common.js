@@ -329,7 +329,7 @@ async function applyRoleMenuVisibility() {
 
   const navLogs   = document.getElementById('nav-logs');
   const navDev    = document.getElementById('nav-dev');
-  const navDosing = document.getElementById('nav-dosing');
+  //const navDosing = document.getElementById('nav-dosing');
 
   // Logs some sempre
   if (navLogs) navLogs.style.display = 'none';
@@ -340,10 +340,10 @@ async function applyRoleMenuVisibility() {
   }
 
   // Dosadora só aparece se o usuário tiver pelo menos um dosing_device
-  if (navDosing) {
+  /*if (navDosing) {
     const hasDoser = await hasDosingDevices();
     navDosing.style.display = hasDoser ? 'inline-block' : 'none';
-  }
+  }*/
 }
 
 
