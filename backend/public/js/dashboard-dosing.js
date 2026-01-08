@@ -14,6 +14,18 @@ const pumpAlarmInput     = document.getElementById('pumpAlarmInput');
 const pumpDailyMaxInput  = document.getElementById('pumpDailyMaxInput');
 
 
+const schedulePumpSelect   = document.getElementById('schedulePumpSelect');
+const scheduleDosesPerDay  = document.getElementById('scheduleDosesPerDay');
+const scheduleStartTime    = document.getElementById('scheduleStartTime');
+const scheduleEndTime      = document.getElementById('scheduleEndTime');
+const scheduleVolumePerDay = document.getElementById('scheduleVolumePerDay');
+const addScheduleBtn       = document.getElementById('addScheduleBtn');
+const schedulesTableBody   = document.getElementById('schedulesTableBody');
+
+let cachedPumps = [];
+
+
+
 function showDosingError(msg) {
   if (!dosingDevicesError) return;
   dosingDevicesError.textContent = `Erro ao carregar devices: ${msg}`;
@@ -139,17 +151,18 @@ function renderPumps(pumps) {
   for (const p of pumps) {
     const tr = document.createElement('tr');
 
-    tr.innerHTML = `
-      <td>${p.name ?? '--'}</td>
-      <td>${p.index ?? '--'}</td>
-      <td>${p.calibration_rate_ml_s?.toFixed?.(2) ?? p.calibration_rate_ml_s ?? '--'}</td>
-      <td>${p.daily_max_ml ?? '--'}</td>
-      <td>${p.reservoir_volume_ml ?? '--'}</td>
-      <td>${p.alarm_threshold_percent ?? '--'}</td>
-      <td>
-        <button class="btn-small" data-pump-id="${p.id}" data-action="delete">Remover</button>
-      </td>
-    `;
+  tr.innerHTML = `
+    <td>${p.name ?? '--'}</td>
+    <td>${p.index_on_device ?? '--'}</td>
+    <td>${p.calibration_rate_ml_s?.toFixed?.(2) ?? p.calibration_rate_ml_s ?? '--'}</td>
+    <td>${p.max_daily_ml ?? '--'}</td>
+    <td>${p.container_volume_ml ?? '--'}</td>
+    <td>${p.alarm_threshold_pct ?? '--'}</td>
+    <td>
+      <button class="btn-small" data-pump-id="${p.id}" data-action="delete">Remover</button>
+    </td>
+  `;
+
 
     pumpsTableBody.appendChild(tr);
   }
@@ -186,7 +199,7 @@ async function loadPumpsForSelected() {
 
   try {
     const res = await fetch(
-      `/api/v1/user/dosing/pumps?device_id=${encodeURIComponent(deviceId)}`,
+      `/api/v1/user/dosing/pumps?deviceId=${encodeURIComponent(deviceId)}`,
       {
         headers: { Authorization: `Bearer ${token}` },
       },
@@ -194,15 +207,24 @@ async function loadPumpsForSelected() {
     const data = await res.json();
     if (!res.ok) {
       console.error('Erro ao carregar bombas:', data?.error);
+      cachedPumps = [];
       renderPumps([]);
+      updateSchedulePumpSelect();
       return;
     }
-    renderPumps(data.data || []);
+
+    cachedPumps = data.data || [];
+    renderPumps(cachedPumps);
+    updateSchedulePumpSelect();
+    await loadSchedulesForSelectedPump(); // assim a aba Agendas já reflete a 1ª bomba selecionada
   } catch (err) {
     console.error('Erro ao carregar bombas:', err);
+    cachedPumps = [];
     renderPumps([]);
+    updateSchedulePumpSelect();
   }
 }
+
 
 if (addPumpBtn) {
   addPumpBtn.addEventListener('click', async () => {
@@ -235,13 +257,14 @@ if (addPumpBtn) {
         body: JSON.stringify({
           device_id: deviceId,
           name,
-          index,
-          reservoir_volume_ml: Number.isNaN(volume) ? null : volume,
-          calibration_rate_ml_s: Number.isNaN(rate) ? null : rate,
-          alarm_threshold_percent: Number.isNaN(alarm) ? null : alarm,
-          daily_max_ml: Number.isNaN(dailyMax) ? null : dailyMax,
+          index_on_device: Number.isNaN(index) ? 0 : index,
+          container_volume_ml: Number.isNaN(volume) ? undefined : volume,
+          alarm_threshold_pct: Number.isNaN(alarm) ? undefined : alarm,
+          calibration_rate_ml_s: Number.isNaN(rate) ? undefined : rate,
+          max_daily_ml: Number.isNaN(dailyMax) ? undefined : dailyMax,
         }),
       });
+
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
@@ -258,6 +281,183 @@ if (addPumpBtn) {
     } catch (err) {
       console.error('Erro ao criar bomba:', err);
       alert('Falha de comunicação ao criar bomba.');
+    }
+  });
+}
+
+function updateSchedulePumpSelect() {
+  if (!schedulePumpSelect) return;
+  schedulePumpSelect.innerHTML = '<option value="">-- Selecione uma bomba --</option>';
+  for (const p of cachedPumps) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.name} (idx ${p.index_on_device})`;
+    schedulePumpSelect.appendChild(opt);
+  }
+}
+
+function daysMaskFromCheckboxes() {
+  const boxes = document.querySelectorAll('.schedule-day');
+  let mask = 0;
+  boxes.forEach((b) => {
+    if (b.checked) mask |= Number(b.value);
+  });
+  return mask;
+}
+
+function daysMaskToHuman(mask) {
+  const map = [
+    { bit: 1, label: 'Seg' },
+    { bit: 2, label: 'Ter' },
+    { bit: 4, label: 'Qua' },
+    { bit: 8, label: 'Qui' },
+    { bit: 16, label: 'Sex' },
+    { bit: 32, label: 'Sáb' },
+    { bit: 64, label: 'Dom' },
+  ];
+  return map.filter(d => (mask & d.bit) !== 0).map(d => d.label).join(', ') || '--';
+}
+
+function renderSchedules(schedules, pumpId) {
+  if (!schedulesTableBody) return;
+  schedulesTableBody.innerHTML = '';
+
+  if (!schedules || !schedules.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 7;
+    td.textContent = 'Nenhuma agenda para esta bomba.';
+    tr.appendChild(td);
+    schedulesTableBody.appendChild(tr);
+    return;
+  }
+
+  const pump = cachedPumps.find(p => p.id === pumpId);
+
+  for (const s of schedules) {
+    const tr = document.createElement('tr');
+    const dias = daysMaskToHuman(s.days_mask);
+
+    tr.innerHTML = `
+      <td>${pump ? pump.name : '--'}</td>
+      <td>${s.enabled ? 'Sim' : 'Não'}</td>
+      <td>${dias}</td>
+      <td>${s.doses_per_day}</td>
+      <td>${s.start_time?.slice(0,5) || '--'} - ${s.end_time?.slice(0,5) || '--'}</td>
+      <td>${s.volume_per_day_ml}</td>
+      <td>
+        <button class="btn-small" data-sched-id="${s.id}" data-action="delete">Remover</button>
+      </td>
+    `;
+
+    schedulesTableBody.appendChild(tr);
+  }
+
+  schedulesTableBody.querySelectorAll('button[data-action="delete"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-sched-id');
+      if (!id) return;
+      if (!confirm('Remover esta agenda?')) return;
+
+      try {
+        const token = localStorage.getItem('jwtToken');
+        const res = await fetch(`/api/v1/user/dosing/schedules/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          console.error('Erro ao remover schedule');
+        }
+        await loadSchedulesForSelectedPump();
+      } catch (err) {
+        console.error('Erro ao remover schedule:', err);
+      }
+    });
+  });
+}
+
+async function loadSchedulesForSelectedPump() {
+  if (!schedulePumpSelect) return;
+  const pumpId = Number(schedulePumpSelect.value);
+  if (!pumpId) {
+    renderSchedules([], null);
+    return;
+  }
+
+  const token = localStorage.getItem('jwtToken');
+  if (!token) return;
+
+  try {
+    const res = await fetch(`/api/v1/user/dosing/schedules?pumpId=${encodeURIComponent(pumpId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Erro ao carregar schedules:', data?.error);
+      renderSchedules([], pumpId);
+      return;
+    }
+    renderSchedules(data.data || [], pumpId);
+  } catch (err) {
+    console.error('Erro ao carregar schedules:', err);
+    renderSchedules([], pumpId);
+  }
+}
+
+
+if (schedulePumpSelect) {
+  schedulePumpSelect.addEventListener('change', loadSchedulesForSelectedPump);
+}
+
+if (addScheduleBtn) {
+  addScheduleBtn.addEventListener('click', async () => {
+    const pumpId = Number(schedulePumpSelect?.value);
+    if (!pumpId) {
+      alert('Selecione uma bomba.');
+      return;
+    }
+
+    const dosesPerDay = Number(scheduleDosesPerDay?.value || 0);
+    const startTime = scheduleStartTime?.value || '12:00';
+    const endTime = scheduleEndTime?.value || startTime;
+    const volumePerDay = Number(scheduleVolumePerDay?.value || 0);
+    const daysMask = daysMaskFromCheckboxes();
+
+    if (!dosesPerDay || !volumePerDay) {
+      alert('Informe doses por dia e volume diário.');
+      return;
+    }
+
+    const token = localStorage.getItem('jwtToken');
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/v1/user/dosing/schedules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          pump_id: pumpId,
+          enabled: 1,
+          days_mask: daysMask,
+          doses_per_day: dosesPerDay,
+          start_time: startTime,
+          end_time: endTime,
+          volume_per_day_ml: volumePerDay,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        console.error('Erro ao criar schedule:', data);
+        alert(data.error || 'Erro ao criar agenda.');
+        return;
+      }
+      await loadSchedulesForSelectedPump();
+    } catch (err) {
+      console.error('Erro ao criar schedule:', err);
+      alert('Falha de comunicação ao criar agenda.');
     }
   });
 }
