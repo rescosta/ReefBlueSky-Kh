@@ -366,7 +366,6 @@
       justify-content: space-between;
     }
 
-
     .status-badge.good {
       background: #022c22;
       border-color: #16a34a;
@@ -457,6 +456,151 @@
       cursor: pointer;
     }
 
+    .dosing-page {
+      max-width: 1200px;
+      margin: 80px auto 40px;
+      padding: 0 24px 40px;
+      color: #e5e7eb;
+    }
+
+    .dosing-hero {
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+
+    .dosing-hero-title {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .dosing-hero-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .dosing-tabs {
+      display: flex;
+      gap: 24px;
+      border-bottom: 1px solid #374151;
+      margin-bottom: 24px;
+      padding: 0 4px;
+    }
+
+    .dosing-tab {
+      background: none;
+      border: none;
+      padding: 12px 0;
+      font-size: 14px;
+      color: #9ca3af;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .dosing-tab.active {
+      color: #ffffff;
+    }
+
+    .dosing-tab.active::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: #60a5fa;
+    }
+
+    .dosing-view {
+      display: block;
+    }
+
+    .dosing-card {
+      background: #020617;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      border: 1px solid #1f2937;
+    }
+
+    .dosing-card-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .dosing-card-subtitle {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    .dosing-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .dosing-label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: #9ca3af;
+    }
+
+    .dosing-input {
+      width: 100%;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #e5e7eb;
+    }
+
+    .dosing-btn-primary {
+      margin-top: 8px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      background: #6366f1;
+      color: #f9fafb;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .dosing-btn-primary:hover {
+      background: #4f46e5;
+    }
+
+    .dosing-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .dosing-table th,
+    .dosing-table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .dosing-table th {
+      text-align: left;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .dosing-error {
+      color: #fecaca;
+      background: #7f1d1d;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
         @media (max-width: 768px) {
       /* esconder menu textual e rótulos que ocupam espaço */
       .nav {
@@ -520,7 +664,6 @@
         border-radius: 1px;
         margin: 2px 0;
       }
-
     }
 
   </style>
@@ -539,38 +682,91 @@
     <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
   </div>
 
-  
-  <div class="tabs">
-    <button id="tabDevices" class="tab-button active">Meus Devices</button>
-    <button id="tabPumps" class="tab-button">Bombas</button>
-    <button id="tabSchedules" class="tab-button">Agendas</button>
+  <div class="dosing-page">
+    <div class="dosing-hero">
+      <div class="dosing-hero-title">🚰 Dosadora Balling</div>
+      <div class="dosing-hero-subtitle">Gerenciador de doses automáticas</div>
+    </div>
+
+    <div class="dosing-tabs">
+      <button id="tabDashboard" class="dosing-tab active">Dashboard</button>
+      <button id="tabDevices"   class="dosing-tab">Devices</button>
+      <button id="tabPumps"     class="dosing-tab">Bombas</button>
+      <button id="tabSchedules" class="dosing-tab">Agendas</button>
+      <button id="tabHistory"   class="dosing-tab">Histórico</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="dosingDashboardView" class="dosing-view">
+      <div class="dosing-card">
+        <h2 class="dosing-card-title">Alertas Recentes</h2>
+        <!-- placeholder -->
+      </div>
+      <div class="dosing-card">
+        <h2 class="dosing-card-title">Status do Sistema</h2>
+        <!-- placeholder -->
+      </div>
+    </section>
+
+    <!-- DEVICES -->
+    <section id="dosingDevicesView" class="dosing-view" style="display:none;">
+      <div class="dosing-card">
+        <h2 class="dosing-card-title">Meus Devices</h2>
+      </div>
+
+      <div id="dosingDevicesError" class="dosing-error" style="display:none;"></div>
+
+      <div class="dosing-card">
+        <h3 class="dosing-card-subtitle">Adicionar Novo Device</h3>
+        <div class="dosing-form-grid">
+          <div>
+            <label class="dosing-label">Nome do Device</label>
+            <input type="text" id="newDosingDeviceName" class="dosing-input" placeholder="Ex: Dosadora Principal" />
+          </div>
+          <div>
+            <label class="dosing-label">Tipo de Hardware</label>
+            <select id="newDosingDeviceHw" class="dosing-input">
+              <option value="ESP8266">ESP8266 (NodeMCU)</option>
+              <option value="ESP32">ESP32</option>
+            </select>
+          </div>
+        </div>
+        <button id="addDosingDeviceBtn" class="dosing-btn-primary">Criar Device</button>
+      </div>
+
+      <div class="dosing-card">
+        <table class="dosing-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Tipo HW</th>
+              <th>Online</th>
+              <th>Último contato</th>
+              <th>Bombas</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="dosingDevicesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- BOMBAS -->
+    <section id="dosingPumpsView" class="dosing-view" style="display:none;">
+      <!-- depois plugamos com a API /bombas, layout igual ao antigo -->
+    </section>
+
+    <!-- AGENDAS -->
+    <section id="dosingSchedulesView" class="dosing-view" style="display:none;">
+      <!-- depois trazemos o formulário de Agendas do HTML antigo -->
+    </section>
+
+    <!-- HISTÓRICO -->
+    <section id="dosingHistoryView" class="dosing-view" style="display:none;">
+      <!-- tabela de histórico igual ao antigo -->
+    </section>
   </div>
 
-  <div id="dosingDevicesView">
-    <div id="dosingDevicesError" class="error-message" style="display:none;"></div>
-    <button id="addDosingDeviceBtn" class="btn-primary">+ Adicionar Novo Device</button>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Tipo HW</th>
-          <th>Online</th>
-          <th>Último contato</th>
-          <th>Bombas</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody id="dosingDevicesBody"></tbody>
-    </table>
-  </div>
-
-  <div id="dosingPumpsView" style="display:none;">
-    <!-- tabela de bombas -->
-  </div>
-
-  <div id="dosingSchedulesView" style="display:none;">
-    <!-- tabela de agendas -->
-  </div>
 
 
   <div class="footer">
