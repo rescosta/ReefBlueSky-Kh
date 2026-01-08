@@ -540,197 +540,38 @@
   </div>
 
   
-  <div class="content">
-    <!-- Coluna esquerda -->
-    <div class="left-col" style="display:flex; flex-direction:column; gap:16px;">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Alcalinidade (dKH)</div>
-            <div class="card-subtitle">Última medição do device selecionado</div>
-          </div>
-        </div>
-        <div class="kh-main">
-          <div>
-            <div id="khValue" class="kh-value">--</div>
-            <div id="khDiff" class="kh-diff muted">0.00 dKH</div>
-          </div>
-          <div class="kh-side">
-            <div class="kh-side-row">
-              <span class="muted">Penúltima</span>
-              <span id="khPrev">--</span>
-            </div>
-            <div class="kh-side-row">
-              <span class="muted">Mín. janela</span>
-              <span id="khMin">--</span>
-            </div>
-            <div class="kh-side-row">
-              <span class="muted">Máx. janela</span>
-              <span id="khMax">--</span>
-            </div>
-          </div>
-        </div>
-          <div class="kh-target-line">
-            Alvo: <span class="value" id="khTargetSpan">--</span> dKH
-            <span id="khRefSpan" class="kh-small">ref: --</span>
-          </div>
-
-        <div class="kh-metrics-row">
-          <div>
-            <span class="label">24h</span>
-            <div class="kh-window neutral" id="kh24hSpan">--</div>
-          </div>
-          <div>
-            <span class="label">3 dias</span>
-            <div class="kh-window neutral" id="kh3dSpan">--</div>
-          </div>
-          <div>
-            <span class="label">7 dias</span>
-            <div class="kh-window neutral" id="kh7dSpan">--</div>
-          </div>
-          <div>
-            <span class="label">15 dias</span>
-            <div class="kh-window neutral" id="kh15dSpan">--</div>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Medição</div>
-        </div>
-        <div class="measure-info">
-          <span><span class="label">Última:</span> <span id="lastMeasureTime" class="value">--</span></span>
-          <span><span class="label">Próxima estimada:</span> <span id="nextMeasureTime" class="value">--</span></span>
-          <span><span class="label">Calibração:</span> <span id="calibrationDate" class="value">--</span></span>
-        </div>
-
-        <div class="measure-info" style="margin-top:8px;">
-          <span>
-            <span class="label">Teste automático:</span>
-            <label style="margin-left:4px; font-size:13px;">
-              <input type="checkbox" id="testModeToggle" />
-              <span class="value">ON/OFF</span>
-            </label>
-          </span>
-          <span>
-            <button id="testNowBtn" class="btn-small" style="margin-top:4px;" disabled>
-              Iniciar teste agora
-            </button>
-          </span>
-        </div>
-
-    <!-- Progresso do teste manual + botão ABORT -->
-        <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
-          <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="testNowProgressFill"></div>
-          </div>
-        </div>
-
-        <div id="abortArea" style="display:none; margin-top:8px;">
-          <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
-            ABORTAR teste/dose
-          </button>
-          <div id="abortStatusText" class="muted" style="margin-top:4px;">&nbsp;</div>
-        </div>
-      </div>
-    </div>
-
-  
-
-    <!-- Coluna direita -->
-    <div class="right-col" style="display:flex; flex-direction:column; gap:16px;">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Status</div>
-        </div>
-        <div class="status-circles">
-          <div class="status-circle">
-            <div id="statusPh" class="status-badge">--</div>
-            <div class="status-label">Saúde do KH</div>
-          </div>
-            <div class="status-circle" id="khBufferCard">
-              <div id="statusBuffer" class="status-badge off">0</div>
-              <div class="status-label">KH Buffer</div>
-            </div>
-          <div class="status-circle">
-            <div id="statusReactor" class="status-badge off">OFF</div>
-            <div class="status-label">Reator CA</div>
-          </div>
-        </div>
-      </div>
-
-    
-      <!-- Correção de KH (Bomba 4) -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Correção de KH (Bomba 4)</div>
-            <div class="card-subtitle">Dose manual baseada na calibração</div>
-          </div>
-        </div>
-
-        <div class="measure-info">
-          <span>
-            <span class="label">Volume a dosar (mL):</span>
-            <input
-              type="number"
-              id="doseVolumeInput"
-              min="0"
-              step="0.1"
-              style="margin-top:4px; width:100%; padding:4px 6px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb; font-size:13px;"
-            />
-          </span>
-          <span style="margin-top:4px;">
-            <span class="label">Taxa calibrada bomba 4:</span>
-            <span id="pump4RateSpan" class="value">-- mL/s</span>
-          </span>
-        </div>
-
-        <div class="measure-info" style="margin-top:8px;">
-          <span>
-            <button id="applyDoseBtn" class="btn-small">
-              Aplicar dose
-            </button>
-          </span>
-        </div>
-
-        <!-- Progresso da dose bomba 4 -->
-        <div id="doseProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
-          <div class="progress-label" id="doseProgressLabel">Dose em andamento...</div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="doseProgressFill"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Últimas medições</div>
-          <div class="card-subtitle" id="lastCountInfo">-- registros recentes</div>
-        </div>
-        
-        <div class="kh-history-container">
-          <table class="table-small">
-            <thead>
-              <tr>
-                <th>Data/hora</th>
-                <th></th>
-                <th>KH</th>
-                <th>pH ref</th>
-                <th>pH amostra</th>
-                <th>Temp (°C)</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="measurementsBody"></tbody>
-          </table>
-        </div>
-      </div>  
-    </div>
+  <div class="tabs">
+    <button id="tabDevices" class="tab-button active">Meus Devices</button>
+    <button id="tabPumps" class="tab-button">Bombas</button>
+    <button id="tabSchedules" class="tab-button">Agendas</button>
   </div>
+
+  <div id="dosingDevicesView">
+    <div id="dosingDevicesError" class="error-message" style="display:none;"></div>
+    <button id="addDosingDeviceBtn" class="btn-primary">+ Adicionar Novo Device</button>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Tipo HW</th>
+          <th>Online</th>
+          <th>Último contato</th>
+          <th>Bombas</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="dosingDevicesBody"></tbody>
+    </table>
+  </div>
+
+  <div id="dosingPumpsView" style="display:none;">
+    <!-- tabela de bombas -->
+  </div>
+
+  <div id="dosingSchedulesView" style="display:none;">
+    <!-- tabela de agendas -->
+  </div>
+
 
   <div class="footer">
     <div id="userInfo">Usuário --</div>
@@ -738,6 +579,6 @@
   </div>
 
   <script src="js/dashboard-common.js"></script>
-  <script src="js/dashboard-main.js"></script>
+  <script src="js/dashboard-dosing.js"></script>
 </body>
 </html>
