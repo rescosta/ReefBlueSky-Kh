@@ -23,11 +23,12 @@ const pool = require('./db-pool');
 const nodemailer = require('nodemailer');
 const displayRoutes    = require('./display-endpoints');
 const dosingUserRoutes = require('./dosing-user-routes');
-const dosingIotRoutes  = require('./dosing-iot-routes');
+const dosingIotRoutes  = require('./dosing-iot-routes'); 
 
 const axios = require('axios');
 
 dotenv.config();
+
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
@@ -698,9 +699,6 @@ function requireDev(req, res, next) {
 // Web (JWT) – dosing
 app.use('/api/v1/user/dosing', authUserMiddleware, dosingUserRoutes);
 
-// IoT (esp_uid) – dosing
-app.use('/api', dosingIotRoutes);
-
 
 function buildTokenPayload(userRow) {
   return {
@@ -772,6 +770,11 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/api/display', displayRoutes);
+
+
+// IoT (esp_uid) – dosing
+app.use('/api', dosingIotRoutes);
+
 
 // ============================================================================
 // [SEGURANÇA] Autenticação JWT
