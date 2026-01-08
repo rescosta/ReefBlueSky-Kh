@@ -21,6 +21,7 @@ let lastStatusUpdate = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    await initTopbar(); 
     // 1) tenta validar o token chamando /auth/me
     const res = await apiFetch('/api/v1/auth/me');
 
