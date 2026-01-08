@@ -84,13 +84,39 @@ async function loadDosingDevices() {
 
 async function initDashboardDosing() {
   await DashboardCommon.initTopbar();
-  await DashboardCommon.loadDevicesCommon(); // só pro seletor do topo, se quiser
+
+  const devs = await DashboardCommon.loadDevicesCommon();
+  if (!devs.length) {
+    showDosingError('Nenhum dispositivo associado.');
+    return;
+  }
+
+  // sincroniza LCD com o device selecionado, igual tela de gráficos
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (deviceId) {
+    try {
+      const resp = await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+      );
+      const json = await resp.json();
+      if (
+        resp.ok &&
+        json.success &&
+        json.data &&
+        typeof DashboardCommon.setLcdStatus === 'function'
+      ) {
+        DashboardCommon.setLcdStatus(json.data.lcdStatus);
+      }
+    } catch (e) {
+      console.error('Erro ao carregar lcdStatus na tela Dosadora', e);
+    }
+  }
+
   await loadDosingDevices();
 }
 
-document.addEventListener('DOMContentLoaded', initDashboardDosing);
-
-
-window.addEventListener('deviceChanged', async () => {
-  await loadDosingDevices();
+document.addEventListener('DOMContentLoaded', () => {
+  initDashboardDosing().catch((err) =>
+    console.error('initDashboardDosing error', err),
+  );
 });
