@@ -1751,9 +1751,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
 
     const devices = rows.map((r) => {
       const dosingStatus =
-        r.dosing_online === 1 ? 'online' :
-        r.dosing_online === 0 ? 'offline' :
-        'never';
+        r.dosing_online === 1 ? 'online' : 'offline'; 
 
       return {
         id:        r.id,
