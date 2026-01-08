@@ -1,475 +1,743 @@
-
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🚰 ReefBlueSky - Dosadora Balling</title>
+  <meta charset="UTF-8" />
+  <title>ReefBlueSky - Painel Principal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    :root {
-      --primary: #2196F3;
-      --success: #4CAF50;
-      --danger: #f44336;
-      --warning: #ff9800;
-      --dark: #212121;
-      --light: #f5f5f5;
-      --border: #e0e0e0;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      max-width: 100%;
+      width: 100%;
+      overflow-x: hidden;
     }
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: var(--dark);
-      line-height: 1.6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
-    
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
+    a {
+      color: inherit;
+      text-decoration: none;
     }
-    
-    header {
-      background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
-      color: white;
-      padding: 20px;
-      margin-bottom: 30px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    header h1 {
+
+    /* TOPBAR */
+    .topbar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      /* antes: padding: 10px 24px; */
+      padding: 10px 12px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 28px;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
-    
-    .nav-tabs {
+
+    @supports (padding: max(0px)) {
+      .topbar {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+      }
+    }
+
+    .topbar-left {
       display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      border-bottom: 2px solid var(--border);
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
     }
-    
-    .tab-btn {
-      padding: 12px 20px;
-      background: none;
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .nav {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .nav a {
+      opacity: 0.8;
+      padding-bottom: 2px;
+      border-bottom: 2px solid transparent;
+    }
+    .nav a.active {
+      opacity: 1;
+      border-color: #facc15;
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .badge-ok,
+    .badge-error,
+    .badge,
+    .badge-on,
+    .badge-off {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-ok {
+      background: #16a34a33;
+      border: 1px solid #22c55e;
+      color: #bbf7d0;
+    }
+    .badge-error {
+      background: #b91c1c33;
+      border: 1px solid #f97373;
+      color: #fecaca;
+    }
+    .badge-on {
+      background: #16a34a33;
+      border: 1px solid #22c55e;
+      color: #bbf7d0;
+    }
+    .badge-off {
+      background: #111827;
+      border: 1px solid #4b5563;
+      color: #9ca3af;
+    }
+    .btn-small {
       border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
-      font-size: 16px;
-      font-weight: 500;
-      color: #666;
-      border-bottom: 3px solid transparent;
-      transition: all 0.3s;
+      background: #0f172a;
+      color: #e5e7eb;
     }
-    
-    .tab-btn:hover {
-      color: var(--primary);
+    .btn-small:hover {
+      background: #111827;
     }
-    
-    .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
+    .device-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
     }
-    
-    .tab-content {
-      display: none;
+    .device-selector select {
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      padding: 4px 8px;
+      font-size: 13px;
     }
-    
-    .tab-content:not(.hidden) {
-      display: block;
+
+    /* LAYOUT PRINCIPAL */
+    .content {
+      flex: 1;
+      /* antes: padding: 16px 24px 24px; */
+      padding: 12px 10px 16px;
+      display: grid;
+      grid-template-columns: 2fr 1.5fr;
+      gap: 16px;
     }
-    
-    .hidden {
-      display: none !important;
+
+    @media (max-width: 960px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
     }
-    
-    /* CARDS */
-    .device-card, .pump-card, .schedule-card {
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 15px;
-      border-left: 4px solid var(--primary);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      transition: transform 0.2s, box-shadow 0.2s;
+    .left-col,
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
-    
-    .device-card:hover, .pump-card:hover, .schedule-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    .card {
+      background: #020617;
+      border-radius: 10px;
+      padding: 14px 16px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
     }
-    
-    .device-card.status-online {
-      border-left-color: var(--success);
-    }
-    
-    .device-card.status-offline {
-      border-left-color: var(--danger);
-    }
-    
-    .pump-card.pump-low {
-      border-left-color: var(--warning);
-    }
-    
-    .device-header, .pump-header, .schedule-header {
+    .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 15px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 10px;
+      margin-bottom: 8px;
     }
-    
-    .device-header h3, .pump-header h4, .schedule-header h4 {
-      margin: 0;
-      flex: 1;
+    .card-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
     }
-    
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
+    .card-subtitle {
       font-size: 12px;
-      font-weight: 600;
-      white-space: nowrap;
+      color: #6b7280;
     }
-    
-    .status-badge.status-online {
-      background: #c8e6c9;
-      color: #1b5e20;
-    }
-    
-    .status-badge.status-offline {
-      background: #ffcdd2;
-      color: #b71c1c;
-    }
-    
-    .device-info p, .pump-info p {
-      margin: 8px 0;
-      font-size: 14px;
-    }
-    
-    code {
-      background: #f5f5f5;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-    
-    /* VOLUME BAR */
-    .volume-bar {
-      width: 100%;
-      height: 24px;
-      background: #f0f0f0;
-      border-radius: 12px;
-      overflow: hidden;
-      margin: 10px 0;
-      position: relative;
-    }
-    
-    .volume-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #4CAF50, #8BC34A);
-      transition: width 0.3s ease;
-      display: flex;
+
+    /* CARD PRINCIPAL KH */
+    .kh-main {
+      display: grid;
+      grid-template-columns: 2fr 1.2fr;
+      gap: 12px;
       align-items: center;
-      justify-content: flex-end;
-      padding-right: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: white;
     }
-    
-    .volume-text {
-      font-size: 13px;
-      color: #666;
-      margin: 5px 0 0 0;
+    .kh-value {
+      font-size: 60px;
+      font-weight: 700;
+      color: #e5e7eb;
     }
-    
-    /* BUTTONS */
-    .btn {
-      padding: 10px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+    .kh-diff {
       font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s;
-      display: inline-block;
+      margin-top: 4px;
     }
-    
-    .btn-primary {
-      background: var(--primary);
-      color: white;
+    .kh-diff.negative {
+      color: #f97373;
     }
-    
-    .btn-primary:hover {
-      background: #1976d2;
+    .kh-diff.positive {
+      color: #4ade80;
     }
-    
-    .btn-secondary {
-      background: #e0e0e0;
-      color: var(--dark);
-    }
-    
-    .btn-secondary:hover {
-      background: #d0d0d0;
-    }
-    
-    .btn-danger {
-      background: var(--danger);
-      color: white;
-    }
-    
-    .btn-danger:hover {
-      background: #d32f2f;
-    }
-    
-    .btn-small {
-      padding: 6px 12px;
-      font-size: 12px;
-    }
-    
-    .pump-status {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 4px;
-    }
-    
-    .pump-status.enabled {
-      background: #c8e6c9;
-      color: #1b5e20;
-    }
-    
-    .pump-status.disabled {
-      background: #ffcccc;
-      color: #8b0000;
-    }
-    
-    .schedule-status {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 4px;
-    }
-    
-    .schedule-status.enabled {
-      background: #c8e6c9;
-      color: #1b5e20;
-    }
-    
-    .schedule-status.disabled {
-      background: #ffcccc;
-      color: #8b0000;
-    }
-    
-    .device-actions, .pump-actions, .schedule-actions {
+    .kh-side {
       display: flex;
-      gap: 10px;
-      margin-top: 15px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
     }
-    
-    .device-info {
-      font-size: 13px;
-      color: #666;
+
+    .kh-metrics-row {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      font-size: 11px;
     }
-    
-    /* ALERTS */
-    .alert {
-      padding: 15px;
-      border-radius: 4px;
-      margin-bottom: 15px;
+
+    .kh-metrics-row .label {
+      display: block;
+      color: #9ca3af;
+      margin-bottom: 2px;
     }
-    
-    .alert-info {
-      background: #e3f2fd;
-      color: #01579b;
+
+    .kh-window {
+      padding: 4px 6px;
+      border-radius: 6px;
+      text-align: center;
+      background: #020617;
+      border: 1px solid #1f2937;
     }
-    
-    .alert-danger {
-      background: #ffebee;
-      color: #b71c1c;
+
+    .kh-window.ok {
+      background-color: #022c22;
+      border-color: #16a34a;
+      color: #bbf7d0;
     }
-    
-    .alert-success {
-      background: #f1f8e9;
-      color: #33691e;
+
+    .kh-window.warn {
+      background-color: #451a03;
+      border-color: #f59e0b;
+      color: #fed7aa;
     }
-    
-    /* TOAST */
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      padding: 16px 24px;
-      border-radius: 4px;
-      color: white;
+
+    .kh-window.alert {
+      background-color: #450a0a;
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+
+    .kh-window.neutral {
+      background-color: #020617;
+      border-color: #374151;
+      color: #9ca3af;
+    }
+
+    .kh-target-line {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .kh-target-line span.value {
+      color: #e5e7eb;
       font-weight: 500;
-      animation: slideIn 0.3s ease;
-      z-index: 1000;
     }
-    
-    .toast-success {
-      background: var(--success);
+
+    .kh-side-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    
-    .toast-error {
-      background: var(--danger);
+    .muted {
+      color: #6b7280;
+      font-size: 12px;
     }
-    
-    @keyframes slideIn {
-      from {
-        transform: translateX(400px);
-        opacity: 0;
+
+    /* CARD STATUS */
+    .status-circles {
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }
+    .status-circle {
+      flex: 1;
+      text-align: center;
+    }
+    .status-label {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 6px;
+    }
+    .status-badge {
+      font-size: 22px;
+      font-weight: 600;
+      padding: 18px 0;
+      border-radius: 999px;
+      background: #022c22;
+      border: 1px solid #16a34a;
+      color: #bbf7d0;
+    }
+    .status-badge.off {
+      background: #111827;
+      border-color: #4b5563;
+      color: #9ca3af;
+    }
+
+    /* CARD MEDIÇÃO */
+    .measure-info {
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .measure-info span.label {
+      color: #9ca3af;
+    }
+    .measure-info span.value {
+      color: #e5e7eb;
+    }
+
+    /* CARD LISTA DE MEDIÇÕES */
+    .table-small {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .table-small th,
+    .table-small td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #1f2937;
+    }
+    .table-small th {
+      text-align: left;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+    .table-small tbody tr:hover {
+      background: #030712;
+    }
+
+    .progress-wrapper { font-size: 12px; }
+    .progress-label { margin-bottom: 4px; color: #9ca3af; }
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #020617;
+      border: 1px solid #1f2937;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #eab308);
+      transition: width 0.3s linear;
+    }
+
+    /* BARRA INFERIOR */
+    .footer {
+      font-size: 11px;
+      color: #6b7280;
+      /* antes: padding: 6px 24px 10px; */
+      padding: 6px 10px 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+
+    .status-badge.good {
+      background: #022c22;
+      border-color: #16a34a;
+      color: #bbf7d0;
+    }
+    .status-badge.warn {
+      background: #451a03;
+      border-color: #f59e0b;
+      color: #fed7aa;
+    }
+    .status-badge.bad {
+      background: #450a0a;
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+
+    .kh-history-container {
+      max-height: 260px;
+      overflow-y: auto;     
+      overflow-x: hidden;
+    }
+
+    /* opcional: scrollbar mais discreta (WebKit) */
+    .kh-history-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .kh-history-container::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 3px;
+    }
+    .kh-history-container::-webkit-scrollbar-track {
+      background: #020617;
+    }
+
+    .kh-trend {
+    text-align: center;
+    width: 14px;
+    }
+
+    .kh-trend.up    { color: #60a5fa; }  /* verde: #22c55e - vermelho: #f97373 - azul: #60a5fa */
+    .kh-trend.down  { color: #60a5fa; }  
+    .kh-trend.equal { color: #22c55e; }  
+
+    .menu-toggle {
+      display: none;        /* desktop */
+      background: none;
+      border: 0;
+      padding: 6px;
+      cursor: pointer;
+    }
+    .menu-toggle span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      margin: 3px 0;
+    }
+
+    .side-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 72%;
+      max-width: 280px;
+      height: 100%;
+      background: #020617;
+      color: #e5e7eb;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease-out;
+      z-index: 40;
+      padding: 24px 16px;
+    }
+    .side-menu.open {
+      transform: translateX(0);
+    }
+    .side-menu a {
+      display: block;
+      padding: 10px 0;
+      font-size: 16px;
+    }
+    .side-close {
+      background: none;
+      border: 0;
+      color: #9ca3af;
+      font-size: 24px;
+      margin-bottom: 16px;
+      cursor: pointer;
+    }
+
+        @media (max-width: 768px) {
+      /* esconder menu textual e rótulos que ocupam espaço */
+      .nav {
+        display: none;
       }
-      to {
-        transform: translateX(0);
-        opacity: 1;
+      .device-selector span:first-child {
+        display: none;
       }
-    }
-    
-    /* RESPONSIVE */
-    @media (max-width: 768px) {
-      .container {
-        padding: 10px;
+      .device-selector {
+        max-width: 150px;
       }
-      
-      header h1 {
+      .device-selector select {
+        width: 100%;
+      }
+      #lcdStatusIcon {
+        font-size: 10px;
+        padding: 2px 8px;
+      }
+      #logoutBtn {
+        display: none;
+      }
+
+      /* topo em duas linhas: logo em cima, infos embaixo */
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 8px 12px;
+        gap: 4px;
+      }
+
+      .topbar-left {
+        justify-content: center;
+        order: 1;
+      }
+
+      .logo {
         font-size: 20px;
       }
-      
-      .nav-tabs {
+
+      .topbar-right {
+        order: 2;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;      /* já “enxuga” a direita */
+        font-size: 12px;
+      }
+
+      /* hambúrguer com três barras empilhadas */
+      .menu-toggle {
+        display: flex !important;
         flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 8px;
+        width: 36px;
       }
-      
-      .tab-btn {
-        width: 100%;
-        text-align: left;
+      .menu-toggle span {
+        width: 20px;
+        height: 2px;
+        background: #e5e7eb;
+        border-radius: 1px;
+        margin: 2px 0;
       }
-      
-      .device-header, .pump-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      
-      .status-badge {
-        margin-top: 10px;
-      }
-      
-      .device-actions, .pump-actions, .schedule-actions {
-        width: 100%;
-      }
-      
-      .btn {
-        flex: 1;
-        min-width: 100px;
-      }
+
     }
+
   </style>
 </head>
 <body>
-  <!-- Topbar unificado (igual main) -->
   <div id="topbar-root"></div>
 
-  <!-- Wrapper principal igual ao dashboard-main -->
-  <div id="app-root" class="app-root">
-    <main class="app-main">
-      <div class="app-content">
-        <!-- CONTEÚDO ESPECÍFICO DA DOSADORA -->
-        <div class="container">
+  <!-- painel lateral -->
+  <div id="sideMenu" class="side-menu">
+    <button id="closeMenu" class="side-close">×</button>
+    <a href="dashboard-main.html">Principal</a>
+    <a href="dashboard-graficos.html">Gráficos</a>
+    <a href="dashboard-config.html">Configurações</a>
+    <a href="dashboard-sistema.html">Sistema</a>
+    <a href="dashboard-logs.html">Dev</a>
+    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
+  </div>
 
-          <!-- NAVIGATION TABS -->
-          <div class="nav-tabs">
-            <button class="tab-btn active" data-tab="devices-tab">📱 Meus Devices</button>
-            <button class="tab-btn" data-tab="pumps-tab">💧 Bombas</button>
-            <button class="tab-btn" data-tab="schedules-tab">⏰ Agendas</button>
-            <button class="tab-btn" data-tab="history-tab">📋 Histórico</button>
-            <button class="tab-btn" data-tab="alerts-tab">🔔 Alertas</button>
+  
+  <div class="content">
+    <!-- Coluna esquerda -->
+    <div class="left-col" style="display:flex; flex-direction:column; gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Alcalinidade (dKH)</div>
+            <div class="card-subtitle">Última medição do device selecionado</div>
+          </div>
+        </div>
+        <div class="kh-main">
+          <div>
+            <div id="khValue" class="kh-value">--</div>
+            <div id="khDiff" class="kh-diff muted">0.00 dKH</div>
+          </div>
+          <div class="kh-side">
+            <div class="kh-side-row">
+              <span class="muted">Penúltima</span>
+              <span id="khPrev">--</span>
+            </div>
+            <div class="kh-side-row">
+              <span class="muted">Mín. janela</span>
+              <span id="khMin">--</span>
+            </div>
+            <div class="kh-side-row">
+              <span class="muted">Máx. janela</span>
+              <span id="khMax">--</span>
+            </div>
+          </div>
+        </div>
+          <div class="kh-target-line">
+            Alvo: <span class="value" id="khTargetSpan">--</span> dKH
+            <span id="khRefSpan" class="kh-small">ref: --</span>
           </div>
 
-          <!-- DEVICES TAB -->
-          <div id="devices-tab" class="tab-content">
-            <h2>Meus Devices Dosadora</h2>
-            <div id="devices-list" style="margin-top: 20px;">
-              <p>⏳ Carregando devices...</p>
-            </div>
-            <button class="btn btn-primary" style="margin-top: 20px;" onclick="showCreateDeviceDialog()">
-              ➕ Adicionar Novo Device
+        <div class="kh-metrics-row">
+          <div>
+            <span class="label">24h</span>
+            <div class="kh-window neutral" id="kh24hSpan">--</div>
+          </div>
+          <div>
+            <span class="label">3 dias</span>
+            <div class="kh-window neutral" id="kh3dSpan">--</div>
+          </div>
+          <div>
+            <span class="label">7 dias</span>
+            <div class="kh-window neutral" id="kh7dSpan">--</div>
+          </div>
+          <div>
+            <span class="label">15 dias</span>
+            <div class="kh-window neutral" id="kh15dSpan">--</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Medição</div>
+        </div>
+        <div class="measure-info">
+          <span><span class="label">Última:</span> <span id="lastMeasureTime" class="value">--</span></span>
+          <span><span class="label">Próxima estimada:</span> <span id="nextMeasureTime" class="value">--</span></span>
+          <span><span class="label">Calibração:</span> <span id="calibrationDate" class="value">--</span></span>
+        </div>
+
+        <div class="measure-info" style="margin-top:8px;">
+          <span>
+            <span class="label">Teste automático:</span>
+            <label style="margin-left:4px; font-size:13px;">
+              <input type="checkbox" id="testModeToggle" />
+              <span class="value">ON/OFF</span>
+            </label>
+          </span>
+          <span>
+            <button id="testNowBtn" class="btn-small" style="margin-top:4px;" disabled>
+              Iniciar teste agora
             </button>
-          </div>
+          </span>
+        </div>
 
-          <!-- PUMPS TAB -->
-          <div id="pumps-tab" class="tab-content hidden">
-            <h2>Configurar Bombas</h2>
-            <p style="color: #666; margin-bottom: 15px;">
-              ℹ️ Selecione um device na aba "Meus Devices" para gerenciar suas bombas
-            </p>
-            <div id="pumps-list" style="margin-top: 20px;">
-              <p>Selecione um device primeiro</p>
+    <!-- Progresso do teste manual + botão ABORT -->
+        <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+          <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="testNowProgressFill"></div>
+          </div>
+        </div>
+
+        <div id="abortArea" style="display:none; margin-top:8px;">
+          <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
+            ABORTAR teste/dose
+          </button>
+          <div id="abortStatusText" class="muted" style="margin-top:4px;">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+
+  
+
+    <!-- Coluna direita -->
+    <div class="right-col" style="display:flex; flex-direction:column; gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Status</div>
+        </div>
+        <div class="status-circles">
+          <div class="status-circle">
+            <div id="statusPh" class="status-badge">--</div>
+            <div class="status-label">Saúde do KH</div>
+          </div>
+            <div class="status-circle" id="khBufferCard">
+              <div id="statusBuffer" class="status-badge off">0</div>
+              <div class="status-label">KH Buffer</div>
             </div>
-            <button class="btn btn-primary" id="create-pump-btn" style="margin-top: 20px; display: none;">
-              ➕ Adicionar Nova Bomba
+          <div class="status-circle">
+            <div id="statusReactor" class="status-badge off">OFF</div>
+            <div class="status-label">Reator CA</div>
+          </div>
+        </div>
+      </div>
+
+    
+      <!-- Correção de KH (Bomba 4) -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Correção de KH (Bomba 4)</div>
+            <div class="card-subtitle">Dose manual baseada na calibração</div>
+          </div>
+        </div>
+
+        <div class="measure-info">
+          <span>
+            <span class="label">Volume a dosar (mL):</span>
+            <input
+              type="number"
+              id="doseVolumeInput"
+              min="0"
+              step="0.1"
+              style="margin-top:4px; width:100%; padding:4px 6px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb; font-size:13px;"
+            />
+          </span>
+          <span style="margin-top:4px;">
+            <span class="label">Taxa calibrada bomba 4:</span>
+            <span id="pump4RateSpan" class="value">-- mL/s</span>
+          </span>
+        </div>
+
+        <div class="measure-info" style="margin-top:8px;">
+          <span>
+            <button id="applyDoseBtn" class="btn-small">
+              Aplicar dose
             </button>
+          </span>
+        </div>
+
+        <!-- Progresso da dose bomba 4 -->
+        <div id="doseProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+          <div class="progress-label" id="doseProgressLabel">Dose em andamento...</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="doseProgressFill"></div>
           </div>
+        </div>
+      </div>
 
-          <!-- SCHEDULES TAB -->
-          <div id="schedules-tab" class="tab-content hidden">
-            <h2>Agendas de Dose</h2>
-            <p style="color: #666; margin-bottom: 15px;">
-              ℹ️ Selecione uma bomba em "Bombas" para criar agendas automáticas
-            </p>
-            <div id="schedules-list" style="margin-top: 20px;">
-              <p>Selecione uma bomba primeiro</p>
-            </div>
-            <button class="btn btn-primary" id="create-schedule-btn" style="margin-top: 20px; display: none;">
-              ➕ Adicionar Nova Agenda
-            </button>
-          </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Últimas medições</div>
+          <div class="card-subtitle" id="lastCountInfo">-- registros recentes</div>
+        </div>
+        
+        <div class="kh-history-container">
+          <table class="table-small">
+            <thead>
+              <tr>
+                <th>Data/hora</th>
+                <th></th>
+                <th>KH</th>
+                <th>pH ref</th>
+                <th>pH amostra</th>
+                <th>Temp (°C)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="measurementsBody"></tbody>
+          </table>
+        </div>
+      </div>  
+    </div>
+  </div>
 
-          <!-- HISTORY TAB -->
-          <div id="history-tab" class="tab-content hidden">
-            <h2>Histórico de Doses</h2>
-            <div id="history-list" style="margin-top: 20px;">
-              <p>⏳ Carregando histórico...</p>
-            </div>
-            <button class="btn btn-secondary" style="margin-top: 20px;">
-              📥 Exportar (CSV)
-            </button>
-          </div>
+  <div class="footer">
+    <div id="userInfo">Usuário --</div>
+    <div>ReefBlueSky KH Monitor — Dashboard web</div>
+  </div>
 
-          <!-- ALERTS TAB -->
-          <div id="alerts-tab" class="tab-content hidden">
-            <h2>Alertas e Notificações</h2>
-            <p style="color: #666; margin-bottom: 15px;">
-              🔔 Alertas pendentes de seus devices
-            </p>
-            <div id="alerts-list" style="margin-top: 20px;">
-              <p>Carregando alertas...</p>
-            </div>
-          </div>
-
-        </div> <!-- .container -->
-        <!-- FIM DO CONTEÚDO ESPECÍFICO -->
-      </div> <!-- .app-content -->
-    </main>
-  </div> <!-- #app-root -->
-
-  <!-- Scripts iguais ao main (mesmo path das outras páginas) -->
   <script src="js/dashboard-common.js"></script>
-  <script src="js/dashboard-dosing.js"></script>
+  <script src="js/dashboard-main.js"></script>
 </body>
-
 </html>
-
