@@ -82,12 +82,44 @@ async function loadDosingDevices() {
   }
 }
 
+
+function initDosingTabs() {
+  const tabs = {
+    tabDashboard: 'dosingDashboardView',
+    tabDevices: 'dosingDevicesView',
+    tabPumps: 'dosingPumpsView',
+    tabSchedules: 'dosingSchedulesView',
+    tabHistory: 'dosingHistoryView',
+  };
+
+  Object.entries(tabs).forEach(([btnId, viewId]) => {
+    const btn = document.getElementById(btnId);
+    const view = document.getElementById(viewId);
+    if (!btn || !view) return;
+
+    btn.addEventListener('click', () => {
+      // ativa/desativa botões
+      Object.keys(tabs).forEach((id) => {
+        const b = document.getElementById(id);
+        if (b) b.classList.toggle('active', id === btnId);
+      });
+      // mostra/esconde views
+      Object.values(tabs).forEach((vid) => {
+        const v = document.getElementById(vid);
+        if (v) v.style.display = vid === viewId ? 'block' : 'none';
+      });
+    });
+  });
+}
+
+
 async function initDashboardDosing() {
   await DashboardCommon.initTopbar();
 
   const devs = await DashboardCommon.loadDevicesCommon();
   if (!devs.length) {
     showDosingError('Nenhum dispositivo associado.');
+    initDosingTabs();
     return;
   }
 
@@ -111,7 +143,7 @@ async function initDashboardDosing() {
       console.error('Erro ao carregar lcdStatus na tela Dosadora', e);
     }
   }
-
+  initDosingTabs();
   await loadDosingDevices();
 }
 
