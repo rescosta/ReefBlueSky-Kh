@@ -3099,7 +3099,12 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         d.kh_auto_enabled,
         d.lcd_status,
         (
-          SELECT MAX(online)
+          SELECT MAX(
+                   CASE
+                     WHEN dd.last_seen >= NOW() - INTERVAL 5 MINUTE THEN 1
+                     ELSE 0
+                   END
+                 )
           FROM dosing_devices dd
           WHERE dd.user_id = d.userId
         ) AS dosing_online
@@ -3137,15 +3142,13 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
             ? cfg.lcd_status
             : 'offline',
         dosingStatus,
-
       },
     });
   } catch (err) {
     console.error('Error fetching KH config', err);
-    return res.status(500).json({ success: false, message: 'Internal server error', });
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
 
 
 // Helper para descobrir a URL local do device.
