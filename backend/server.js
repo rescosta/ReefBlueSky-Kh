@@ -3088,20 +3088,26 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
 
     const sql = `
       SELECT
-        kh_target,
-        kh_reference,
-        kh_tolerance_daily,
-        kh_alert_enabled,
-        kh_alert_channel,
-        pump4_ml_per_sec,
-        kh_health_green_max_dev,
-        kh_health_yellow_max_dev,
-        kh_auto_enabled,
-        lcd_status
-      FROM devices
-      WHERE deviceId = ? AND userId = ?
+        d.kh_target,
+        d.kh_reference,
+        d.kh_tolerance_daily,
+        d.kh_alert_enabled,
+        d.kh_alert_channel,
+        d.pump4_ml_per_sec,
+        d.kh_health_green_max_dev,
+        d.kh_health_yellow_max_dev,
+        d.kh_auto_enabled,
+        d.lcd_status,
+        (
+          SELECT MAX(online)
+          FROM dosing_devices dd
+          WHERE dd.user_id = d.userId
+        ) AS dosing_online
+      FROM devices d
+      WHERE d.deviceId = ? AND d.userId = ?
       LIMIT 1
     `;
+
     const rows = await pool.query(sql, [deviceId, userId]);
 
     if (rows.length === 0) {
@@ -3109,6 +3115,11 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
     }
 
     const cfg = rows[0];
+    const dosingStatus =
+      cfg.dosing_online === 1 ? 'online' :
+      cfg.dosing_online === 0 ? 'offline' :
+      'never';
+
     return res.json({
       success: true,
       data: {
@@ -3125,6 +3136,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
           cfg.lcd_status === 'online' || cfg.lcd_status === 'offline'
             ? cfg.lcd_status
             : 'offline',
+        dosingStatus,
 
       },
     });
