@@ -7,15 +7,20 @@ const express = require('express');
 const router = express.Router();
 
 // Dependências injetadas pelo server.js
-let pool, mailTransporter, ALERT_FROM, sendTelegramForUser, authenticateToken;
+let pool, mailTransporter, ALERT_FROM, sendTelegramForUser;
+let routerAuthMiddleware = (req, res, next) => next(); // default no-op
 
 function initDosingModule(deps) {
   pool = deps.pool;
   mailTransporter = deps.mailTransporter;
   ALERT_FROM = deps.ALERT_FROM;
   sendTelegramForUser = deps.sendTelegramForUser;
-  authenticateToken = deps.authenticateToken;
+  routerAuthMiddleware = deps.authUserMiddleware || ((req, res, next) => next());
+
+  // aplica o middleware em todas as rotas do router (prefixo /api vem do server.js)
+  router.use(routerAuthMiddleware);
 }
+
 
 // ===== HELPER: Validar token IoT (para ESP) =====
 async function verifyIoTToken(espUid) {
@@ -101,7 +106,7 @@ async function notifyDosingAlert(userId, alertType, message) {
 
 // GET /v1/user/dosing/devices
 // Lista todos os devices dosadora do usuário
-router.get('/v1/user/dosing/devices', authenticateToken, async (req, res) => {
+router.get('/v1/user/dosing/devices', async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
@@ -133,7 +138,7 @@ router.get('/v1/user/dosing/devices', authenticateToken, async (req, res) => {
 
 // POST /v1/user/dosing/devices
 // Criar novo device dosadora (metadata; handshake ESP atribui)
-router.post('/v1/user/dosing/devices', authenticateToken, async (req, res) => {
+router.post('/v1/user/dosing/devices', async (req, res) => {
   let conn;
   try {
     const { name, hw_type, timezone } = req.body;
@@ -144,15 +149,43 @@ router.post('/v1/user/dosing/devices', authenticateToken, async (req, res) => {
     }
 
     conn = await pool.getConnection();
+
+    // 1) cria o device
     const result = await conn.query(
       `INSERT INTO dosing_devices (user_id, name, hw_type, timezone, esp_uid)
        VALUES (?, ?, ?, ?, ?)`,
       [userId, name, hw_type, timezone || 'America/Sao_Paulo', `pending-${Date.now()}`]
     );
 
+    const deviceId = result.insertId;
+
+    // 2) cria 5 bombas padrão P01..P05
+    const pumps = [];
+    for (let i = 0; i < 5; i++) {
+      pumps.push([
+        deviceId,
+        `P0${i + 1}`, // nome inicial
+        i,           // index_on_device 0..4
+        500,         // container_volume_ml
+        500,         // current_volume_ml
+        10,          // alarm_threshold_pct
+        1.0,         // calibration_rate_ml_s
+        100          // max_daily_ml
+      ]);
+    }
+
+    await conn.batch(
+      `INSERT INTO dosing_pumps 
+         (device_id, name, index_on_device,
+          container_volume_ml, current_volume_ml,
+          alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      pumps
+    );
+
     res.status(201).json({
       success: true,
-      data: { id: result.insertId, name, hw_type }
+      data: { id: deviceId, name, hw_type }
     });
   } catch (err) {
     console.error('Error creating dosing device:', err);
@@ -164,7 +197,7 @@ router.post('/v1/user/dosing/devices', authenticateToken, async (req, res) => {
 
 // PUT /v1/user/dosing/devices/:id
 // Atualizar device (nome, timezone)
-router.put('/v1/user/dosing/devices/:id', authenticateToken, async (req, res) => {
+router.put('/v1/user/dosing/devices/:id', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -197,7 +230,7 @@ router.put('/v1/user/dosing/devices/:id', authenticateToken, async (req, res) =>
 });
 
 // DELETE /v1/user/dosing/devices/:id
-router.delete('/v1/user/dosing/devices/:id', authenticateToken, async (req, res) => {
+router.delete('/v1/user/dosing/devices/:id', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -225,7 +258,7 @@ router.delete('/v1/user/dosing/devices/:id', authenticateToken, async (req, res)
 // ===== PUMPS =====
 
 // GET /v1/user/dosing/pumps?deviceId=X
-router.get('/v1/user/dosing/pumps', authenticateToken, async (req, res) => {
+router.get('/v1/user/dosing/pumps', async (req, res) => {
   let conn;
   try {
     const { deviceId } = req.query;
@@ -253,7 +286,7 @@ router.get('/v1/user/dosing/pumps', authenticateToken, async (req, res) => {
 
 // POST /v1/user/dosing/pumps
 // Criar bomba
-router.post('/v1/user/dosing/pumps', authenticateToken, async (req, res) => {
+router.post('/v1/user/dosing/pumps', async (req, res) => {
   let conn;
   try {
     const {
@@ -293,7 +326,7 @@ router.post('/v1/user/dosing/pumps', authenticateToken, async (req, res) => {
 });
 
 // PUT /v1/user/dosing/pumps/:id
-router.put('/v1/user/dosing/pumps/:id', authenticateToken, async (req, res) => {
+router.put('/v1/user/dosing/pumps/:id', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -337,7 +370,7 @@ router.put('/v1/user/dosing/pumps/:id', authenticateToken, async (req, res) => {
 // ===== SCHEDULES =====
 
 // GET /v1/user/dosing/schedules?pumpId=X
-router.get('/v1/user/dosing/schedules', authenticateToken, async (req, res) => {
+router.get('/v1/user/dosing/schedules', async (req, res) => {
   let conn;
   try {
     const { pumpId } = req.query;
@@ -364,7 +397,7 @@ router.get('/v1/user/dosing/schedules', authenticateToken, async (req, res) => {
 });
 
 // POST /v1/user/dosing/schedules
-router.post('/v1/user/dosing/schedules', authenticateToken, async (req, res) => {
+router.post('/v1/user/dosing/schedules', async (req, res) => {
   let conn;
   try {
     const {
@@ -404,7 +437,7 @@ router.post('/v1/user/dosing/schedules', authenticateToken, async (req, res) => 
 });
 
 // PUT /v1/user/dosing/schedules/:id
-router.put('/v1/user/dosing/schedules/:id', authenticateToken, async (req, res) => {
+router.put('/v1/user/dosing/schedules/:id', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -442,7 +475,7 @@ router.put('/v1/user/dosing/schedules/:id', authenticateToken, async (req, res) 
 });
 
 // DELETE /v1/user/dosing/schedules/:id
-router.delete('/v1/user/dosing/schedules/:id', authenticateToken, async (req, res) => {
+router.delete('/v1/user/dosing/schedules/:id', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -474,7 +507,7 @@ router.delete('/v1/user/dosing/schedules/:id', authenticateToken, async (req, re
 
 // POST /v1/user/dosing/pumps/:id/dose
 // Disparar uma dose manual
-router.post('/v1/user/dosing/pumps/:id/dose', authenticateToken, async (req, res) => {
+router.post('/v1/user/dosing/pumps/:id/dose', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -534,7 +567,7 @@ router.post('/v1/user/dosing/pumps/:id/dose', authenticateToken, async (req, res
 // ===== CALIBRAÇÃO =====
 
 // POST /v1/user/dosing/pumps/:id/calibrate
-router.post('/v1/user/dosing/pumps/:id/calibrate', authenticateToken, async (req, res) => {
+router.post('/v1/user/dosing/pumps/:id/calibrate', async (req, res) => {
   let conn;
   try {
     const { id } = req.params;
@@ -590,16 +623,58 @@ router.post('/v1/iot/dosing/handshake', async (req, res) => {
 
     conn = await pool.getConnection();
     
-    // Buscar device por esp_uid
-    let device = await conn.query(
-      `SELECT id, user_id, online FROM dosing_devices WHERE esp_uid = ? LIMIT 1`,
+  // Buscar device por esp_uid
+  let device = await conn.query(
+    `SELECT id, user_id, online FROM dosing_devices WHERE esp_uid = ? LIMIT 1`,
+    [esp_uid]
+  );
+
+  if (!device || device.length === 0) {
+    // tentar descobrir dono na tabela principal (devices)
+    const mainDev = await conn.query(
+      `SELECT userId FROM devices WHERE deviceId = ? LIMIT 1`,
       [esp_uid]
     );
-
-    if (!device || device.length === 0) {
-      // Device não existe ainda - poderia registrar automaticamente, mas é mais seguro rejeitar
+    if (!mainDev || mainDev.length === 0) {
       return res.status(404).json({ success: false, error: 'Device not found' });
     }
+
+    const userId = mainDev[0].userId;
+
+    // cria dosing_device
+    const devResult = await conn.query(
+      `INSERT INTO dosing_devices (user_id, name, hw_type, timezone, esp_uid)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, `Dosadora ${esp_uid}`, hw_type || 'ESP32', 'America/Sao_Paulo', esp_uid]
+    );
+    const deviceId = devResult.insertId;
+
+    // cria 5 bombas P01..P05
+    const pumps = [];
+    for (let i = 0; i < 5; i++) {
+      pumps.push([
+        deviceId,
+        `P0${i + 1}`,
+        i,
+        500,
+        500,
+        10,
+        1.0,
+        100
+      ]);
+    }
+
+    await conn.batch(
+      `INSERT INTO dosing_pumps
+         (device_id, name, index_on_device,
+          container_volume_ml, current_volume_ml,
+          alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      pumps
+    );
+
+    device = [{ id: deviceId, user_id: userId, online: 0 }];
+  }
 
     const deviceId = device[0].id;
     const userId = device[0].user_id;
