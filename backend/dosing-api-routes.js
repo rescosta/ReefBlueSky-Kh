@@ -19,7 +19,7 @@ function initDosingModule(deps) {
   routerAuthMiddleware = deps.authUserMiddleware || ((req, res, next) => next());
 
   // aplica o middleware em todas as rotas do router (prefixo /api vem do server.js)
-  router.use(routerAuthMiddleware);
+  router.use('/v1/user/dosing', routerAuthMiddleware);
 }
 
 
