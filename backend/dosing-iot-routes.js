@@ -3,7 +3,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('./db-pool'); 
 
-/
 // ===== HELPER: Validar token IoT (para ESP) =====
 async function verifyIoTToken(espUid) {
   let conn;
@@ -216,15 +215,22 @@ router.post('/v1/iot/dosing/handshake', async (req, res) => {
 router.post('/v1/iot/dosing/status', async (req, res) => {
   let conn;
   try {
-    const { esp_uid, uptime_s, signal_dbm, pumps } = req.body;
+    const body = req.body || {};
+    const espUid = body.esp_uid || body.espUid;
+    const uptime_s   = body.uptime_s;
+    const signal_dbm = body.signal_dbm;
+    const pumps      = body.pumps;
 
-    if (!esp_uid) {
-      return res.status(400).json({ success: false, error: 'Missing esp_uid' });
+    if (!espUid) {
+      console.warn('[DOSING IOT] status sem esp_uid. Body=', body);
+      return res
+        .status(400)
+        .json({ success: false, error: 'esp_uid obrigatório' });
     }
 
     conn = await pool.getConnection();
     
-    const device = await verifyIoTToken(esp_uid);
+    const device = await verifyIoTToken(espUid);
     if (!device) {
       return res.status(404).json({ success: false, error: 'Device not found' });
     }
