@@ -1033,7 +1033,7 @@ initDosingModule({
   mailTransporter,
   ALERT_FROM,
   sendTelegramForUser,
-  authUserMiddleware,  
+  authUserMiddleware,
 });
 
 app.use('/api', dosingRouter);
