@@ -80,7 +80,7 @@ function renderDosingDevices(devices) {
 }
 
 async function loadDosingDevices() {
-  const token = localStorage.getItem('jwtToken');
+  const token = localStorage.getItem('token');
   if (!token) {
     showDosingError('Não autenticado.');
     return;
@@ -175,7 +175,7 @@ function renderPumps(pumps) {
       if (!confirm('Remover esta bomba?')) return;
 
       try {
-        const token = localStorage.getItem('jwtToken');
+        const token = localStorage.getItem('token');
         await fetch(`/api/v1/user/dosing/pumps/${encodeURIComponent(pumpId)}`, {
           method: 'DELETE',
           headers: {
@@ -194,7 +194,7 @@ async function loadPumpsForSelected() {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   if (!deviceId || !pumpsTableBody) return;
 
-  const token = localStorage.getItem('jwtToken');
+  const token = localStorage.getItem('token');
   if (!token) return;
 
   try {
@@ -247,7 +247,7 @@ if (addPumpBtn) {
     }
 
     try {
-      const token = localStorage.getItem('jwtToken');
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/v1/user/dosing/pumps', {
         method: 'POST',
         headers: {
@@ -360,7 +360,7 @@ function renderSchedules(schedules, pumpId) {
       if (!confirm('Remover esta agenda?')) return;
 
       try {
-        const token = localStorage.getItem('jwtToken');
+        const token = localStorage.getItem('token');
         const res = await fetch(`/api/v1/user/dosing/schedules/${encodeURIComponent(id)}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
@@ -384,7 +384,7 @@ async function loadSchedulesForSelectedPump() {
     return;
   }
 
-  const token = localStorage.getItem('jwtToken');
+  const token = localStorage.getItem('token');
   if (!token) return;
 
   try {
@@ -428,7 +428,7 @@ if (addScheduleBtn) {
       return;
     }
 
-    const token = localStorage.getItem('jwtToken');
+    const token = localStorage.getItem('token');
     if (!token) return;
 
     try {
@@ -473,7 +473,6 @@ async function initDashboardDosing() {
     return;
   }
 
-  // sincroniza LCD com o device selecionado, igual tela de gráficos
   const deviceId = DashboardCommon.getSelectedDeviceId();
   if (deviceId) {
     try {
@@ -481,22 +480,24 @@ async function initDashboardDosing() {
         `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
       );
       const json = await resp.json();
-      if (
-        resp.ok &&
-        json.success &&
-        json.data &&
-        typeof DashboardCommon.setLcdStatus === 'function'
-      ) {
-        DashboardCommon.setLcdStatus(json.data.lcdStatus);
+      if (resp.ok && json.success && json.data) {
+        if (typeof DashboardCommon.setLcdStatus === 'function') {
+          DashboardCommon.setLcdStatus(json.data.lcdStatus);
+        }
+        if (typeof DashboardCommon.setDosingStatus === 'function') {
+          DashboardCommon.setDosingStatus(json.data.dosingStatus);
+        }
       }
     } catch (e) {
       console.error('Erro ao carregar lcdStatus na tela Dosadora', e);
     }
   }
+
   initDosingTabs();
   await loadDosingDevices();
   await loadPumpsForSelected();
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboardDosing().catch((err) =>

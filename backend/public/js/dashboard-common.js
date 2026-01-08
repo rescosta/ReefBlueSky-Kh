@@ -148,6 +148,10 @@ function getTopbarHtml() {
           LCD OFF
         </span>
 
+        <span id="dosingStatusIcon" class="badge-off" style="display:none; font-size:12px;">
+          DOS OFF
+        </span>
+
         <!-- NOVO: atalho para dosadora -->
         <button id="dosingBtn" class="btn-small" style="margin-left:8px;">
           Dosadora
@@ -447,19 +451,23 @@ async function initTopbar() {
     const currentId = getSelectedDeviceId();
     if (!currentId) return;
 
-    // Pinga o /kh-config para pegar lcdStatus atualizado
     try {
       const resp = await apiFetch(
         `/api/v1/user/devices/${encodeURIComponent(currentId)}/kh-config`
       );
       const json = await resp.json();
-      if (resp.ok && json.success && json.data && typeof DashboardCommon.setLcdStatus === 'function') {
-        DashboardCommon.setLcdStatus(json.data.lcdStatus); // online/offline/never
+      if (resp.ok && json.success && json.data) {
+        if (typeof DashboardCommon.setLcdStatus === 'function') {
+          DashboardCommon.setLcdStatus(json.data.lcdStatus);
+        }
+        if (typeof DashboardCommon.setDosingStatus === 'function') {
+          DashboardCommon.setDosingStatus(json.data.dosingStatus);
+        }
       }
     } catch (e) {
-      console.error('Erro ao atualizar lcdStatus periodicamente', e);
-      // em erro, não mexe no estado atual do badge
+      console.error('Erro ao atualizar lcd/dosing status periodicamente', e);
     }
+
   }, 30000);
 }
 
@@ -504,6 +512,31 @@ function setLcdStatus(status) {
     }
 }
 
+function setDosingStatus(status) {
+  const el = document.getElementById('dosingStatusIcon');
+  if (!el) return;
+
+  if (status === undefined || status === null) return;
+
+  if (status === 'never') {
+    el.style.display = 'none';
+    return;
+  }
+
+  el.style.display = 'inline-block';
+
+  if (status === 'online') {
+    el.textContent = 'DOS ON';
+    el.className = 'badge-on';
+    el.title = 'Dosadora conectada';
+  } else {
+    el.textContent = 'DOS OFF';
+    el.className = 'badge-off';
+    el.title = 'Dosadora desconectada';
+  }
+}
+
+
 
 window.DashboardCommon = {
   initTopbar,
@@ -514,6 +547,7 @@ window.DashboardCommon = {
   getSelectedDeviceIdOrAlert,
   applyRoleMenuVisibility,
   setLcdStatus,
+  setDosingStatus,
   currentUserRole: 'user',
 };
 
