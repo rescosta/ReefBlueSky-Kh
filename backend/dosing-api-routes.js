@@ -20,8 +20,12 @@ function initDosingModule(deps) {
   sendTelegramForUser = deps.sendTelegramForUser;
   routerAuthMiddleware = deps.authUserMiddleware || ((req, res, next) => next());
 
+  console.log('[Dosing] initDosingModule: registrando auth em /v1/user/dosing');
 
-  router.use('/v1/user/dosing', routerAuthMiddleware);
+  router.use('/v1/user/dosing', (req, res, next) => {
+    console.log('[Dosing] middleware JWT em', req.method, req.originalUrl);
+    routerAuthMiddleware(req, res, next);
+  });
 }
 
 
