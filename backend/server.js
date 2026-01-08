@@ -803,44 +803,46 @@ function generateRefreshToken(userId, deviceId) {
 
 // ===== Middleware de autenticação de usuário (JWT - web) =====
 function authUserMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+
+  console.log('[AUTH] authUserMiddleware chamado em', req.method, req.originalUrl);
+  console.log('[AUTH] Authorization header =', authHeader || '<nenhum>');
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token não fornecido'
-    });
+    console.warn('[AUTH] Sem Bearer header');
+    return res
+      .status(401)
+      .json({ success: false, message: 'Token não fornecido' });
   }
 
   const token = authHeader.substring(7);
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+
     if (!decoded.userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token inválido para usuário'
-      });
+      console.warn('[AUTH] Token sem userId', decoded);
+      return res
+        .status(401)
+        .json({ success: false, message: 'Token inválido para usuário' });
     }
 
     req.user = {
       userId: decoded.userId,
       deviceId: decoded.deviceId || null,
-      role: decoded.role || 'user'
+      role: decoded.role || 'user',
     };
 
+    console.log('[AUTH] OK userId=', req.user.userId, 'role=', req.user.role);
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      console.warn('authUserMiddleware: Token expirado');  // ← MUDE AQUI
-    } else {
-      console.error('authUserMiddleware error:', err.message);  // ← E AQUI
-    }
-    return res.status(401).json({
-      success: false,
-      message: 'Token inválido ou expirado'
-    });
+    console.warn('[AUTH] Erro ao verificar token', err.message);
+    return res
+      .status(401)
+      .json({ success: false, message: 'Token inválido ou expirado' });
   }
 }
+
 
 
 function requireDev(req, res, next) {
@@ -1035,6 +1037,8 @@ initDosingModule({
 });
 
 app.use('/api', dosingRouter);
+console.log('[Dosing] Router montado em /api');
+
 
 
 // ============================================================================
