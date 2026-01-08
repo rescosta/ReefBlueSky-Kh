@@ -128,13 +128,14 @@ function getTopbarHtml() {
     <div class="topbar">
       <div class="topbar-left">
         <div class="logo">ReefBlueSky</div>
-        <nav class="nav">
-          <a href="dashboard" id="nav-main">Principal</a>
-          <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
-          <a href="dashboard-config.html" id="nav-config">Configurações</a>
-          <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
-          <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
-        </nav>
+          <nav class="nav">
+            <a href="dashboard" id="nav-main">Principal</a>
+            <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
+            <a href="dashboard-config.html" id="nav-config">Configurações</a>
+            <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
+            <a href="dashboard-dosing.html" id="nav-dosing" style="display:none;">Dosadora</a>
+            <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
+          </nav>
       </div>
       <div class="topbar-right">
         <div class="device-selector">
@@ -175,6 +176,7 @@ function highlightActiveNav() {
     { id: 'nav-graficos', match: 'dashboard-graficos.html' },
     { id: 'nav-config', match: 'dashboard-config.html' },
     { id: 'nav-sistema', match: 'dashboard-sistema.html' },
+    { id: 'nav-dosing',  match: 'dashboard-dosing.html' },
     { id: 'nav-dev', match: 'dashboard-logs.html' },
   ];
 
@@ -308,13 +310,26 @@ function updateDeviceStatusBadge() {
   }
 }
 
+async function hasDosingDevices() {
+  try {
+    const res = await apiFetch('/api/v1/user/dosing/devices');
+    const json = await res.json();
+    if (!res.ok || !json.success) return false;
+    const list = json.data || [];
+    return list.length > 0;
+  } catch (err) {
+    console.error('hasDosingDevices error', err);
+    return false;
+  }
+}
 
-function applyRoleMenuVisibility() {
+async function applyRoleMenuVisibility() {
   const role =
     (window.DashboardCommon && DashboardCommon.currentUserRole) || 'user';
 
-  const navLogs = document.getElementById('nav-logs');
-  const navDev  = document.getElementById('nav-dev');
+  const navLogs   = document.getElementById('nav-logs');
+  const navDev    = document.getElementById('nav-dev');
+  const navDosing = document.getElementById('nav-dosing');
 
   // Logs some sempre
   if (navLogs) navLogs.style.display = 'none';
@@ -323,7 +338,14 @@ function applyRoleMenuVisibility() {
   if (navDev) {
     navDev.style.display = role === 'dev' ? 'inline-block' : 'none';
   }
+
+  // Dosadora só aparece se o usuário tiver pelo menos um dosing_device
+  if (navDosing) {
+    const hasDoser = await hasDosingDevices();
+    navDosing.style.display = hasDoser ? 'inline-block' : 'none';
+  }
 }
+
 
 
 // Inicializar topbar em qualquer página
@@ -404,7 +426,8 @@ async function initTopbar() {
   await loadUserCommon();
   await ensureFreshToken(); 
 
-  applyRoleMenuVisibility();
+  await applyRoleMenuVisibility();
+
   const devs = await loadDevicesCommon();
   if (devs.length) {
     updateDeviceStatusBadge();

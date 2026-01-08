@@ -19,38 +19,23 @@ let schedules = [];
 let pollIntervalId = null;
 let lastStatusUpdate = {};
 
-// INIT idêntico ao main/config
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    // 1) valida token no servidor
-    const res = await apiFetch('/api/v1/auth/me');
-    if (!res.ok) {
-      redirectToLogin();
-      return;
-    }
-    const me = await res.json();
-    if (!me || !me.success) {
-      redirectToLogin();
-      return;
-    }
+    // 1) Inicializa topbar + valida token via DashboardCommon
+    await DashboardCommon.initTopbar(); // já faz /auth/me e redirectToLogin se falhar
+
+    console.log('[Dosing] Iniciando dashboard...');
+
+    // 2) Fluxo normal da dosadora
+    await loadDevices();
+    setupEventListeners();
+    setupTabs();
+    startPolling();
   } catch (err) {
-    // qualquer erro na auth cai pro login
+    console.error('[Dosing] Erro na inicialização:', err);
     redirectToLogin();
-    return;
   }
-
-  // 2) fluxo normal da dosing
-  await DashboardCommon.initTopbar();
-  console.log('[Dosing] Iniciando dashboard...');
-  await loadDevices();
-  setupEventListeners();
-  setupTabs();
-  startPolling();
 });
-
-
-
-
 
 
 // ===== POLLING (como JoyReef) =====
