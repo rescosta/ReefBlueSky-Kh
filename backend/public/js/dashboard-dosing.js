@@ -1,560 +1,836 @@
-/**
- * ReefBlueSky Dosadora Dashboard v2
- * Frontend melhorado com:
- * - Real-time polling + WebSocket-ready
- * - Fila offline-first de comandos
- * - Status visual em tempo real
- * - Sincronização automática
- */
+// dashboard-main.js
 
-const DOSING_API = '/api/v1/user/dosing';
-const POLL_INTERVAL = 5000;
-const COMMAND_QUEUE_KEY = 'dosing_command_queue';
+const khValueEl = document.getElementById('khValue');
+const khDiffEl = document.getElementById('khDiff');
+const khPrevEl = document.getElementById('khPrev');
+const khMinEl = document.getElementById('khMin');
+const khMaxEl = document.getElementById('khMax');
 
-let selectedDeviceId = null;
-let selectedPumpId = null;
-let devices = [];
-let pumps = [];
-let schedules = [];
-let pollIntervalId = null;
-let lastStatusUpdate = {};
+const lastMeasureTimeEl = document.getElementById('lastMeasureTime');
+const nextMeasureTimeEl = document.getElementById('nextMeasureTime');
+const calibrationDateEl = document.getElementById('calibrationDate');
 
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await initTopbar(); 
-    // 1) tenta validar o token chamando /auth/me
-    const res = await apiFetch('/api/v1/auth/me');
+const statusPhEl = document.getElementById('statusPh');
+const statusBufferEl = document.getElementById('statusBuffer');
+const statusReactorEl = document.getElementById('statusReactor');
 
-    if (!res.ok) {
-      redirectToLogin();
-      return;
-    }
+const measurementsBody = document.getElementById('measurementsBody');
+const lastCountInfo = document.getElementById('lastCountInfo');
 
-    const json = await res.json().catch(() => null);
-    if (!json || !json.success) {
-      redirectToLogin();
-      return;
-    }
+const khTargetSpan = document.getElementById('khTargetSpan');
+const khRefSpan    = document.getElementById('khRefSpan');
+const kh24hSpan = document.getElementById('kh24hSpan');
+const kh3dSpan = document.getElementById('kh3dSpan');
+const kh7dSpan = document.getElementById('kh7dSpan');
+const kh15dSpan = document.getElementById('kh15dSpan');
 
-    currentUser = json.data; // mesma global usada no main
+const testModeToggle = document.getElementById('testModeToggle');
+const testNowBtn     = document.getElementById('testNowBtn');
 
-    console.log('[Dosing] Iniciando dashboard...');
 
-    // 2) fluxo normal da dosadora
-    await loadDevices();
-    setupEventListeners();
-    setupTabs();
-    startPolling();
-  } catch (err) {
-    console.error('[Dosing] Erro na inicialização:', err);
-    redirectToLogin();
+const testNowProgressWrapper = document.getElementById('testNowProgressWrapper');
+const testNowProgressFill   = document.getElementById('testNowProgressFill');
+const testNowProgressLabel  = document.getElementById('testNowProgressLabel');
+const abortArea             = document.getElementById('abortArea');
+const abortBtn              = document.getElementById('abortBtn');
+const abortStatusText       = document.getElementById('abortStatusText');
+
+
+
+const doseVolumeInput   = document.getElementById('doseVolumeInput');
+const pump4RateSpan     = document.getElementById('pump4RateSpan');
+const applyDoseBtn      = document.getElementById('applyDoseBtn');
+
+const doseProgressWrapper = document.getElementById('doseProgressWrapper');
+const doseProgressFill    = document.getElementById('doseProgressFill');
+const doseProgressLabel   = document.getElementById('doseProgressLabel');
+
+const pump4CalibBtn            = document.getElementById('pump4CalibBtn');
+const pump4CalibProgressWrapper = document.getElementById('pump4CalibProgressWrapper');
+const pump4CalibProgressFill    = document.getElementById('pump4CalibProgressFill');
+const pump4CalibProgressLabel   = document.getElementById('pump4CalibProgressLabel');
+
+let pump4CalibTimerId = null;
+let pump4CalibEndTime = null;
+
+let pump4MlPerSec   = null;  // virá da API futuramente
+let isRunningDose   = false;
+let doseStartedAt   = null;
+let doseTotalMs     = 0;
+let doseTimerId     = null;
+
+
+let isRunningTestNow = false;
+let testNowStartedAt = null;
+let testNowTotalMs   = 8 * 60 * 1000; // 8 minutos
+let testNowStep      = 0;
+let testNowTimerId   = null;
+
+let currentKhTarget = null;
+
+
+function updateTestNowProgress() {
+  if (!isRunningTestNow || !testNowStartedAt || !testNowProgressFill) return;
+
+  const elapsed = Date.now() - testNowStartedAt;
+  const stepDuration = testNowTotalMs / 5;
+  let step = Math.floor(elapsed / stepDuration) + 1;
+  if (step < 1) step = 1;
+  if (step > 5) step = 5;
+
+  testNowStep = step;
+
+  const percent = step * 20; // 5 etapas => 20% cada
+  testNowProgressFill.style.width = `${percent}%`;
+
+  if (testNowProgressLabel) {
+    testNowProgressLabel.textContent = `Teste em andamento — etapa ${step} de 5`;
   }
-});
 
-
-
-// ===== POLLING (como JoyReef) =====
-function startPolling() {
-  console.log('[Dosing] Iniciando polling de status...');
-  pollIntervalId = setInterval(async () => {
-    if (selectedDeviceId) {
-      await loadDeviceStatus(selectedDeviceId);
-    }
-  }, POLL_INTERVAL);
+  if (elapsed >= testNowTotalMs) {
+    // terminou tempo estimado
+    stopTestNowProgress(false);
+  }
 }
 
-function stopPolling() {
-  if (pollIntervalId) {
-    clearInterval(pollIntervalId);
-    pollIntervalId = null;
+function startTestNowProgress() {
+  if (!testNowProgressWrapper) return;
+
+  isRunningTestNow = true;
+  testNowStartedAt = Date.now();
+  testNowStep = 1;
+
+  testNowProgressFill.style.width = '20%';
+  testNowProgressLabel.textContent = 'Teste em andamento — etapa 1 de 5';
+
+  testNowProgressWrapper.style.display = 'block';
+  abortArea.style.display = 'block';
+  abortStatusText.innerHTML = '&nbsp;';
+
+  if (testNowTimerId) clearInterval(testNowTimerId);
+  testNowTimerId = setInterval(updateTestNowProgress, 1000);
+}
+
+function stopTestNowProgress(wasAborted) {
+  isRunningTestNow = false;
+  testNowStartedAt = null;
+  testNowStep = 0;
+
+  if (testNowTimerId) {
+    clearInterval(testNowTimerId);
+    testNowTimerId = null;
+  }
+
+  if (testNowProgressWrapper) {
+    testNowProgressWrapper.style.display = 'none';
+    testNowProgressFill.style.width = '0%';
+    testNowProgressLabel.textContent = wasAborted
+      ? 'Teste cancelado'
+      : 'Teste concluído';
+  }
+
+  if (abortArea) {
+    abortArea.style.display = 'none';
+  }
+
+  if (abortStatusText) {
+    abortStatusText.textContent = wasAborted
+      ? 'Cancelado pelo usuário.'
+      : '';
   }
 }
 
-// ===== TABS =====
-function setupTabs() {
-  document.querySelectorAll('[data-tab]').forEach(tab => {
-    tab.addEventListener('click', (e) => {
-      const target = e.target.dataset.tab;
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      document.getElementById(target).classList.remove('hidden');
-    });
+function updateDoseProgress() {
+  if (!isRunningDose || !doseStartedAt || !doseProgressFill || doseTotalMs <= 0) return;
+
+  const elapsed = Date.now() - doseStartedAt;
+  let fraction = elapsed / doseTotalMs;
+  if (fraction < 0) fraction = 0;
+  if (fraction > 1) fraction = 1;
+
+  const percent = Math.round(fraction * 100);
+  doseProgressFill.style.width = `${percent}%`;
+
+  if (doseProgressLabel) {
+    doseProgressLabel.textContent = `Dose em andamento — ${percent}%`;
+  }
+
+  if (elapsed >= doseTotalMs) {
+    stopDoseProgress(false);
+  }
+}
+
+function startDoseProgress(totalMs) {
+  if (!doseProgressWrapper || !totalMs || totalMs <= 0) return;
+
+  isRunningDose = true;
+  doseStartedAt = Date.now();
+  doseTotalMs   = totalMs;
+
+  doseProgressFill.style.width = '0%';
+  doseProgressLabel.textContent = 'Dose em andamento...';
+
+  doseProgressWrapper.style.display = 'block';
+  abortArea.style.display = 'block';
+  abortStatusText.innerHTML = '&nbsp;';
+
+  if (doseTimerId) clearInterval(doseTimerId);
+  doseTimerId = setInterval(updateDoseProgress, 500);
+}
+
+function stopDoseProgress(wasAborted) {
+  isRunningDose = false;
+  doseStartedAt = null;
+  doseTotalMs   = 0;
+
+  if (doseTimerId) {
+    clearInterval(doseTimerId);
+    doseTimerId = null;
+  }
+
+  if (doseProgressWrapper) {
+    doseProgressWrapper.style.display = 'none';
+    doseProgressFill.style.width = '0%';
+    doseProgressLabel.textContent = wasAborted
+      ? 'Dose cancelada'
+      : 'Dose concluída';
+  }
+}
+
+function updatePump4CalibProgress() {
+  if (!pump4CalibEndTime || !pump4CalibProgressFill) return;
+
+  const now = Date.now();
+  const totalMs = 60 * 1000; // 60s fixos
+  const remainingMs = pump4CalibEndTime - now;
+  const clamped = Math.max(0, Math.min(totalMs, remainingMs));
+  const fraction = 1 - clamped / totalMs;
+  const percent = Math.round(fraction * 100);
+
+  pump4CalibProgressFill.style.width = `${percent}%`;
+
+  if (pump4CalibProgressLabel) {
+    const remainingSec = Math.ceil(clamped / 1000);
+    pump4CalibProgressLabel.textContent =
+      remainingMs > 0
+        ? `Calibração em andamento... ${remainingSec}s`
+        : 'Calibração concluída. Informe o volume medido abaixo.';
+  }
+
+  if (remainingMs <= 0 && pump4CalibTimerId) {
+    clearInterval(pump4CalibTimerId);
+    pump4CalibTimerId = null;
+  }
+}
+
+function startPump4CalibProgress() {
+  if (!pump4CalibProgressWrapper) return;
+
+  pump4CalibEndTime = Date.now() + 60 * 1000; // 60s
+  pump4CalibProgressWrapper.style.display = 'block';
+  pump4CalibProgressFill.style.width = '0%';
+  pump4CalibProgressLabel.textContent =
+    'Calibração em andamento... 60s';
+
+  if (pump4CalibTimerId) clearInterval(pump4CalibTimerId);
+  pump4CalibTimerId = setInterval(updatePump4CalibProgress, 500);
+}
+
+
+function applyTestModeUI(testModeEnabled) {
+  if (!testModeToggle || !testNowBtn) return;
+  testModeToggle.checked = !!testModeEnabled;
+  testNowBtn.disabled = !testModeEnabled;
+}
+
+// Utilitário simples de data/hora
+function formatDateTime(ms) {
+  if (!ms) return '--';
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return '--';
+  return d.toLocaleString(undefined, {
+    dateStyle: 'short',
+    timeStyle: 'short',
   });
 }
 
-// ===== DEVICES =====
-async function loadDevices() {
-  try {
-    showLoading('devices-list');
-    const res = await apiCall(`${DOSING_API}/devices`);
-    devices = res.data || [];
-    
-    const container = document.getElementById('devices-list');
-    container.innerHTML = '';
-    
-    if (devices.length === 0) {
-      container.innerHTML = `
-        <div class="alert alert-info">
-          📌 Nenhum device dosadora registrado
-        </div>
-      `;
-      return;
+// Estatísticas de KH
+function computeStats(measures) {
+  if (!measures || !measures.length) return null;
+
+  const khs = measures
+    .map((m) => m.kh)
+    .filter((k) => typeof k === 'number');
+
+  if (!khs.length) return null;
+
+  const last = khs[0];
+  const prev = khs[1] ?? null;
+
+  // desvio em relação ao alvo
+  const diff = (typeof currentKhTarget === 'number' && currentKhTarget > 0)
+    ? last - currentKhTarget
+    : 0;
+
+
+  const min = Math.min(...khs);
+  const max = Math.max(...khs);
+
+  return { last, prev, diff, min, max };
+}
+
+// Atualiza os textos e estilos do card principal de KH
+function updateKhCard(measures) {
+  const stats = computeStats(measures);
+  if (stats) {
+    khValueEl.textContent = stats.last.toFixed(2);
+
+    if (stats.prev !== null) {
+      khPrevEl.textContent = stats.prev.toFixed(2);
+      const diffText = stats.diff.toFixed(2) + ' dKH';
+      khDiffEl.textContent = diffText;
+      if (stats.diff > 0) {
+        khDiffEl.className = 'kh-diff positive';
+      } else if (stats.diff < 0) {
+        khDiffEl.className = 'kh-diff negative';
+      } else {
+        khDiffEl.className = 'kh-diff muted';
+      }
+    } else {
+      khPrevEl.textContent = '--';
+      khDiffEl.textContent = '0.00 dKH';
+      khDiffEl.className = 'kh-diff muted';
     }
-    
-    devices.forEach(device => {
-      const statusClass = device.online ? 'status-online' : 'status-offline';
-      const statusText = device.online ? '🟢 Online' : '🔴 Offline';
-      const timeSinceLastSeen = formatTime(device.last_seen);
-      
-      const card = document.createElement('div');
-      card.className = `device-card ${statusClass}`;
-      card.innerHTML = `
-        <div class="device-header">
-          <h3>${device.name}</h3>
-          <span class="status-badge ${statusClass}">${statusText}</span>
-        </div>
-        
-        <div class="device-info">
-          <p><strong>ESP UID:</strong> <code>${device.esp_uid}</code></p>
-          <p><strong>Hardware:</strong> ${device.hw_type} | <strong>FW:</strong> ${device.firmware_version || 'N/A'}</p>
-          <p><strong>Bombas:</strong> ${device.pump_count} | <strong>Alertas pendentes:</strong> ${device.alert_count}</p>
-          <p><strong>Último contato:</strong> ${timeSinceLastSeen}</p>
-          ${device.last_ip ? `<p><strong>IP:</strong> ${device.last_ip}</p>` : ''}
-        </div>
-        
-        <div class="device-actions">
-          <button class="btn btn-primary" onclick="selectDevice(${device.id})">
-            Gerenciar
-          </button>
-          <button class="btn btn-secondary" onclick="deleteDevice(${device.id})">
-            Remover
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-  } catch (err) {
-    showError('devices-list', `Erro ao carregar devices: ${err.message}`);
+
+    khMinEl.textContent = stats.min.toFixed(2);
+    khMaxEl.textContent = stats.max.toFixed(2);
+  } else {
+    khValueEl.textContent = '--';
+    khPrevEl.textContent = '--';
+    khDiffEl.textContent = 'Sem dados';
+    khDiffEl.className = 'kh-diff muted';
+    khMinEl.textContent = '--';
+    khMaxEl.textContent = '--';
   }
 }
 
-async function selectDevice(deviceId) {
-  selectedDeviceId = deviceId;
-  selectedPumpId = null;
-  
-  // Navegar para primeira aba visível
-  const firstTab = document.querySelector('[data-tab]');
-  if (firstTab) firstTab.click();
-  
-  // Carregar dados do device
-  await loadPumps(deviceId);
-  await loadDeviceStatus(deviceId);
-}
-
-async function loadDeviceStatus(deviceId) {
-  try {
-    const res = await apiCall(`${DOSING_API}/devices`);
-    const device = res.data?.find(d => d.id === deviceId);
-    
-    if (device) {
-      lastStatusUpdate[deviceId] = {
-        online: device.online,
-        lastSeen: device.last_seen,
-        timestamp: Date.now()
-      };
-      
-      // Atualizar UI de status do device selecionado
-      updateDeviceStatusUI(device);
-    }
-  } catch (err) {
-    console.error('[Dosing] Erro ao carregar status:', err);
-  }
-}
-
-function updateDeviceStatusUI(device) {
-  const header = document.querySelector('.device-status-header');
-  if (!header) return;
-  
-  const statusClass = device.online ? 'status-online' : 'status-offline';
-  const statusText = device.online ? '🟢 Online' : '🔴 Offline';
-  
-  header.innerHTML = `
-    <h2>${device.name}</h2>
-    <span class="status-badge ${statusClass}">${statusText}</span>
-  `;
-}
-
-async function deleteDevice(deviceId) {
-  if (!confirm('Tem certeza? Isso vai deletar todas as bombas e agendas.')) return;
-  
-  try {
-    await apiCall(`${DOSING_API}/devices/${deviceId}`, 'DELETE');
-    showSuccess('Dosadora removida!');
-    await loadDevices();
-  } catch (err) {
-    showError('Erro ao remover device:', err.message);
-  }
-}
-
-// ===== PUMPS =====
-async function loadPumps(deviceId) {
-  try {
-    showLoading('pumps-list');
-    const res = await apiCall(`${DOSING_API}/pumps?deviceId=${deviceId}`);
-    pumps = res.data || [];
-    
-    const container = document.getElementById('pumps-list');
-    container.innerHTML = '';
-    
-    if (pumps.length === 0) {
-      container.innerHTML = `
-        <div class="alert alert-info">
-          Nenhuma bomba configurada para este device
-        </div>
-      `;
-      return;
-    }
-    
-    pumps.forEach(pump => {
-      const percentage = (pump.current_volume_ml / pump.container_volume_ml * 100).toFixed(1);
-      const isLow = percentage < 30;
-      const pumpCard = createPumpCard(pump, percentage, isLow);
-      container.appendChild(pumpCard);
-    });
-  } catch (err) {
-    showError('pumps-list', `Erro ao carregar bombas: ${err.message}`);
-  }
-}
-
-function createPumpCard(pump, percentage, isLow) {
-  const card = document.createElement('div');
-  card.className = `pump-card ${isLow ? 'pump-low' : ''}`;
-  
-  const progressColor = percentage < 20 ? '#ff4444' : percentage < 50 ? '#ffaa00' : '#00cc44';
-  
-  card.innerHTML = `
-    <div class="pump-header">
-      <h4>${pump.name} (Índice: ${pump.index_on_device})</h4>
-      <span class="pump-status ${pump.enabled ? 'enabled' : 'disabled'}">
-        ${pump.enabled ? '✓ Ativa' : '✗ Inativa'}
-      </span>
-    </div>
-    
-    <div class="pump-volume">
-      <div class="volume-bar">
-        <div class="volume-fill" style="width: ${percentage}%; background: ${progressColor};"></div>
-      </div>
-      <p class="volume-text">${pump.current_volume_ml}mL / ${pump.container_volume_ml}mL (${percentage}%)</p>
-    </div>
-    
-    <div class="pump-info">
-      <p><strong>Taxa calibração:</strong> ${pump.calibration_rate_ml_s.toFixed(2)} mL/s</p>
-      <p><strong>Máx diário:</strong> ${pump.max_daily_ml} mL</p>
-    </div>
-    
-    <div class="pump-actions">
-      <button class="btn btn-small btn-primary" onclick="openDoseDialog(${pump.id}, '${pump.name}')">
-        💧 Dosar
-      </button>
-      <button class="btn btn-small btn-secondary" onclick="openPumpSettings(${pump.id})">
-        ⚙️ Editar
-      </button>
-    </div>
-  `;
-  
-  return card;
-}
-
-// ===== DOSE MANUAL (com fila offline) =====
-function openDoseDialog(pumpId, pumpName) {
-  const input = prompt(`Volume a dosar em ${pumpName} (mL):`);
-  if (!input) return;
-  
-  const volumeML = parseFloat(input);
-  if (isNaN(volumeML) || volumeML <= 0) {
-    showError('Volume inválido');
+function formatMetricWindow(labelEl, metric, khTarget) {
+  if (!metric) {
+    labelEl.textContent = '--';
+    labelEl.className = 'kh-window neutral';
     return;
   }
-  
-  queueDoseCommand(pumpId, volumeML, pumpName);
-}
 
-async function queueDoseCommand(pumpId, volumeML, pumpName) {
-  const command = {
-    id: `cmd_${Date.now()}`,
-    pumpId,
-    volumeML,
-    pumpName,
-    timestamp: Date.now(),
-    status: 'QUEUED',
-    attempts: 0
-  };
-  
-  // Adicionar à fila local
-  let queue = JSON.parse(localStorage.getItem(COMMAND_QUEUE_KEY) || '[]');
-  queue.push(command);
-  localStorage.setItem(COMMAND_QUEUE_KEY, JSON.stringify(queue));
-  
-  console.log('[Dosing] Comando enfileirado:', command);
-  showSuccess(`Dose enfileirada: ${volumeML}mL em ${pumpName}`);
-  
-  // Se device está online, tentar executar imediatamente
-  if (selectedDeviceId && lastStatusUpdate[selectedDeviceId]?.online) {
-    await processCommandQueue();
+  const maxPos = metric.maxPositiveDeviation;
+  const maxNeg = metric.maxNegativeDeviation;
+
+  // maior desvio absoluto
+  const worst = Math.abs(maxPos) >= Math.abs(maxNeg) ? maxPos : maxNeg;
+
+  labelEl.textContent = `${worst >= 0 ? '+' : ''}${worst.toFixed(2)} dKH`;
+
+  if (Math.abs(worst) <= 0.2) {
+    labelEl.className = 'kh-window ok';
+  } else if (Math.abs(worst) <= 0.5) {
+    labelEl.className = 'kh-window warn';
+  } else {
+    labelEl.className = 'kh-window alert';
   }
 }
 
-async function processCommandQueue() {
-  let queue = JSON.parse(localStorage.getItem(COMMAND_QUEUE_KEY) || '[]');
-  const pending = queue.filter(c => c.status === 'QUEUED');
-  
-  for (const cmd of pending) {
+
+function updateStatusFromKh(kh, khTarget) {
+  if (typeof kh !== 'number' || typeof khTarget !== 'number' || khTarget <= 0) {
+    statusPhEl.textContent = '--';
+    statusPhEl.className = 'status-badge off';
+    return;
+  }
+
+  const delta = Math.abs(kh - khTarget);
+
+  const greenMax  = typeof khHealthGreenMaxDev  === 'number' && khHealthGreenMaxDev  > 0
+    ? khHealthGreenMaxDev
+    : 0.2;
+  const yellowMax = typeof khHealthYellowMaxDev === 'number' && khHealthYellowMaxDev > 0
+    ? khHealthYellowMaxDev
+    : 0.5;
+
+  // 1) Número de saúde: % do alvo, simétrico
+  let pct = 100 - (Math.abs(kh - khTarget) / khTarget) * 100;
+  if (pct < 0) pct = 0;
+  if (pct > 100) pct = 100;
+  const intPct = Math.round(pct);
+  statusPhEl.textContent = `${intPct}%`;
+
+  // 2) Cor continua baseada no desvio absoluto
+  if (delta <= greenMax) {
+    statusPhEl.className = 'status-badge good';
+  } else if (delta <= yellowMax) {
+    statusPhEl.className = 'status-badge warn';
+  } else {
+    statusPhEl.className = 'status-badge bad';
+  }
+}
+
+const khBufferCard = document.getElementById('khBufferCard'); // div do card
+
+if (khBufferCard) {
+  khBufferCard.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    const newState = !khAutoEnabled;
     try {
-      const res = await apiCall(`${DOSING_API}/pumps/${cmd.pumpId}/dose`, 'POST', {
-        volume_ml: cmd.volumeML
-      });
-      
-      if (res.success) {
-        cmd.status = 'SENT';
-        cmd.timestamp = Date.now();
-        console.log('[Dosing] Dose enviada:', cmd);
+      const res = await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ khAutoEnabled: newState }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) return;
+
+      khAutoEnabled = newState;
+      if (statusBufferEl) {
+        statusBufferEl.textContent = khAutoEnabled ? 'ON' : 'OFF';
+        statusBufferEl.className = khAutoEnabled
+          ? 'status-badge on'
+          : 'status-badge off';
       }
     } catch (err) {
-      cmd.attempts++;
-      if (cmd.attempts > 3) {
-        cmd.status = 'FAILED';
-        console.error('[Dosing] Dose falhou após 3 tentativas:', cmd);
-      }
+      console.error('toggle khAutoEnabled error', err);
     }
-  }
-  
-  localStorage.setItem(COMMAND_QUEUE_KEY, JSON.stringify(queue));
+  });
 }
 
-// ===== AGENDAS =====
-async function loadSchedules(pumpId) {
-  try {
-    showLoading('schedules-list');
-    const res = await apiCall(`${DOSING_API}/schedules?pumpId=${pumpId}`);
-    schedules = res.data || [];
-    
-    const container = document.getElementById('schedules-list');
-    container.innerHTML = '';
-    
-    if (schedules.length === 0) {
-      container.innerHTML = `
-        <div class="alert alert-info">
-          Nenhuma agenda para esta bomba
-        </div>
-      `;
-      return;
-    }
-    
-    schedules.forEach(schedule => {
-      const card = document.createElement('div');
-      card.className = 'schedule-card';
-      card.innerHTML = `
-        <div class="schedule-header">
-          <h4>${schedule.doses_per_day} dose(s) por dia</h4>
-          <span class="schedule-status ${schedule.enabled ? 'enabled' : 'disabled'}">
-            ${schedule.enabled ? '✓ Ativa' : '✗ Inativa'}
-          </span>
-        </div>
-        
-        <div class="schedule-info">
-          <p><strong>Horários:</strong> ${schedule.start_time} - ${schedule.end_time}</p>
-          <p><strong>Volume total:</strong> ${schedule.volume_per_day_ml} mL</p>
-          <p><strong>Dias:</strong> ${formatDaysMask(schedule.days_mask)}</p>
-        </div>
-        
-        <div class="schedule-actions">
-          <button class="btn btn-small btn-secondary" onclick="editSchedule(${schedule.id})">
-            ✏️ Editar
-          </button>
-          <button class="btn btn-small btn-danger" onclick="deleteSchedule(${schedule.id})">
-            🗑️ Remover
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
-  } catch (err) {
-    showError('schedules-list', `Erro ao carregar agendas: ${err.message}`);
-  }
-}
 
-// ===== HELPERS =====
-function setupEventListeners() {
-  // Criar bomba
-  const createPumpBtn = document.getElementById('create-pump-btn');
-  if (createPumpBtn) {
-    createPumpBtn.addEventListener('click', async () => {
-      if (!selectedDeviceId) {
-        showError('Selecione um device primeiro');
-        return;
-      }
-      await showCreatePumpDialog(selectedDeviceId);
-    });
-  }
-  
-  // Criar agenda
-  const createScheduleBtn = document.getElementById('create-schedule-btn');
-  if (createScheduleBtn) {
-    createScheduleBtn.addEventListener('click', async () => {
-      if (!selectedPumpId) {
-        showError('Selecione uma bomba primeiro');
-        return;
-      }
-      await showCreateScheduleDialog(selectedPumpId);
-    });
-  }
-}
+// Popular tabela de medições e campos de horário
+function updateMeasurementsView(measures) {
+  measurementsBody.innerHTML = '';
 
-async function showCreatePumpDialog(deviceId) {
-  const name = prompt('Nome da bomba:');
-  if (!name) return;
-  
-  const indexStr = prompt('Índice na ESP (0-3):');
-  const index = parseInt(indexStr);
-  if (isNaN(index) || index < 0 || index > 3) {
-    showError('Índice inválido');
+  if (!measures || !measures.length) {
+    lastCountInfo.textContent = 'Nenhum dado de medição';
+    lastMeasureTimeEl.textContent = 'Nenhum teste realizado ainda';
+    nextMeasureTimeEl.textContent = '--';
+    updateKhCard([]);
+    updateStatusFromKh(undefined, currentKhTarget);
     return;
   }
-  
-  const containerVolume = prompt('Volume do recipiente (mL):', '500');
-  if (!containerVolume) return;
-  
-  try {
-    await apiCall(`${DOSING_API}/pumps`, 'POST', {
-      device_id: deviceId,
-      name,
-      index_on_device: index,
-      container_volume_ml: parseFloat(containerVolume),
-      calibration_rate_ml_s: 1.0,
-      alarm_threshold_pct: 10,
-      max_daily_ml: 1000
-    });
-    
-    showSuccess('Bomba criada!');
-    await loadPumps(deviceId);
-  } catch (err) {
-    showError('Erro ao criar bomba:', err.message);
-  }
-}
 
-async function showCreateScheduleDialog(pumpId) {
-  // Simplificado: usar formulário modal em HTML depois
-  // Por agora, um prompt simples
-  const dosesPerDay = prompt('Doses por dia:');
-  if (!dosesPerDay) return;
-  
-  const startTime = prompt('Horário início (HH:MM):', '08:00');
-  const endTime = prompt('Horário fim (HH:MM):', '20:00');
-  const volumePerDay = prompt('Volume total diário (mL):', '100');
-  
-  try {
-    await apiCall(`${DOSING_API}/schedules`, 'POST', {
-      pump_id: pumpId,
-      enabled: 1,
-      days_mask: 127, // Todos os dias
-      doses_per_day: parseInt(dosesPerDay),
-      start_time: startTime,
-      end_time: endTime,
-      volume_per_day_ml: parseFloat(volumePerDay)
-    });
-    
-    showSuccess('Agenda criada!');
-    await loadSchedules(pumpId);
-  } catch (err) {
-    showError('Erro ao criar agenda:', err.message);
-  }
-}
+  lastCountInfo.textContent = `${measures.length} registros recentes`;
 
-async function deleteSchedule(scheduleId) {
-  if (!confirm('Remover agenda?')) return;
-  
-  try {
-    await apiCall(`${DOSING_API}/schedules/${scheduleId}`, 'DELETE');
-    showSuccess('Agenda removida!');
-    if (selectedPumpId) {
-      await loadSchedules(selectedPumpId);
+  // Tabela (continua mostrando até 30 registros mais recentes)
+  measures.slice(0, 30).forEach((m) => {
+    const tr = document.createElement('tr');
+
+    const tempText =
+      typeof m.temperature === 'number'
+        ? m.temperature.toFixed(1)
+        : (m.temperature ?? '--');
+
+    const khValue =
+      typeof m.kh === 'number'
+        ? m.kh
+        : (m.kh != null ? Number(m.kh) : null);
+
+    let arrow = '';
+    let trendClass = 'kh-trend equal';
+
+    if (
+      khValue != null &&
+      !Number.isNaN(khValue) &&
+      currentKhTarget != null &&
+      !Number.isNaN(currentKhTarget)
+    ) {
+      if (khValue > currentKhTarget + 0.01) {
+        arrow = '▲';
+        trendClass = 'kh-trend up';
+      } else if (khValue < currentKhTarget - 0.01) {
+        arrow = '▼';
+        trendClass = 'kh-trend down';
+      } else {
+        arrow = '◆';
+        trendClass = 'kh-trend equal';
+      }
     }
-  } catch (err) {
-    showError('Erro ao remover agenda:', err.message);
-  }
-}
 
-function formatDaysMask(mask) {
-  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-  const selected = [];
-  for (let i = 0; i < 7; i++) {
-    if (mask & (1 << i)) {
-      selected.push(days[i]);
-    }
-  }
-  return selected.length === 7 ? 'Todos os dias' : selected.join(', ');
-}
+    tr.innerHTML = `
+      <td>${formatDateTime(m.timestamp)}</td>
+      <td class="${trendClass}">${arrow}</td>
+      <td>${
+        khValue != null && !Number.isNaN(khValue)
+          ? khValue.toFixed(2)
+          : (m.kh ?? '--')
+      }</td>
+      <td>${m.phref ?? '--'}</td>
+      <td>${m.phsample ?? '--'}</td>
+      <td>${tempText}</td>
+      <td>${m.status ?? '--'}</td>
+    `;
 
-function formatTime(timestamp) {
-  if (!timestamp) return 'Nunca';
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = (now - date) / 1000; // segundos
-  
-  if (diff < 60) return 'Agora';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m atrás`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
-  return `${Math.floor(diff / 86400)}d atrás`;
-}
+    measurementsBody.appendChild(tr);
+  });
 
-// ===== API CALLS COM TRATAMENTO DE ERRO =====
-async function apiCall(url, method = 'GET', body = null) {
-  const options = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
+  // -------- Janela de 24h para min/máx e desvio --------
+  const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
+  const measures24h = measures.filter((m) => {
+    const ts =
+      typeof m.timestamp === 'number'
+        ? m.timestamp
+        : Date.parse(m.timestamp);
+    return ts && (now - ts) <= DAY_MS;
+  });
 
-  const res = await apiFetch(url, options);  // mesmo helper de main/config
+  // Usa 24h se tiver dado, senão cai para o conjunto completo
+  const windowMeasures = measures24h.length ? measures24h : measures;
 
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(errData.error || `HTTP ${res.status}`);
-  }
+  // Atualiza card principal (valor atual, anterior, desvio, min/max)
+  updateKhCard(windowMeasures);
 
-  return res.json();
-}
+  // Horários (última medição continua sendo a mais recente da lista completa)
+  const lastTs = measures[0].timestamp;
+  lastMeasureTimeEl.textContent = lastTs
+    ? formatDateTime(lastTs)
+    : 'Nenhum teste realizado ainda';
 
-
-// ===== UI HELPERS =====
-function showLoading(elementId) {
-  const el = document.getElementById(elementId);
-  if (el) el.innerHTML = '<p>⏳ Carregando...</p>';
-}
-
-function showError(elementId, message) {
-  const el = document.getElementById(elementId);
-  if (el) {
-    el.innerHTML = `<div class="alert alert-danger">${message}</div>`;
+  // Estimativa simples: +1h a partir do último TS, se houver
+  if (lastTs) {
+    const nextTs = lastTs + 60 * 60 * 1000;
+    nextMeasureTimeEl.textContent = formatDateTime(nextTs);
   } else {
-    alert(`Erro: ${message}`);
+    nextMeasureTimeEl.textContent = '--';
+  }
+
+  // Calibração ainda será plugada por API futura
+  calibrationDateEl.textContent = '--';
+
+  // Status (100%, amarelo, vermelho) também baseado na janela 24h
+  const stats = computeStats(windowMeasures);
+  if (
+    stats &&
+    typeof stats.last === 'number' &&
+    typeof currentKhTarget === 'number'
+  ) {
+    updateStatusFromKh(stats.last, currentKhTarget);
+  } else {
+    updateStatusFromKh(undefined, currentKhTarget);
   }
 }
 
-function showSuccess(message) {
-  const toast = document.createElement('div');
-  toast.className = 'toast toast-success';
-  toast.textContent = `✓ ${message}`;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => toast.remove(), 3000);
+
+
+// Carrega medições para o device atualmente selecionado no topo
+async function loadMeasurementsForSelected() {
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (!deviceId) {
+    lastCountInfo.textContent = 'Nenhum dispositivo associado';
+    updateMeasurementsView([]);
+    return;
+  }
+
+  try {
+
+    // 1) Primeiro carrega KH target/config
+    await loadKhInfo(deviceId);
+
+    // 2) Depois metrics (se quiser manter aqui)
+    await loadKhMetrics(deviceId);
+
+    // 3) Por fim, medições (vai usar currentKhTarget já setado)
+    
+    const res = await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/measurements`, {
+    });
+
+    const json = await res.json();
+    if (!json.success) {
+      console.error(json.message || 'Erro ao buscar medições');
+      lastCountInfo.textContent = 'Erro ao carregar medições';
+      updateMeasurementsView([]);
+      return;
+    }
+
+    const measures = json.data || [];
+    updateMeasurementsView(measures);
+  } catch (err) {
+    console.error('loadMeasurementsForSelected error', err);
+    lastCountInfo.textContent = 'Erro de comunicação ao carregar medições';
+    updateMeasurementsView([]);
+  }
 }
 
-// ===== CLEANUP =====
-window.addEventListener('beforeunload', () => {
-  stopPolling();
+async function loadKhMetrics(deviceId) {
+  try {
+    const resp = await apiFetch(`/api/v1/user/devices/${deviceId}/kh-metrics`, {
+    });
+    if (!resp.ok) {
+      console.error('Erro ao buscar KH metrics', await resp.text());
+      return;
+    }
+    const json = await resp.json();
+    if (!json.success) {
+      console.error('KH metrics falhou', json.message);
+      return;
+    }
+
+    let { khTarget, metrics } = json.data || {};
+
+    // garante número
+    if (khTarget != null) {
+      khTarget = typeof khTarget === 'number' ? khTarget : parseFloat(khTarget);
+      if (Number.isNaN(khTarget)) khTarget = null;
+    }
+
+    if (khTargetSpan) {
+      khTargetSpan.textContent = khTarget != null ? khTarget.toFixed(2) : '--';
+    }
+
+    formatMetricWindow(kh24hSpan, metrics['24h'], khTarget);
+    formatMetricWindow(kh3dSpan, metrics['3d'], khTarget);
+    formatMetricWindow(kh7dSpan, metrics['7d'], khTarget);
+    formatMetricWindow(kh15dSpan, metrics['15d'], khTarget);
+  } catch (err) {
+    console.error('loadKhMetrics error', err);
+  }
+}
+
+
+let khHealthGreenMaxDev = null;
+let khHealthYellowMaxDev = null;
+let khAutoEnabled = false;
+
+
+async function loadKhInfo(deviceId) {
+  try {
+    const resp = await apiFetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
+       );
+
+    const json = await resp.json();
+    if (!resp.ok || !json.success) {
+      console.error('Erro ao carregar KH config na tela principal', json.message || json.error);
+      return;
+    }
+
+    const data = json.data || {};
+
+    if (DashboardCommon && typeof DashboardCommon.setLcdStatus === 'function') {
+      DashboardCommon.setLcdStatus(data.lcdStatus);
+    }
+
+    const khTarget = typeof data.khTarget === 'number'
+      ? data.khTarget
+      : (data.khTarget != null ? parseFloat(data.khTarget) : null);
+    const khReference = typeof data.khReference === 'number'
+      ? data.khReference
+      : (data.khReference != null ? parseFloat(data.khReference) : null);
+
+    khHealthGreenMaxDev = typeof data.khHealthGreenMaxDev === 'number'
+      ? data.khHealthGreenMaxDev
+      : (data.khHealthGreenMaxDev != null ? parseFloat(data.khHealthGreenMaxDev) : null);
+
+    khHealthYellowMaxDev = typeof data.khHealthYellowMaxDev === 'number'
+      ? data.khHealthYellowMaxDev
+      : (data.khHealthYellowMaxDev != null ? parseFloat(data.khHealthYellowMaxDev) : null);
+
+    khAutoEnabled = !!data.khAutoEnabled;
+
+    // atualizar visual do card KH Buffer
+    if (statusBufferEl) {
+      statusBufferEl.textContent = khAutoEnabled ? 'ON' : 'OFF';
+      statusBufferEl.className = khAutoEnabled
+        ? 'status-badge on'
+        : 'status-badge off';
+    }
+
+    if (typeof data.pump4MlPerSec === 'number') {
+      pump4MlPerSec = data.pump4MlPerSec;
+    } else if (data.pump4MlPerSec != null) {
+      const v = parseFloat(data.pump4MlPerSec);
+      pump4MlPerSec = Number.isNaN(v) ? null : v;
+    } else {
+      pump4MlPerSec = null;
+    }
+
+    if (pump4RateSpan) {
+      pump4RateSpan.textContent =
+        pump4MlPerSec != null
+          ? `${pump4MlPerSec.toFixed(2)} mL/s`
+          : '-- mL/s';
+    }
+    
+
+    currentKhTarget = (khTarget != null && !Number.isNaN(khTarget))
+      ? khTarget
+      : null;
+
+    if (khTargetSpan) {
+      khTargetSpan.textContent =
+        khTarget != null && !Number.isNaN(khTarget)
+          ? khTarget.toFixed(2)
+          : '--';
+    }
+    if (khRefSpan) {
+      khRefSpan.textContent =
+        khReference != null && !Number.isNaN(khReference)
+          ? `ref: ${khReference.toFixed(2)}`
+          : 'ref: --';
+    }
+  } catch (err) {
+    console.error('loadKhInfo error', err);
+  }
+}
+
+
+if (testModeToggle) {
+  testModeToggle.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    try {
+      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/test-mode`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      });
+      applyTestModeUI(enabled);
+    } catch (err) {
+      console.error('test_mode error', err);
+    }
+  });
+}
+
+if (testNowBtn) {
+  testNowBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    try {
+      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'testnow' }),
+      });
+
+      // inicia barra de 5 etapas
+      startTestNowProgress();
+
+      await loadMeasurementsForSelected();
+    } catch (err) {
+      console.error('testnow command error', err);
+    }
+  });
+}
+
+
+if (applyDoseBtn) {
+  applyDoseBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    const volumeStr = doseVolumeInput ? doseVolumeInput.value : '';
+    const volume = parseFloat(volumeStr);
+    if (!volume || Number.isNaN(volume) || volume <= 0) {
+      alert('Informe um volume válido em mL.');
+      return;
+    }
+
+    const effectivePump4 =
+      pump4MlPerSec && pump4MlPerSec > 0 ? pump4MlPerSec : 0.8;
+    const seconds = volume / effectivePump4;
+    const totalMs = seconds * 1000;
+
+    try {
+      await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'khcorrection',
+            value: volume, // <<< AQUI, não params
+          }),
+        }
+      );
+
+      startDoseProgress(totalMs);
+    } catch (err) {
+      console.error('khcorrection command error', err);
+    }
+  });
+}
+
+
+
+if (abortBtn) {
+  abortBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    try {
+      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'abort' }),
+      });
+
+      stopTestNowProgress(true);
+      stopDoseProgress(true);
+    } catch (err) {
+      console.error('abort command error', err);
+      // em caso de erro, ainda assim paramos visualmente para não deixar a UI travada
+      stopTestNowProgress(true);
+      stopDoseProgress(true);
+    }
+  });
+}
+
+if (pump4CalibBtn) {
+  pump4CalibBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    try {
+      await apiFetch(
+        `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ type: 'pump4calibrate' }),
+        }
+      );
+
+      // Inicia barra regressiva local de 60s
+      startPump4CalibProgress();
+    } catch (err) {
+      console.error('pump4calibrate command error', err);
+    }
+  });
+}
+
+async function initDashboardMain() {
+  await DashboardCommon.initTopbar();
+
+  const dosingBtn = document.getElementById('dosingBtn');
+  if (dosingBtn) {
+    dosingBtn.addEventListener('click', () => {
+      window.location.href = 'dashboard-dosing.html';
+    });
+  }
+
+  const devs = await DashboardCommon.loadDevicesCommon(); // usa a global
+  if (!devs.length) {
+    lastCountInfo.textContent = 'Nenhum dispositivo associado';
+    updateMeasurementsView([]);
+    return;
+  }
+
+  await loadMeasurementsForSelected();
+}
+
+// Quando o DOM estiver pronto, inicializa
+document.addEventListener('DOMContentLoaded', initDashboardMain);
+
+// Reage à troca de device no topo
+window.addEventListener('deviceChanged', async () => {
+  await loadMeasurementsForSelected();
 });
+
