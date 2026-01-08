@@ -6,10 +6,12 @@
 // dosing-api-routes.js
 const express = require('express');
 const router = express.Router();
+const userRouter = express.Router();
+
 
 // Dependências injetadas pelo server.js
 let pool, mailTransporter, ALERT_FROM, sendTelegramForUser;
-let routerAuthMiddleware = (req, res, next) => next(); // default no-op
+let routerAuthMiddleware = (req, res, next) => next();
 
 function initDosingModule(deps) {
   pool = deps.pool;
@@ -18,7 +20,7 @@ function initDosingModule(deps) {
   sendTelegramForUser = deps.sendTelegramForUser;
   routerAuthMiddleware = deps.authUserMiddleware || ((req, res, next) => next());
 
-  // aplica o middleware em todas as rotas do router (prefixo /api vem do server.js)
+
   router.use('/v1/user/dosing', routerAuthMiddleware);
 }
 
@@ -110,8 +112,14 @@ async function notifyDosingAlert(userId, alertType, message) {
 router.get('/v1/user/dosing/devices', async (req, res) => {
   let conn;
   try {
-    conn = await pool.getConnection();
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
     const userId = req.user.userId;
+
+    conn = await pool.getConnection();
     
     const devices = await conn.query(
       `SELECT 
@@ -142,8 +150,15 @@ router.get('/v1/user/dosing/devices', async (req, res) => {
 router.post('/v1/user/dosing/devices', async (req, res) => {
   let conn;
   try {
-    const { name, hw_type, timezone } = req.body;
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
     const userId = req.user.userId;
+
+    const { name, hw_type, timezone } = req.body;
+
 
     if (!name || !['ESP8266', 'ESP32'].includes(hw_type)) {
       return res.status(400).json({ success: false, error: 'Invalid input' });
@@ -201,9 +216,15 @@ router.post('/v1/user/dosing/devices', async (req, res) => {
 router.put('/v1/user/dosing/devices/:id', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;    
     const { id } = req.params;
     const { name, timezone } = req.body;
-    const userId = req.user.userId;
+
 
     conn = await pool.getConnection();
     
@@ -234,8 +255,14 @@ router.put('/v1/user/dosing/devices/:id', async (req, res) => {
 router.delete('/v1/user/dosing/devices/:id', async (req, res) => {
   let conn;
   try {
-    const { id } = req.params;
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
     const userId = req.user.userId;
+
+    const { id } = req.params;
 
     conn = await pool.getConnection();
     const dev = await conn.query(
@@ -262,8 +289,14 @@ router.delete('/v1/user/dosing/devices/:id', async (req, res) => {
 router.get('/v1/user/dosing/pumps', async (req, res) => {
   let conn;
   try {
-    const { deviceId } = req.query;
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
     const userId = req.user.userId;
+
+    const { deviceId } = req.query;
 
     conn = await pool.getConnection();
     
@@ -290,11 +323,16 @@ router.get('/v1/user/dosing/pumps', async (req, res) => {
 router.post('/v1/user/dosing/pumps', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;    
     const {
       device_id, name, index_on_device, container_volume_ml, 
       alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml
     } = req.body;
-    const userId = req.user.userId;
 
     conn = await pool.getConnection();
     
@@ -330,12 +368,19 @@ router.post('/v1/user/dosing/pumps', async (req, res) => {
 router.put('/v1/user/dosing/pumps/:id', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;
+
     const { id } = req.params;
     const { 
       name, enabled, container_volume_ml, current_volume_ml, 
       alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml 
     } = req.body;
-    const userId = req.user.userId;
+
 
     conn = await pool.getConnection();
     
@@ -374,8 +419,15 @@ router.put('/v1/user/dosing/pumps/:id', async (req, res) => {
 router.get('/v1/user/dosing/schedules', async (req, res) => {
   let conn;
   try {
-    const { pumpId } = req.query;
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
     const userId = req.user.userId;
+
+
+    const { pumpId } = req.query;
+
 
     conn = await pool.getConnection();
     
@@ -401,11 +453,17 @@ router.get('/v1/user/dosing/schedules', async (req, res) => {
 router.post('/v1/user/dosing/schedules', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;
+
     const {
       pump_id, enabled, days_mask, doses_per_day, 
       start_time, end_time, volume_per_day_ml
     } = req.body;
-    const userId = req.user.userId;
 
     conn = await pool.getConnection();
     
@@ -441,9 +499,16 @@ router.post('/v1/user/dosing/schedules', async (req, res) => {
 router.put('/v1/user/dosing/schedules/:id', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;
+
     const { id } = req.params;
     const { enabled, days_mask, doses_per_day, start_time, end_time, volume_per_day_ml } = req.body;
-    const userId = req.user.userId;
+
 
     conn = await pool.getConnection();
     
@@ -479,9 +544,14 @@ router.put('/v1/user/dosing/schedules/:id', async (req, res) => {
 router.delete('/v1/user/dosing/schedules/:id', async (req, res) => {
   let conn;
   try {
-    const { id } = req.params;
-    const userId = req.user.userId;
 
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;    
+    const { id } = req.params;
+  
     conn = await pool.getConnection();
     const sched = await conn.query(
       `SELECT s.id FROM dosing_schedules s
@@ -511,9 +581,16 @@ router.delete('/v1/user/dosing/schedules/:id', async (req, res) => {
 router.post('/v1/user/dosing/pumps/:id/dose', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;
+
     const { id } = req.params;
     const { volume_ml } = req.body;
-    const userId = req.user.userId;
+
 
     if (!volume_ml || volume_ml <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid volume' });
@@ -571,9 +648,16 @@ router.post('/v1/user/dosing/pumps/:id/dose', async (req, res) => {
 router.post('/v1/user/dosing/pumps/:id/calibrate', async (req, res) => {
   let conn;
   try {
+
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] /devices sem req.user', req.user);
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;
+
     const { id } = req.params;
     const { measured_volume_ml, run_seconds } = req.body;
-    const userId = req.user.userId;
+
 
     if (!measured_volume_ml || !run_seconds || measured_volume_ml <= 0 || run_seconds <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid calibration data' });
