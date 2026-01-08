@@ -29,6 +29,8 @@ function initDosingModule(deps) {
 }
 
 
+
+
 // ===== HELPER: Validar token IoT (para ESP) =====
 async function verifyIoTToken(espUid) {
   let conn;
