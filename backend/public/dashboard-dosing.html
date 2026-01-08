@@ -381,91 +381,96 @@
   </style>
 </head>
 <body>
+  <!-- Topbar unificado (igual main) -->
   <div id="topbar-root"></div>
-  <div class="container">
-    <header>
-      <h1>🚰 ReefBlueSky - Dosadora Balling</h1>
-      <p>Gerenciador inteligente de doses automáticas com sincronização em tempo real</p>
-    </header>
-    
-    <!-- NAVIGATION TABS -->
-    <div class="nav-tabs">
-      <button class="tab-btn active" data-tab="devices-tab">📱 Meus Devices</button>
-      <button class="tab-btn" data-tab="pumps-tab">💧 Bombas</button>
-      <button class="tab-btn" data-tab="schedules-tab">⏰ Agendas</button>
-      <button class="tab-btn" data-tab="history-tab">📋 Histórico</button>
-      <button class="tab-btn" data-tab="alerts-tab">🔔 Alertas</button>
-    </div>
-    
-    <!-- DEVICES TAB -->
-    <div id="devices-tab" class="tab-content">
-      <h2>Meus Devices Dosadora</h2>
-      <div id="devices-list" style="margin-top: 20px;">
-        <p>⏳ Carregando devices...</p>
-      </div>
-      <button class="btn btn-primary" style="margin-top: 20px;" onclick="showCreateDeviceDialog()">
-        ➕ Adicionar Novo Device
-      </button>
-    </div>
-    
-    <!-- PUMPS TAB -->
-    <div id="pumps-tab" class="tab-content hidden">
-      <h2>Configurar Bombas</h2>
-      <p style="color: #666; margin-bottom: 15px;">
-        ℹ️ Selecione um device na aba "Meus Devices" para gerenciar suas bombas
-      </p>
-      <div id="pumps-list" style="margin-top: 20px;">
-        <p>Selecione um device primeiro</p>
-      </div>
-      <button class="btn btn-primary" id="create-pump-btn" style="margin-top: 20px; display: none;">
-        ➕ Adicionar Nova Bomba
-      </button>
-    </div>
-    
-    <!-- SCHEDULES TAB -->
-    <div id="schedules-tab" class="tab-content hidden">
-      <h2>Agendas de Dose</h2>
-      <p style="color: #666; margin-bottom: 15px;">
-        ℹ️ Selecione uma bomba em "Bombas" para criar agendas automáticas
-      </p>
-      <div id="schedules-list" style="margin-top: 20px;">
-        <p>Selecione uma bomba primeiro</p>
-      </div>
-      <button class="btn btn-primary" id="create-schedule-btn" style="margin-top: 20px; display: none;">
-        ➕ Adicionar Nova Agenda
-      </button>
-    </div>
-    
-    <!-- HISTORY TAB -->
-    <div id="history-tab" class="tab-content hidden">
-      <h2>Histórico de Doses</h2>
-      <div id="history-list" style="margin-top: 20px;">
-        <p>⏳ Carregando histórico...</p>
-      </div>
-      <button class="btn btn-secondary" style="margin-top: 20px;">
-        📥 Exportar (CSV)
-      </button>
-    </div>
-    
-    <!-- ALERTS TAB -->
-    <div id="alerts-tab" class="tab-content hidden">
-      <h2>Alertas e Notificações</h2>
-      <p style="color: #666; margin-bottom: 15px;">
-        🔔 Alertas pendentes de seus devices
-      </p>
-      <div id="alerts-list" style="margin-top: 20px;">
-        <p>Carregando alertas...</p>
-      </div>
-    </div>
-  </div>
-  
-  <div class="footer">
-    <div id="userInfo">Usuário --</div>
-    <div>ReefBlueSky Dosadora — Dashboard web</div>
-  </div>
 
-  <script src="js/dashboard-common.js"></script>
-  <script src="js/dashboard-dosing.js"></script>
+  <!-- Wrapper principal igual ao dashboard-main -->
+  <div id="app-root" class="app-root">
+    <main class="app-main">
+      <div class="app-content">
+        <!-- CONTEÚDO ESPECÍFICO DA DOSADORA -->
+        <div class="container">
+
+          <!-- NAVIGATION TABS -->
+          <div class="nav-tabs">
+            <button class="tab-btn active" data-tab="devices-tab">📱 Meus Devices</button>
+            <button class="tab-btn" data-tab="pumps-tab">💧 Bombas</button>
+            <button class="tab-btn" data-tab="schedules-tab">⏰ Agendas</button>
+            <button class="tab-btn" data-tab="history-tab">📋 Histórico</button>
+            <button class="tab-btn" data-tab="alerts-tab">🔔 Alertas</button>
+          </div>
+
+          <!-- DEVICES TAB -->
+          <div id="devices-tab" class="tab-content">
+            <h2>Meus Devices Dosadora</h2>
+            <div id="devices-list" style="margin-top: 20px;">
+              <p>⏳ Carregando devices...</p>
+            </div>
+            <button class="btn btn-primary" style="margin-top: 20px;" onclick="showCreateDeviceDialog()">
+              ➕ Adicionar Novo Device
+            </button>
+          </div>
+
+          <!-- PUMPS TAB -->
+          <div id="pumps-tab" class="tab-content hidden">
+            <h2>Configurar Bombas</h2>
+            <p style="color: #666; margin-bottom: 15px;">
+              ℹ️ Selecione um device na aba "Meus Devices" para gerenciar suas bombas
+            </p>
+            <div id="pumps-list" style="margin-top: 20px;">
+              <p>Selecione um device primeiro</p>
+            </div>
+            <button class="btn btn-primary" id="create-pump-btn" style="margin-top: 20px; display: none;">
+              ➕ Adicionar Nova Bomba
+            </button>
+          </div>
+
+          <!-- SCHEDULES TAB -->
+          <div id="schedules-tab" class="tab-content hidden">
+            <h2>Agendas de Dose</h2>
+            <p style="color: #666; margin-bottom: 15px;">
+              ℹ️ Selecione uma bomba em "Bombas" para criar agendas automáticas
+            </p>
+            <div id="schedules-list" style="margin-top: 20px;">
+              <p>Selecione uma bomba primeiro</p>
+            </div>
+            <button class="btn btn-primary" id="create-schedule-btn" style="margin-top: 20px; display: none;">
+              ➕ Adicionar Nova Agenda
+            </button>
+          </div>
+
+          <!-- HISTORY TAB -->
+          <div id="history-tab" class="tab-content hidden">
+            <h2>Histórico de Doses</h2>
+            <div id="history-list" style="margin-top: 20px;">
+              <p>⏳ Carregando histórico...</p>
+            </div>
+            <button class="btn btn-secondary" style="margin-top: 20px;">
+              📥 Exportar (CSV)
+            </button>
+          </div>
+
+          <!-- ALERTS TAB -->
+          <div id="alerts-tab" class="tab-content hidden">
+            <h2>Alertas e Notificações</h2>
+            <p style="color: #666; margin-bottom: 15px;">
+              🔔 Alertas pendentes de seus devices
+            </p>
+            <div id="alerts-list" style="margin-top: 20px;">
+              <p>Carregando alertas...</p>
+            </div>
+          </div>
+
+        </div> <!-- .container -->
+        <!-- FIM DO CONTEÚDO ESPECÍFICO -->
+      </div> <!-- .app-content -->
+    </main>
+  </div> <!-- #app-root -->
+
+  <!-- Scripts iguais ao main (mesmo path das outras páginas) -->
+  <script src="dashboard-common.js"></script>
+  <script src="dashboard-dosing.js"></script>
 </body>
+
 </html>
 
