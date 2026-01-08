@@ -259,7 +259,13 @@ async function loadDevicesCommon() {
   const cur = currentDevices.find((d) => d.deviceId === currentId);
   if (cur && typeof cur.lcdStatus !== 'undefined') {
     DashboardCommon.setLcdStatus(cur.lcdStatus); // online ou offline
-  } /*else {
+  } 
+
+  if (cur && typeof cur.dosingStatus !== 'undefined') {
+    DashboardCommon.setDosingStatus(cur.dosingStatus);
+  }
+
+  /*else {
     DashboardCommon.setLcdStatus('never');
   }*/
 
@@ -402,7 +408,13 @@ async function initTopbar() {
       const cur = currentDevices.find((d) => d.deviceId === currentId);
       if (cur && typeof cur.lcdStatus !== 'undefined') {
         DashboardCommon.setLcdStatus(cur.lcdStatus);
-      } /*else {
+      } 
+
+      if (cur && typeof cur.dosingStatus !== 'undefined') {
+        DashboardCommon.setDosingStatus(cur.dosingStatus);
+      }
+
+      /*else {
         DashboardCommon.setLcdStatus('never');
       }*/
 
