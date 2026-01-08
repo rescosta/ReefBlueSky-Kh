@@ -1026,8 +1026,7 @@ app.post(
   }
 );
 
-
-/*initDosingModule({
+initDosingModule({
   pool,
   mailTransporter,
   ALERT_FROM,
@@ -1036,7 +1035,7 @@ app.post(
 });
 
 app.use('/api', dosingRouter);
-*/
+
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
