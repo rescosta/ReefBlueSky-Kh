@@ -1,3 +1,4 @@
+
 /**
  * ReefBlueSky KH Monitor - Backend Node.js
  * Servidor com endpoints protegidos, autenticação JWT e integração com Cloudflare Tunnel
