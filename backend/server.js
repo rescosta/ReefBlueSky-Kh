@@ -22,6 +22,8 @@ const fs = require('fs');
 const mariadb = require('mariadb');
 const nodemailer = require('nodemailer');
 const displayRoutes = require('./display-endpoints');
+const { router: dosingRouter, initDosingModule } = require('./dosing-api-routes');
+
 const axios = require('axios');
 
 dotenv.config();
@@ -67,6 +69,7 @@ function detectNetType() {
 
 console.log('ifaces =', os.networkInterfaces());
 console.log('netType =', detectNetType());
+
 
 
 function readWifiRssi(cb) {
@@ -677,7 +680,6 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(__dirname + '/public/dashboard-main.html');
 });
 
-
 // ============================================================================
 // [SEGURANÇA] Middlewares de Proteção
 // ============================================================================
@@ -723,7 +725,6 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/api/display', displayRoutes);
-
 
 // ============================================================================
 // [SEGURANÇA] Autenticação JWT
@@ -1024,6 +1025,19 @@ app.post(
     }
   }
 );
+
+
+initDosingModule({
+  pool,
+  mailTransporter,
+  ALERT_FROM,
+  sendTelegramForUser,
+  authUserMiddleware,  
+});
+
+app.use('/api', dosingRouter);
+
+
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
@@ -1838,16 +1852,16 @@ app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async
  * POST /api/v1/device/register
  * [SEGURANÇA] Registrar novo dispositivo
  */
-app.post('/api/v1/device/register', authLimiter, async (req, res) => {
+app.post('/api/v1/device/register',  /*authLimiter, */ async (req, res) => {
     console.log('[API] POST /api/v1/device/register');
     
     const { deviceId, username, password, local_ip, type } = req.body;
 
-    const allowedTypes = new Set(['KH', 'LCD']);
+    const allowedTypes = new Set(['KH', 'LCD', 'DOSER']);
     if (!type || !allowedTypes.has(type)) {
       return res.status(400).json({
         success: false,
-        message: 'type inválido (use KH ou LCD)'
+        message: 'type inválido (use KH, LCD ou )'
       });
     }
     
@@ -1905,6 +1919,13 @@ app.post('/api/v1/device/register', authLimiter, async (req, res) => {
       const now = new Date();
 
       // 3) Criar/atualizar device já vinculando userId
+        const friendlyName =
+          type === 'KH'
+            ? 'RBS-KH'
+            : type === 'LCD'
+              ? 'RBS-LCD'
+              : 'RBS-DOSER';
+
         await conn.query(
           `INSERT INTO devices (deviceId, userId, type, name, local_ip, last_seen, createdAt, updatedAt)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1919,14 +1940,13 @@ app.post('/api/v1/device/register', authLimiter, async (req, res) => {
             deviceId,
             user.id,
             type,
-            type === 'KH' ? 'RBS-KH' : 'RBS-LCD',
+            friendlyName,
             local_ip || null,
             now,
             now,
             now
           ]
         );
-
     
     // Gerar tokens
     const token = generateToken(user.id, deviceId);
