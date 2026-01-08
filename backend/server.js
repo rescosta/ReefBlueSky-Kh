@@ -1708,46 +1708,71 @@ app.post('/api/user/telegram/test', authUserMiddleware, async (req, res) => {
 app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
   console.log('API GET /api/v1/user/devices');
   const userId = req.user.userId;
-  const { type } = req.query;   // ex.: "KH" ou "LCD"
+  const { type } = req.query;
 
   let conn;
   try {
     conn = await pool.getConnection();
 
     let sql = `
-      SELECT id,
-             deviceId,
-             name,
-             type,
-             local_ip AS localIp,
-             last_seen AS lastSeen,
-             createdAt,
-             updatedAt
-        FROM devices
-       WHERE userId = ?
+      SELECT
+        d.id,
+        d.deviceId,
+        d.name,
+        d.type,
+        d.local_ip AS localIp,
+        d.last_seen AS lastSeen,
+        d.lcd_status,
+        (
+          SELECT MAX(
+                   CASE
+                     WHEN dd.last_seen >= NOW() - INTERVAL 5 MINUTE THEN 1
+                     ELSE 0
+                   END
+                 )
+          FROM dosing_devices dd
+          WHERE dd.user_id = d.userId
+        ) AS dosing_online,
+        d.createdAt,
+        d.updatedAt
+      FROM devices d
+      WHERE d.userId = ?
     `;
     const params = [userId];
 
-    // se vier ?type=KH, filtra só monitores KH; ?type=LCD, só displays
     if (type) {
-      sql += ' AND type = ?';
-      params.push(type);   // deve ser exatamente "KH" ou "LCD"
+      sql += ' AND d.type = ?';
+      params.push(type);   // "KH" ou "LCD"
     }
 
-    sql += ' ORDER BY createdAt DESC';
+    sql += ' ORDER BY d.createdAt DESC';
 
     const rows = await conn.query(sql, params);
 
-    // normalizar lastSeen para ms desde epoch
-    const devices = rows.map((r) => ({
-      ...r,
-      lastSeen: r.lastSeen ? new Date(r.lastSeen).getTime() : null,
-    }));
+    const devices = rows.map((r) => {
+      const dosingStatus =
+        r.dosing_online === 1 ? 'online' :
+        r.dosing_online === 0 ? 'offline' :
+        'never';
 
-    return res.json({
-      success: true,
-      data: devices,
+      return {
+        id:        r.id,
+        deviceId:  r.deviceId,
+        name:      r.name,
+        type:      r.type,
+        localIp:   r.localIp,
+        lastSeen:  r.lastSeen ? new Date(r.lastSeen).getTime() : null,
+        lcdStatus:
+          r.lcd_status === 'online' || r.lcd_status === 'offline'
+            ? r.lcd_status
+            : 'offline',
+        dosingStatus,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
     });
+
+    return res.json({ success: true, data: devices });
 
   } catch (err) {
     console.error('API /user/devices error:', err.message);
@@ -1764,6 +1789,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
     }
   }
 });
+
 
 // Histórico de medições de um device do usuário
 app.get('/api/v1/user/devices/:deviceId/measurements', authUserMiddleware, async (req, res) => {
