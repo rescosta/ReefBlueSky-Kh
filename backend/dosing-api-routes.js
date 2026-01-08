@@ -1,3 +1,16 @@
+
+/**
+ * ReefBlueSky KH Monitor - Backend Node.js
+ * Servidor com endpoints protegidos, autenticação JWT e integração com Cloudflare Tunnel
+ * 
+ * Funcionalidades:
+ * - Autenticação JWT com refresh tokens
+ * - Endpoints protegidos para sincronização de dados
+ * - Armazenamento de medições em banco de dados
+ * - Métricas de saúde do sistema
+ * - Compatibilidade com Cloudflare Tunnel
+ */
+
 // ============================================
 // ReefBlueSky Dosing Module - API Routes
 // ============================================
