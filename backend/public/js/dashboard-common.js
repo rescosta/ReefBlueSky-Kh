@@ -152,11 +152,6 @@ function getTopbarHtml() {
           DOS OFF
         </span>
 
-        <!-- NOVO: atalho para dosadora -->
-        <button id="dosingBtn" class="btn-small" style="margin-left:8px;">
-          Dosadora
-        </button>
-
         <div id="currentTime" class="topbar-clock">--:--</div>
 
         <button id="logoutBtn" class="btn-small">Sair</button>
