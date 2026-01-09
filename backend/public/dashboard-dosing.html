@@ -1,970 +1,673 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>ReefBlueSky - Painel Principal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dosadora Balling - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    html, body {
-      max-width: 100%;
-      width: 100%;
-      overflow-x: hidden;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e0e0e0;
+            padding: 20px;
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-        sans-serif;
-      background: #020617;
-      color: #e5e7eb;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
 
-    /* TOPBAR */
-    .topbar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      /* antes: padding: 10px 24px; */
-      padding: 10px 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    }
+        header {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            color: white;
+        }
 
-    @supports (padding: max(0px)) {
-      .topbar {
-        padding-left: max(10px, env(safe-area-inset-left));
-        padding-right: max(10px, env(safe-area-inset-right));
-      }
-    }
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
 
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .logo {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
-    .nav {
-      display: flex;
-      gap: 16px;
-      font-size: 14px;
-    }
-    .nav a {
-      opacity: 0.8;
-      padding-bottom: 2px;
-      border-bottom: 2px solid transparent;
-    }
-    .nav a.active {
-      opacity: 1;
-      border-color: #facc15;
-    }
-    .topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 14px;
-    }
-    .badge-ok,
-    .badge-error,
-    .badge,
-    .badge-on,
-    .badge-off {
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .badge-ok {
-      background: #16a34a33;
-      border: 1px solid #22c55e;
-      color: #bbf7d0;
-    }
-    .badge-error {
-      background: #b91c1c33;
-      border: 1px solid #f97373;
-      color: #fecaca;
-    }
-    .badge-on {
-      background: #16a34a33;
-      border: 1px solid #22c55e;
-      color: #bbf7d0;
-    }
-    .badge-off {
-      background: #111827;
-      border: 1px solid #4b5563;
-      color: #9ca3af;
-    }
-    .btn-small {
-      border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      background: #0f172a;
-      color: #e5e7eb;
-    }
-    .btn-small:hover {
-      background: #111827;
-    }
-    .device-selector {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-    }
-    .device-selector select {
-      background: #020617;
-      color: #e5e7eb;
-      border-radius: 6px;
-      border: 1px solid #374151;
-      padding: 4px 8px;
-      font-size: 13px;
-    }
+        header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
 
-    /* LAYOUT PRINCIPAL */
-    .content {
-      flex: 1;
-      /* antes: padding: 16px 24px 24px; */
-      padding: 12px 10px 16px;
-      display: grid;
-      grid-template-columns: 2fr 1.5fr;
-      gap: 16px;
-    }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0;
+        }
 
-    @media (max-width: 960px) {
-      .content {
-        grid-template-columns: 1fr;
-      }
-    }
-    .left-col,
-    .right-col {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .card {
-      background: #020617;
-      border-radius: 10px;
-      padding: 14px 16px;
-      border: 1px solid #1f2937;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-    }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    .card-title {
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #9ca3af;
-    }
-    .card-subtitle {
-      font-size: 12px;
-      color: #6b7280;
-    }
+        .tabs button {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
 
-    /* CARD PRINCIPAL KH */
-    .kh-main {
-      display: grid;
-      grid-template-columns: 2fr 1.2fr;
-      gap: 12px;
-      align-items: center;
-    }
-    .kh-value {
-      font-size: 60px;
-      font-weight: 700;
-      color: #e5e7eb;
-    }
-    .kh-diff {
-      font-size: 14px;
-      margin-top: 4px;
-    }
-    .kh-diff.negative {
-      color: #f97373;
-    }
-    .kh-diff.positive {
-      color: #4ade80;
-    }
-    .kh-side {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 14px;
-    }
+        .tabs button:hover {
+            color: #e0e0e0;
+        }
 
-    .kh-metrics-row {
-      margin-top: 10px;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-      font-size: 11px;
-    }
+        .tabs button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
 
-    .kh-metrics-row .label {
-      display: block;
-      color: #9ca3af;
-      margin-bottom: 2px;
-    }
+        .view {
+            display: none;
+        }
 
-    .kh-window {
-      padding: 4px 6px;
-      border-radius: 6px;
-      text-align: center;
-      background: #020617;
-      border: 1px solid #1f2937;
-    }
+        .view.active {
+            display: block;
+        }
 
-    .kh-window.ok {
-      background-color: #022c22;
-      border-color: #16a34a;
-      color: #bbf7d0;
-    }
+        .error-msg {
+            background: #c0392b;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+        }
 
-    .kh-window.warn {
-      background-color: #451a03;
-      border-color: #f59e0b;
-      color: #fed7aa;
-    }
+        .success-msg {
+            background: #27ae60;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+        }
 
-    .kh-window.alert {
-      background-color: #450a0a;
-      border-color: #ef4444;
-      color: #fecaca;
-    }
+        .pump-selector {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #1a1f26;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
 
-    .kh-window.neutral {
-      background-color: #020617;
-      border-color: #374151;
-      color: #9ca3af;
-    }
+        .pump-selector label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #aaa;
+            font-size: 12px;
+        }
 
-    .kh-target-line {
-      margin-top: 8px;
-      font-size: 12px;
-      color: #9ca3af;
-    }
-    .kh-target-line span.value {
-      color: #e5e7eb;
-      font-weight: 500;
-    }
+        select, input, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f1419;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-family: inherit;
+            margin-bottom: 12px;
+        }
 
-    .kh-side-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .muted {
-      color: #6b7280;
-      font-size: 12px;
-    }
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.3);
+        }
 
-    /* CARD STATUS */
-    .status-circles {
-      display: flex;
-      gap: 16px;
-      justify-content: space-between;
-    }
-    .status-circle {
-      flex: 1;
-      text-align: center;
-    }
-    .status-label {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-top: 6px;
-    }
-    .status-badge {
-      font-size: 22px;
-      font-weight: 600;
-      padding: 18px 0;
-      border-radius: 999px;
-      background: #022c22;
-      border: 1px solid #16a34a;
-      color: #bbf7d0;
-    }
-    .status-badge.off {
-      background: #111827;
-      border-color: #4b5563;
-      color: #9ca3af;
-    }
+        .pump-config {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #1a1f26;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
 
-    /* CARD MEDIÇÃO */
-    .measure-info {
-      font-size: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .measure-info span.label {
-      color: #9ca3af;
-    }
-    .measure-info span.value {
-      color: #e5e7eb;
-    }
+        .pump-config h3 {
+            margin-bottom: 20px;
+            color: #fff;
+            font-size: 16px;
+        }
 
-    /* CARD LISTA DE MEDIÇÕES */
-    .table-small {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-    .table-small th,
-    .table-small td {
-      padding: 4px 6px;
-      border-bottom: 1px solid #1f2937;
-    }
-    .table-small th {
-      text-align: left;
-      color: #9ca3af;
-      font-weight: 500;
-    }
-    .table-small tbody tr:hover {
-      background: #030712;
-    }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
 
-    .progress-wrapper { font-size: 12px; }
-    .progress-label { margin-bottom: 4px; color: #9ca3af; }
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      border-radius: 999px;
-      background: #020617;
-      border: 1px solid #1f2937;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #22c55e, #eab308);
-      transition: width 0.3s linear;
-    }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
 
-    /* BARRA INFERIOR */
-    .footer {
-      font-size: 11px;
-      color: #6b7280;
-      /* antes: padding: 6px 24px 10px; */
-      padding: 6px 10px 10px;
-      display: flex;
-      justify-content: space-between;
-    }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #aaa;
+            font-size: 12px;
+        }
 
-    .status-badge.good {
-      background: #022c22;
-      border-color: #16a34a;
-      color: #bbf7d0;
-    }
-    .status-badge.warn {
-      background: #451a03;
-      border-color: #f59e0b;
-      color: #fed7aa;
-    }
-    .status-badge.bad {
-      background: #450a0a;
-      border-color: #ef4444;
-      color: #fecaca;
-    }
+        .form-group input,
+        .form-group select {
+            margin-bottom: 0;
+        }
 
-    .kh-history-container {
-      max-height: 260px;
-      overflow-y: auto;     
-      overflow-x: hidden;
-    }
+        .range-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
 
-    /* opcional: scrollbar mais discreta (WebKit) */
-    .kh-history-container::-webkit-scrollbar {
-      width: 6px;
-    }
-    .kh-history-container::-webkit-scrollbar-thumb {
-      background: #444;
-      border-radius: 3px;
-    }
-    .kh-history-container::-webkit-scrollbar-track {
-      background: #020617;
-    }
+        .range-group input[type="range"] {
+            flex: 1;
+            margin-bottom: 0;
+        }
 
-    .kh-trend {
-    text-align: center;
-    width: 14px;
-    }
+        .range-value {
+            min-width: 50px;
+            text-align: right;
+            color: #e0e0e0;
+        }
 
-    .kh-trend.up    { color: #60a5fa; }  /* verde: #22c55e - vermelho: #f97373 - azul: #60a5fa */
-    .kh-trend.down  { color: #60a5fa; }  
-    .kh-trend.equal { color: #22c55e; }  
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-    .menu-toggle {
-      display: none;        /* desktop */
-      background: none;
-      border: 0;
-      padding: 6px;
-      cursor: pointer;
-    }
-    .menu-toggle span {
-      display: block;
-      width: 18px;
-      height: 2px;
-      background: #e5e7eb;
-      border-radius: 999px;
-      margin: 3px 0;
-    }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            background: #333;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            border: none;
+            padding: 0;
+        }
 
-    .side-menu {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 72%;
-      max-width: 280px;
-      height: 100%;
-      background: #020617;
-      color: #e5e7eb;
-      transform: translateX(-100%);
-      transition: transform 0.25s ease-out;
-      z-index: 40;
-      padding: 24px 16px;
-    }
-    .side-menu.open {
-      transform: translateX(0);
-    }
-    .side-menu a {
-      display: block;
-      padding: 10px 0;
-      font-size: 16px;
-    }
-    .side-close {
-      background: none;
-      border: 0;
-      color: #9ca3af;
-      font-size: 24px;
-      margin-bottom: 16px;
-      cursor: pointer;
-    }
+        .toggle-switch.active {
+            background: #27ae60;
+        }
 
-    .dosing-page {
-      max-width: 1200px;
-      margin: 80px auto 40px;
-      padding: 0 24px 40px;
-      color: #e5e7eb;
-    }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s ease;
+        }
 
-    .dosing-hero {
-      background: linear-gradient(90deg, #6366f1, #a855f7);
-      border-radius: 16px;
-      padding: 20px 24px;
-      margin-bottom: 24px;
-    }
+        .toggle-switch.active::after {
+            left: 24px;
+        }
 
-    .dosing-hero-title {
-      font-size: 22px;
-      font-weight: 600;
-    }
+        .toggle-label {
+            font-size: 12px;
+            color: #aaa;
+        }
 
-    .dosing-hero-subtitle {
-      font-size: 14px;
-      opacity: 0.9;
-    }
+        .btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
 
-    .dosing-tabs {
-      display: flex;
-      gap: 24px;
-      border-bottom: 1px solid #374151;
-      margin-bottom: 24px;
-      padding: 0 4px;
-    }
+        .btn:hover {
+            background: #764ba2;
+        }
 
-    .dosing-tab {
-      background: none;
-      border: none;
-      padding: 12px 0;
-      font-size: 14px;
-      color: #9ca3af;
-      cursor: pointer;
-      position: relative;
-    }
+        .btn-secondary {
+            background: #444;
+            color: #e0e0e0;
+        }
 
-    .dosing-tab.active {
-      color: #ffffff;
-    }
+        .btn-secondary:hover {
+            background: #555;
+        }
 
-    .dosing-tab.active::after {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: -1px;
-      height: 2px;
-      background: #60a5fa;
-    }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
 
-    .dosing-view {
-      display: block;
-    }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
 
-    .dosing-card {
-      background: #020617;
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 16px;
-      border: 1px solid #1f2937;
-    }
+        table thead {
+            background: #1a1f26;
+            border-bottom: 2px solid #333;
+        }
 
-    .dosing-card-title {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
+        table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #aaa;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
 
-    .dosing-card-subtitle {
-      font-size: 16px;
-      font-weight: 500;
-      margin-bottom: 16px;
-    }
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            color: #e0e0e0;
+        }
 
-    .dosing-form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-      margin-bottom: 16px;
-    }
+        table tbody tr:hover {
+            background: #1a1f26;
+        }
 
-    .dosing-label {
-      display: block;
-      font-size: 13px;
-      margin-bottom: 4px;
-      color: #9ca3af;
-    }
+        .table-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #1a1f26;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
 
-    .dosing-input {
-      width: 100%;
-      background: #020617;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 8px 10px;
-      color: #e5e7eb;
-    }
+        .table-section h3 {
+            margin-bottom: 15px;
+            color: #fff;
+            font-size: 16px;
+        }
 
-    .dosing-btn-primary {
-      margin-top: 8px;
-      padding: 8px 16px;
-      border-radius: 999px;
-      border: none;
-      background: #6366f1;
-      color: #f9fafb;
-      font-size: 14px;
-      cursor: pointer;
-    }
+        .sub-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0;
+        }
 
-    .dosing-btn-primary:hover {
-      background: #4f46e5;
-    }
+        .sub-tabs button {
+            padding: 10px 15px;
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
 
-    .dosing-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
+        .sub-tabs button:hover {
+            color: #e0e0e0;
+        }
 
-    .dosing-table th,
-    .dosing-table td {
-      padding: 10px 8px;
-      border-bottom: 1px solid #1f2937;
-    }
+        .sub-tabs button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
 
-    .dosing-table th {
-      text-align: left;
-      color: #9ca3af;
-      font-weight: 500;
-    }
+        .sub-view {
+            display: none;
+        }
 
-    .dosing-error {
-      color: #fecaca;
-      background: #7f1d1d;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 13px;
-      margin-bottom: 12px;
-    }
+        .sub-view.active {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+        }
+
+        .empty-state p {
+            margin: 0;
+        }
 
         @media (max-width: 768px) {
-      /* esconder menu textual e rótulos que ocupam espaço */
-      .nav {
-        display: none;
-      }
-      .device-selector span:first-child {
-        display: none;
-      }
-      .device-selector {
-        max-width: 150px;
-      }
-      .device-selector select {
-        width: 100%;
-      }
-      #lcdStatusIcon {
-        font-size: 10px;
-        padding: 2px 8px;
-      }
-      #logoutBtn {
-        display: none;
-      }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
 
-      /* topo em duas linhas: logo em cima, infos embaixo */
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 8px 12px;
-        gap: 4px;
-      }
+            header h1 {
+                font-size: 20px;
+            }
 
-      .topbar-left {
-        justify-content: center;
-        order: 1;
-      }
-
-      .logo {
-        font-size: 20px;
-      }
-
-      .topbar-right {
-        order: 2;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 8px;      /* já “enxuga” a direita */
-        font-size: 12px;
-      }
-
-      /* hambúrguer com três barras empilhadas */
-      .menu-toggle {
-        display: flex !important;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 8px;
-        width: 36px;
-      }
-      .menu-toggle span {
-        width: 20px;
-        height: 2px;
-        background: #e5e7eb;
-        border-radius: 1px;
-        margin: 2px 0;
-      }
-    }
-
-  </style>
+            .tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div id="topbar-root"></div>
+    <div class="container">
+        <header>
+            <h1>💧 Dosadora Balling</h1>
+            <p>Gerenciador de doses automáticas</p>
+        </header>
 
-  <!-- painel lateral -->
-  <div id="sideMenu" class="side-menu">
-    <button id="closeMenu" class="side-close">×</button>
-    <a href="dashboard-main.html">Principal</a>
-    <a href="dashboard-graficos.html">Gráficos</a>
-    <a href="dashboard-config.html">Configurações</a>
-    <a href="dashboard-sistema.html">Sistema</a>
-    <a href="dashboard-logs.html">Dev</a>
-    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
-  </div>
+        <!-- Abas principais -->
+        <div class="tabs">
+            <button id="tabDashboard" class="active">Dashboard</button>
+            <button id="tabDevices">Devices</button>
+            <button id="tabBombas">Bombas</button>
+            <button id="tabAgendas">Agendas</button>
+            <button id="tabHistorico">Histórico</button>
+        </div>
 
-  <div class="dosing-page">
-    <div class="dosing-hero">
-      <div class="dosing-hero-title">🚰 Dosadora Balling</div>
-      <div class="dosing-hero-subtitle">Gerenciador de doses automáticas</div>
+        <!-- View: Dashboard -->
+        <div id="dashboardView" class="view active">
+            <div class="error-msg" id="dashboardError"></div>
+            <p>Resumo dos devices e status das dosagens...</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Status</th>
+                        <th>Última Comunicação</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboardBody"></tbody>
+            </table>
+        </div>
+
+        <!-- View: Devices -->
+        <div id="devicesView" class="view">
+            <div class="error-msg" id="devicesError"></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Tipo HW</th>
+                        <th>Status</th>
+                        <th>Último Contato</th>
+                        <th>Bombas</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="devicesBody"></tbody>
+            </table>
+        </div>
+
+        <!-- View: Bombas -->
+        <div id="bombasView" class="view">
+            <div class="error-msg" id="bombasError"></div>
+            <div class="success-msg" id="bombasSuccess"></div>
+
+            <!-- Seletor de Bomba -->
+            <div class="pump-selector">
+                <label>Selecionar Bomba</label>
+                <select id="pumpSelectorDropdown">
+                    <option value="">-- Escolha uma bomba --</option>
+                </select>
+            </div>
+
+            <!-- Configuração da Bomba Selecionada -->
+            <div id="pumpConfigSection" class="pump-config" style="display: none;">
+                <h3 id="pumpConfigTitle">Configuração - Bomba 1</h3>
+
+                <!-- Sub-abas -->
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" data-subtab="settings">⚙️ Configuração</button>
+                    <button class="sub-tab-btn" data-subtab="schedule">📅 Agenda</button>
+                    <button class="sub-tab-btn" data-subtab="manual">⚡ Manual</button>
+                    <button class="sub-tab-btn" data-subtab="calibration">🔧 Calibração</button>
+                </div>
+
+                <!-- Sub-view: Configuração -->
+                <div id="settingsSubView" class="sub-view active">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Nome da Bomba</label>
+                            <input type="text" id="pumpName" placeholder="Ex: KH, Cálcio, Magnésio">
+                        </div>
+                        <div class="form-group">
+                            <label>Bomba Ativa</label>
+                            <div class="toggle-group">
+                                <button class="toggle-switch active" id="pumpActiveToggle"></button>
+                                <span class="toggle-label" id="pumpActiveLabel">Ativa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Volume do Recipiente (mL)</label>
+                            <div class="range-group">
+                                <input type="range" id="pumpContainerSize" min="0" max="5000" value="500" step="10">
+                                <span class="range-value" id="pumpContainerValue">500</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Volume Atual (mL)</label>
+                            <div class="range-group">
+                                <input type="range" id="pumpCurrentVolume" min="0" max="5000" value="500" step="10">
+                                <span class="range-value" id="pumpCurrentValue">500</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Alarme (%)</label>
+                            <input type="number" id="pumpAlarmPercent" value="10" min="0" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label>Máximo Diário (mL)</label>
+                            <input type="number" id="pumpDailyMax" value="100" min="0">
+                        </div>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn" id="savePumpBtn">Salvar Configuração</button>
+                        <button class="btn btn-secondary" id="cancelPumpBtn">Cancelar</button>
+                    </div>
+                </div>
+
+                <!-- Sub-view: Agenda -->
+                <div id="scheduleSubView" class="sub-view">
+                    <p style="margin-bottom: 15px; color: #999;">Defina os horários e dias para esta bomba.</p>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Doses por Dia</label>
+                            <input type="number" id="scheduleDosesPerDay" value="1" min="1" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label>Horário de Início</label>
+                            <input type="time" id="scheduleStartTime" value="12:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Horário de Fim</label>
+                            <input type="time" id="scheduleEndTime" value="18:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Volume Diário (mL)</label>
+                            <input type="number" id="scheduleVolumePerDay" value="36" min="0">
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Dias da Semana</label>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="0" checked> Segunda
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="1" checked> Terça
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="2" checked> Quarta
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="3" checked> Quinta
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="4" checked> Sexta
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="5" checked> Sábado
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                    <input type="checkbox" class="schedule-day" value="6" checked> Domingo
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn" id="saveScheduleBtn">Criar Agenda</button>
+                        <button class="btn btn-secondary" id="cancelScheduleBtn">Cancelar</button>
+                    </div>
+
+                    <div class="table-section">
+                        <h3>Agendas Cadastradas</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Bomba</th>
+                                    <th>Ativa</th>
+                                    <th>Dias</th>
+                                    <th>Doses/Dia</th>
+                                    <th>Janela</th>
+                                    <th>Volume (mL/dia)</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedulesTableBody">
+                                <tr>
+                                    <td colspan="7" class="empty-state" style="border: none; padding: 20px;">
+                                        Nenhuma agenda para esta bomba.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Sub-view: Manual -->
+                <div id="manualSubView" class="sub-view">
+                    <p style="margin-bottom: 15px; color: #999;">Aplique uma dose manual instantânea.</p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Volume a Dosar (mL)</label>
+                            <input type="number" id="manualDoseVolume" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn" id="applyManualDoseBtn">Aplicar Dose</button>
+                        <button class="btn btn-secondary" id="cancelManualBtn">Cancelar</button>
+                    </div>
+                </div>
+
+                <!-- Sub-view: Calibração -->
+                <div id="calibrationSubView" class="sub-view">
+                    <p style="margin-bottom: 15px; color: #999;">
+                        Coloque um recipiente graduado sob a bomba. Pressione "Go" e depois de 10 segundos, insira o volume medido e salve.
+                    </p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Volume Medido (mL)</label>
+                            <input type="number" id="calibrationVolume" placeholder="0" min="0">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn" id="startCalibrationBtn">Go (10s)</button>
+                        <button class="btn" id="saveCalibrationBtn">Salvar Taxa</button>
+                        <button class="btn btn-secondary" id="cancelCalibrationBtn">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela com todas as 6 bombas -->
+            <div class="table-section">
+                <h3>Configurar Bombas</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Bomba</th>
+                            <th>Nome</th>
+                            <th>Ativa</th>
+                            <th>Vol. Recipiente</th>
+                            <th>Vol. Atual</th>
+                            <th>Alarme %</th>
+                            <th>Máx. Diário</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pumpsTableBody">
+                        <tr>
+                            <td colspan="8" class="empty-state" style="border: none; padding: 20px;">
+                                Carregando bombas...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- View: Agendas -->
+        <div id="agendasView" class="view">
+            <p>Visão geral de todas as agendas cadastradas...</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bomba</th>
+                        <th>Status</th>
+                        <th>Próxima Dose</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="allSchedulesBody"></tbody>
+            </table>
+        </div>
+
+        <!-- View: Histórico -->
+        <div id="historicoView" class="view">
+            <p>Histórico de dosagens realizadas...</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Bomba</th>
+                        <th>Volume</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody"></tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="dosing-tabs">
-      <button id="tabDashboard" class="dosing-tab active">Dashboard</button>
-      <button id="tabDevices"   class="dosing-tab">Devices</button>
-      <button id="tabPumps"     class="dosing-tab">Bombas</button>
-      <button id="tabSchedules" class="dosing-tab">Agendas</button>
-      <button id="tabHistory"   class="dosing-tab">Histórico</button>
-    </div>
-
-    <!-- DASHBOARD -->
-    <section id="dosingDashboardView" class="dosing-view">
-      <div class="dosing-card">
-        <h2 class="dosing-card-title">Alertas Recentes</h2>
-        <!-- placeholder -->
-      </div>
-      <div class="dosing-card">
-        <h2 class="dosing-card-title">Status do Sistema</h2>
-        <!-- placeholder -->
-      </div>
-    </section>
-
-    <!-- DEVICES -->
-    <section id="dosingDevicesView" class="dosing-view" style="display:none;">
-      <div class="dosing-card">
-        <h2 class="dosing-card-title">Meus Devices</h2>
-      </div>
-
-      <div id="dosingDevicesError" class="dosing-error" style="display:none;"></div>
-
-      <div class="dosing-card">
-        <h3 class="dosing-card-subtitle">Adicionar Novo Device</h3>
-        <div class="dosing-form-grid">
-          <div>
-            <label class="dosing-label">Nome do Device</label>
-            <input type="text" id="newDosingDeviceName" class="dosing-input" placeholder="Ex: Dosadora Principal" />
-          </div>
-          <div>
-            <label class="dosing-label">Tipo de Hardware</label>
-            <select id="newDosingDeviceHw" class="dosing-input">
-              <option value="ESP8266">ESP8266 (NodeMCU)</option>
-              <option value="ESP32">ESP32</option>
-            </select>
-          </div>
-        </div>
-        <button id="addDosingDeviceBtn" class="dosing-btn-primary">Criar Device</button>
-      </div>
-
-      <div class="dosing-card">
-        <table class="dosing-table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Tipo HW</th>
-              <th>Online</th>
-              <th>Último contato</th>
-              <th>Bombas</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody id="dosingDevicesBody"></tbody>
-        </table>
-      </div>
-    </section>
-  
-    <!-- BOMBAS -->
-    <section id="dosingPumpsView" class="dosing-view" style="display:none;">
-      <div class="dosing-card">
-        <h2 class="dosing-card-title">Configurar Bombas</h2>
-        <h3 class="dosing-card-subtitle">Adicionar Nova Bomba</h3>
-
-        <div class="dosing-form-grid">
-          <div>
-            <label class="dosing-label" for="pumpNameInput">Nome da Bomba</label>
-            <input
-              type="text"
-              id="pumpNameInput"
-              class="dosing-input"
-              placeholder="Ex: KH"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="pumpIndexInput">Índice (0-3)</label>
-            <input
-              type="number"
-              id="pumpIndexInput"
-              class="dosing-input"
-              min="0"
-              max="3"
-              step="1"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="pumpVolumeInput">Volume Recipiente (mL)</label>
-            <input
-              type="number"
-              id="pumpVolumeInput"
-              class="dosing-input"
-              min="0"
-              step="1"
-              value="500"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="pumpRateInput">Taxa Calibração (mL/s)</label>
-            <input
-              type="number"
-              id="pumpRateInput"
-              class="dosing-input"
-              min="0"
-              step="0.1"
-              value="1.0"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="pumpAlarmInput">Limite Alarme (%)</label>
-            <input
-              type="number"
-              id="pumpAlarmInput"
-              class="dosing-input"
-              min="0"
-              max="100"
-              step="1"
-              value="10"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="pumpDailyMaxInput">Máximo Diário (mL)</label>
-            <input
-              type="number"
-              id="pumpDailyMaxInput"
-              class="dosing-input"
-              min="0"
-              step="1"
-              value="100"
-            />
-          </div>
-        </div>
-
-        <button id="addPumpBtn" class="dosing-btn-primary">Adicionar Bomba</button>
-      </div>
-
-      <div class="dosing-card">
-        <table class="dosing-table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Índice</th>
-              <th>Taxa (mL/s)</th>
-              <th>Máx. Diário (mL)</th>
-              <th>Volume (mL)</th>
-              <th>Alarme (%)</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody id="pumpsTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-
-
-    <!-- AGENDAS -->
-    <section id="dosingSchedulesView" class="dosing-view" style="display:none;">
-      <div class="dosing-card">
-        <h2 class="dosing-card-title">Agendas de Dose</h2>
-        <p class="dosing-card-subtitle">Defina os horários e dias para cada bomba.</p>
-
-        <div class="dosing-form-grid">
-          <div>
-            <label class="dosing-label" for="schedulePumpSelect">Selecionar Bomba</label>
-            <select id="schedulePumpSelect" class="dosing-input">
-              <option value="">-- Selecione uma bomba --</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="dosing-label" for="scheduleDosesPerDay">Doses por dia</label>
-            <input
-              type="number"
-              id="scheduleDosesPerDay"
-              class="dosing-input"
-              min="1"
-              max="24"
-              value="1"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="scheduleStartTime">Horário início</label>
-            <input
-              type="time"
-              id="scheduleStartTime"
-              class="dosing-input"
-              value="12:00"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="scheduleEndTime">Horário fim</label>
-            <input
-              type="time"
-              id="scheduleEndTime"
-              class="dosing-input"
-              value="12:00"
-            />
-          </div>
-
-          <div>
-            <label class="dosing-label" for="scheduleVolumePerDay">Volume diário (mL)</label>
-            <input
-              type="number"
-              id="scheduleVolumePerDay"
-              class="dosing-input"
-              min="0"
-              step="1"
-              value="36"
-            />
-          </div>
-        </div>
-
-        <div style="margin-top: 8px;">
-          <label class="dosing-label">Dias da semana</label>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-            <label><input type="checkbox" class="schedule-day" value="1"  checked> Seg</label>
-            <label><input type="checkbox" class="schedule-day" value="2"  checked> Ter</label>
-            <label><input type="checkbox" class="schedule-day" value="4"  checked> Qua</label>
-            <label><input type="checkbox" class="schedule-day" value="8"  checked> Qui</label>
-            <label><input type="checkbox" class="schedule-day" value="16" checked> Sex</label>
-            <label><input type="checkbox" class="schedule-day" value="32" checked> Sáb</label>
-            <label><input type="checkbox" class="schedule-day" value="64" checked> Dom</label>
-          </div>
-        </div>
-
-        <button id="addScheduleBtn" class="dosing-btn-primary">Criar agenda</button>
-      </div>
-
-      <div class="dosing-card">
-        <h3 class="dosing-card-subtitle">Agendas cadastradas</h3>
-        <table class="dosing-table">
-          <thead>
-            <tr>
-              <th>Bomba</th>
-              <th>Ativa</th>
-              <th>Dias</th>
-              <th>Doses/dia</th>
-              <th>Janela</th>
-              <th>Volume (mL/dia)</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody id="schedulesTableBody">
-            <tr>
-              <td colspan="7">Nenhuma agenda para esta bomba.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-
-    <!-- HISTÓRICO -->
-    <section id="dosingHistoryView" class="dosing-view" style="display:none;">
-      <!-- tabela de histórico igual ao antigo -->
-    </section>
-  </div>
-
-
-
-  <div class="footer">
-    <div id="userInfo">Usuário --</div>
-    <div>ReefBlueSky KH Monitor — Dashboard web</div>
-  </div>
-
-  <script src="js/dashboard-common.js"></script>
-  <script src="js/dashboard-dosing.js"></script>
+    <script src="dashboard-dosing-novo.js"></script>
 </body>
 </html>
