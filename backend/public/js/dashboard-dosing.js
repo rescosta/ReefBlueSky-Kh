@@ -14,51 +14,68 @@ async function initDashboard() {
     if (!isTokenValid()) return;
 
     try {
-        await loadDevices();
+        // Usar função do DashboardCommon para carregar devices
+        const token = getToken();
+        const userId = localStorage.getItem('userId');
+        
+        if (!token || !userId) {
+            console.error('❌ Token ou userId não encontrado');
+            showError('Sessão expirada. Faça login novamente.');
+            window.location.href = '/login.html';
+            return;
+        }
+
+        console.log('📱 Carregando devices para user:', userId);
+
+        // Chamar API com token correto
+        const result = await apiCall('/api/v1/user/dosing/devices', 'GET');
+        
+        if (!result || !result.data) {
+            console.error('❌ Resposta inválida da API:', result);
+            showError('Erro ao carregar devices');
+            return;
+        }
+
+        devices = result.data;
+        console.log('✅ Devices carregados:', devices);
+        
+        renderDeviceSelector();
+        
         if (devices.length > 0) {
             currentDevice = devices[0];
+            console.log('✅ Device inicial selecionado:', currentDevice);
             await loadPumps(currentDevice.id);
             await loadSchedules(currentDevice.id, currentPumpIndex);
-            updateNavbarDeviceStatus(currentDevice);
+            updateDeviceInfo();
         } else {
+            console.warn('⚠️ Nenhum device encontrado');
             showError('Nenhum device cadastrado');
         }
     } catch (err) {
-        console.error('Erro ao inicializar:', err);
+        console.error('❌ Erro ao inicializar:', err);
         showError('Erro ao carregar dashboard');
     }
 }
 
 // ===== DEVICES =====
-async function loadDevices() {
-    console.log('📱 Carregando devices...');
-
-    const result = await apiCall(`${API_BASE}/devices`);
-    if (!result || !result.data) {
-        showError('Erro ao carregar devices');
-        return;
-    }
-
-    devices = result.data;
-    renderDeviceSelector();
-}
-
 function renderDeviceSelector() {
     const select = document.getElementById('deviceSelect');
-    if (!select) return;
+    if (!select) {
+        console.error('❌ deviceSelect não encontrado');
+        return;
+    }
 
     select.innerHTML = '';
 
     if (devices.length === 0) {
         select.innerHTML = '<option>Nenhum device encontrado</option>';
-        showError('Nenhum device cadastrado no sistema');
         return;
     }
 
     devices.forEach(device => {
         const option = document.createElement('option');
         option.value = device.id;
-        option.textContent = device.name;
+        option.textContent = device.name || `Device ${device.id}`;
         select.appendChild(option);
     });
 
@@ -71,12 +88,13 @@ async function onDeviceChange() {
     currentPumpIndex = 0;
 
     if (!currentDevice) {
+        console.error('❌ Device não encontrado');
         showError('Device não encontrado');
         return;
     }
 
+    console.log('✅ Device selecionado:', currentDevice.name);
     updateDeviceInfo();
-    updateNavbarDeviceStatus(currentDevice);
     await loadPumps(currentDevice.id);
     await loadSchedules(currentDevice.id, currentPumpIndex);
 }
@@ -90,27 +108,36 @@ function updateDeviceInfo() {
 
     info.innerHTML = `
         <span class="device-status-dot ${!currentDevice.online ? 'offline' : ''}"></span>
-        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
+        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type || 'N/A'} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
     `;
 }
 
 // ===== PUMPS =====
 async function loadPumps(deviceId) {
+    if (!deviceId) {
+        console.error('❌ deviceId não fornecido');
+        return;
+    }
+
     console.log('💧 Carregando bombas para device:', deviceId);
 
-    const result = await apiCall(`${API_BASE}/devices/${deviceId}/pumps`);
+    const result = await apiCall(`/api/v1/user/dosing/devices/${deviceId}/pumps`, 'GET');
+    
     if (!result || !result.data) {
+        console.error('❌ Erro ao carregar bombas:', result);
         showError('Erro ao carregar bombas');
         return;
     }
 
     pumps = result.data;
+    console.log('✅ Bombas carregadas:', pumps.length);
+    
     renderPumpSelectors();
     renderConfigTable();
 }
 
 function renderPumpSelectors() {
-    const selectors = ['pumpSelect', 'pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
+    const selectors = ['pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
 
     selectors.forEach(selectorId => {
         const select = document.getElementById(selectorId);
@@ -121,21 +148,12 @@ function renderPumpSelectors() {
         pumps.forEach((pump, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = `${index + 1} - ${pump.name}`;
+            option.textContent = `${index + 1} - ${pump.name || `Bomba ${index + 1}`}`;
             select.appendChild(option);
         });
 
         select.value = '0';
-        select.addEventListener('change', onPumpChange);
     });
-}
-
-function onPumpChange(e) {
-    if (e.target.id === 'pumpSelect') {
-        currentPumpIndex = parseInt(e.target.value);
-        loadSchedules(currentDevice.id, currentPumpIndex);
-        renderConfigTable();
-    }
 }
 
 // ===== CONFIG TABLE =====
@@ -145,11 +163,16 @@ function renderConfigTable() {
 
     tbody.innerHTML = '';
 
+    if (pumps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma bomba encontrada</td></tr>';
+        return;
+    }
+
     pumps.forEach((pump, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${index + 1}</td>
-            <td>${pump.name}</td>
+            <td>${pump.name || `P${index + 1}`}</td>
             <td>${pump.active ? '✓ Ativa' : '✗ Inativa'}</td>
             <td>${pump.container_size || 0}</td>
             <td>${pump.current_volume || 0}</td>
@@ -167,7 +190,7 @@ function openEditModal(index) {
     if (!pump) return;
 
     document.getElementById('editPumpIndex').value = index;
-    document.getElementById('editName').value = pump.name;
+    document.getElementById('editName').value = pump.name || '';
     document.getElementById('editContainerSize').value = pump.container_size || 0;
     document.getElementById('editCurrentVolume').value = pump.current_volume || 0;
     document.getElementById('editAlarmPercent').value = pump.alarm_percent || 0;
@@ -195,7 +218,7 @@ async function saveEditModal() {
     console.log('💾 Salvando bomba:', index, data);
 
     const result = await apiCall(
-        `${API_BASE}/devices/${currentDevice.id}/pumps/${index}`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${index}`,
         'PUT',
         data
     );
@@ -209,13 +232,20 @@ async function saveEditModal() {
 
 // ===== SCHEDULES =====
 async function loadSchedules(deviceId, pumpIndex) {
-    console.log('📅 Carregando agendas para:', deviceId, pumpIndex);
+    if (!deviceId) {
+        console.error('❌ deviceId não fornecido');
+        return;
+    }
+
+    console.log('📅 Carregando agendas para:', deviceId, 'pump:', pumpIndex);
 
     const result = await apiCall(
-        `${API_BASE}/devices/${deviceId}/pumps/${pumpIndex}/schedules`
+        `/api/v1/user/dosing/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
+        'GET'
     );
 
     schedules = result && result.data ? result.data : [];
+    console.log('✅ Agendas carregadas:', schedules.length);
     renderScheduleTable();
 }
 
@@ -232,7 +262,8 @@ function renderScheduleTable() {
 
     schedules.forEach(schedule => {
         const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-        const daysText = schedule.active_days
+        const activeDaysArray = Array.isArray(schedule.active_days) ? schedule.active_days : [];
+        const daysText = activeDaysArray
             .map((active, i) => active ? days[i] : '')
             .filter(d => d)
             .join(', ');
@@ -240,9 +271,9 @@ function renderScheduleTable() {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><input type="checkbox" ${schedule.active ? 'checked' : ''} disabled></td>
-            <td>${daysText}</td>
+            <td>${daysText || '---'}</td>
             <td>${schedule.doses_per_day || 0}</td>
-            <td>${schedule.start_time} - ${schedule.end_time}</td>
+            <td>${schedule.start_time || '--'} - ${schedule.end_time || '--'}</td>
             <td>${schedule.volume_per_day || 0}</td>
             <td><button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button></td>
         `;
@@ -277,7 +308,7 @@ async function createSchedule() {
     console.log('📅 Criando agenda:', pumpIndex, data);
 
     const result = await apiCall(
-        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
         'POST',
         data
     );
@@ -293,7 +324,7 @@ async function deleteSchedule(scheduleId) {
     if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
 
     const result = await apiCall(
-        `${API_BASE}/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
         'DELETE'
     );
 
@@ -316,7 +347,7 @@ async function applyManualDose() {
     console.log('💧 Aplicando dose manual:', pumpIndex, volume);
 
     const result = await apiCall(
-        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
         'POST',
         { volume }
     );
@@ -335,7 +366,7 @@ async function startCalibration() {
     console.log('⚙️ Iniciando calibração:', pumpIndex);
 
     const result = await apiCall(
-        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
         'POST'
     );
 
@@ -368,7 +399,7 @@ async function saveCalibration() {
     console.log('⚙️ Salvando calibração:', pumpIndex, measuredVolume);
 
     const result = await apiCall(
-        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
         'POST',
         { measured_volume: measuredVolume }
     );
