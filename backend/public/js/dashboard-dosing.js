@@ -1,473 +1,296 @@
-// Dashboard Dosadora - Script Principal - CORRIGIDO
-// ================================================
+// Dashboard Dosadora - Script Principal CORRIGIDO
+// Usa fetch com Bearer token (sem dependência de apiCall/dashboard-common)
 
-let currentDevice = null;
-let currentPumpIndex = 0;
-let devices = [];
-let pumps = [];
-let schedules = [];
+let currentDeviceId = null;
+let currentPumpIndex = null;
+let currentDeviceName = null;
+let cachedPumps = [];
+let cachedSchedules = [];
 
-// ===== INITIALIZATION =====
+// ===== DOM Elements =====
+
+const deviceSelect = document.getElementById('deviceSelect');
+const deviceInfo = document.getElementById('deviceInfo');
+const pumpSelectManual = document.getElementById('pumpSelectManual');
+const pumpSelectCalibration = document.getElementById('pumpSelectCalibration');
+const pumpSelectAgenda = document.getElementById('pumpSelectAgenda');
+const configTableBody = document.getElementById('configTableBody');
+
+// ===== Utility Functions =====
+
+function getAccessToken() {
+  return localStorage.getItem('token');
+}
+
+function showError(msg) {
+  const div = document.createElement('div');
+  div.className = 'error-msg';
+  div.textContent = `❌ ${msg}`;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 5000);
+}
+
+function showSuccess(msg) {
+  const div = document.createElement('div');
+  div.className = 'success-msg';
+  div.textContent = `✅ ${msg}`;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
+
+// ===== INIT =====
+
 async function initDashboard() {
-    console.log('🚀 Iniciando Dashboard Dosadora...');
-
-    if (!isTokenValid()) return;
-
-    try {
-        const token = getToken();
-        const userId = localStorage.getItem('userId');
-        
-        if (!token || !userId) {
-            console.error('❌ Token ou userId não encontrado');
-            showError('Sessão expirada. Faça login novamente.');
-            window.location.href = '/login.html';
-            return;
-        }
-
-        console.log('📱 Carregando devices para user:', userId);
-
-        // Chamar API com token correto
-        const result = await apiCall('/api/v1/user/dosing/devices', 'GET');
-        
-        if (!result || !result.data) {
-            console.error('❌ Resposta inválida da API:', result);
-            showError('Erro ao carregar devices');
-            return;
-        }
-
-        devices = result.data;
-        console.log('✅ Devices carregados:', devices);
-        
-        renderDeviceSelector();
-        
-        if (devices.length > 0) {
-            currentDevice = devices[0];
-            console.log('✅ Device inicial selecionado:', currentDevice);
-            updateDeviceInfo();
-            updateNavbarDeviceInfo();
-            await loadPumps(currentDevice.id);
-            await loadSchedules(currentDevice.id, currentPumpIndex);
-        } else {
-            console.warn('⚠️ Nenhum device encontrado');
-            showError('Nenhum device cadastrado');
-        }
-    } catch (err) {
-        console.error('❌ Erro ao inicializar:', err);
-        showError('Erro ao carregar dashboard');
-    }
+  console.log('🚀 Iniciando Dashboard Dosadora...');
+  
+  const token = getAccessToken();
+  if (!token) {
+    console.error('❌ Token não encontrado');
+    showError('Sessão expirada. Faça login novamente.');
+    window.location.href = '/login.html';
+    return;
+  }
+  
+  await loadDevices();
 }
 
-// ===== DEVICES =====
-function renderDeviceSelector() {
-    const select = document.getElementById('deviceSelect');
-    if (!select) {
-        console.error('❌ deviceSelect não encontrado');
-        return;
-    }
+// ===== Device Selection =====
 
-    select.innerHTML = '';
+async function loadDevices() {
+  const token = getAccessToken();
+  if (!token) {
+    showError('Token não encontrado');
+    return;
+  }
 
-    if (devices.length === 0) {
-        select.innerHTML = '<option>Nenhum device encontrado</option>';
-        return;
-    }
-
-    devices.forEach(device => {
-        const option = document.createElement('option');
-        option.value = device.id;
-        option.textContent = device.name || `Device ${device.id}`;
-        select.appendChild(option);
+  try {
+    console.log('📱 Carregando devices...');
+    
+    const res = await fetch('/api/v1/user/dosing/devices', {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
-
-    select.addEventListener('change', onDeviceChange);
-}
-
-async function onDeviceChange() {
-    const deviceId = parseInt(document.getElementById('deviceSelect').value);
-    currentDevice = devices.find(d => d.id === deviceId);
-    currentPumpIndex = 0;
-
-    if (!currentDevice) {
-        console.error('❌ Device não encontrado');
-        showError('Device não encontrado');
-        return;
-    }
-
-    console.log('✅ Device selecionado:', currentDevice.name);
-    updateDeviceInfo();
-    updateNavbarDeviceInfo();
-    await loadPumps(currentDevice.id);
-    await loadSchedules(currentDevice.id, currentPumpIndex);
-}
-
-function updateDeviceInfo() {
-    if (!currentDevice) return;
-
-    const status = currentDevice.online ? '🟢 Online' : '🔴 Offline';
-    const info = document.getElementById('deviceInfo');
-    if (!info) return;
-
-    info.innerHTML = `
-        <span class="device-status-dot ${!currentDevice.online ? 'offline' : ''}"></span>
-        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type || 'N/A'} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
-    `;
-}
-
-function updateNavbarDeviceInfo() {
-    if (!currentDevice) return;
-
-    const status = currentDevice.online ? '🟢 Online' : '🔴 Offline';
-    const info = document.getElementById('navDeviceInfo');
-    const dot = document.getElementById('navDeviceStatus');
     
-    if (info) info.textContent = `${currentDevice.name} • ${status}`;
-    if (dot) {
-        dot.classList.remove('offline');
-        if (!currentDevice.online) dot.classList.add('offline');
+    const json = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(json.error || 'Erro ao carregar devices');
     }
+    
+    const devices = json.data || [];
+    console.log('✅ Devices carregados:', devices.length);
+    
+    deviceSelect.innerHTML = '';
+    
+    if (devices.length === 0) {
+      console.warn('⚠️ Nenhum device encontrado');
+      showError('Nenhum device cadastrado');
+      return;
+    }
+    
+    // Preencher dropdown
+    for (const d of devices) {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = `${d.name} (${d.hw_type})`;
+      deviceSelect.appendChild(opt);
+    }
+    
+    // Auto-select primeiro
+    if (devices.length > 0) {
+      deviceSelect.value = devices[0].id;
+      currentDeviceId = devices[0].id;
+      currentDeviceName = devices[0].name;
+      console.log('✅ Device auto-selecionado:', devices[0].name);
+      
+      updateDeviceInfo(devices[0]);
+      await loadPumps(devices[0].id);
+    }
+    
+  } catch (err) {
+    console.error('❌ Erro ao carregar devices:', err);
+    showError(err.message);
+  }
 }
 
-// ===== PUMPS =====
+function updateDeviceInfo(device) {
+  if (!deviceInfo) return;
+  
+  const status = device.online ? '🟢 Online' : '🔴 Offline';
+  deviceInfo.innerHTML = `
+    <strong>${device.name}</strong> • ${device.hw_type} • ${status} • ${device.pump_count || 0} bombas
+  `;
+}
+
+// Listener para troca de device
+if (deviceSelect) {
+  deviceSelect.addEventListener('change', async (e) => {
+    const deviceId = parseInt(e.target.value);
+    if (!deviceId) return;
+    
+    const token = getAccessToken();
+    try {
+      console.log('🔄 Buscando device:', deviceId);
+      
+      const res = await fetch('/api/v1/user/dosing/devices', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const json = await res.json();
+      const device = json.data.find(d => d.id == deviceId);
+      
+      if (device) {
+        currentDeviceId = deviceId;
+        currentDeviceName = device.name;
+        console.log('✅ Device selecionado:', device.name);
+        
+        updateDeviceInfo(device);
+        await loadPumps(deviceId);
+      }
+      
+    } catch (err) {
+      console.error('❌ Erro ao trocar device:', err);
+      showError(err.message);
+    }
+  });
+}
+
+// ===== Pumps =====
+
 async function loadPumps(deviceId) {
-    if (!deviceId) {
-        console.error('❌ deviceId não fornecido');
-        return;
-    }
-
+  const token = getAccessToken();
+  if (!token || !deviceId) return;
+  
+  try {
     console.log('💧 Carregando bombas para device:', deviceId);
-
-    const result = await apiCall(`/api/v1/user/dosing/devices/${deviceId}/pumps`, 'GET');
     
-    if (!result || !result.data) {
-        console.error('❌ Erro ao carregar bombas:', result);
-        showError('Erro ao carregar bombas');
-        return;
+    const res = await fetch(`/api/v1/user/dosing/devices/${deviceId}/pumps`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    const json = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(json.error || 'Erro ao carregar bombas');
     }
-
-    pumps = result.data;
-    console.log('✅ Bombas carregadas:', pumps.length);
+    
+    cachedPumps = json.data || [];
+    console.log('✅ Bombas carregadas:', cachedPumps.length);
     
     renderPumpSelectors();
     renderConfigTable();
+    
+    // Carregar agendas do primeiro pump
+    if (cachedPumps.length > 0) {
+      currentPumpIndex = cachedPumps[0].index_on_device;
+      await loadSchedules(deviceId, currentPumpIndex);
+    }
+    
+  } catch (err) {
+    console.error('❌ Erro ao carregar bombas:', err);
+    showError(err.message);
+  }
 }
 
 function renderPumpSelectors() {
-    const selectors = ['pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
-
-    selectors.forEach(selectorId => {
-        const select = document.getElementById(selectorId);
-        if (!select) return;
-
-        select.innerHTML = '';
-
-        pumps.forEach((pump, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = `${index + 1} - ${pump.name || `Bomba ${index + 1}`}`;
-            select.appendChild(option);
-        });
-
-        select.value = '0';
+  const selectors = [pumpSelectManual, pumpSelectCalibration, pumpSelectAgenda];
+  
+  selectors.forEach(select => {
+    if (!select) return;
+    select.innerHTML = '';
+    
+    cachedPumps.forEach((pump, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = `${idx + 1} - ${pump.name || `Bomba ${idx + 1}`}`;
+      select.appendChild(opt);
     });
+    
+    select.value = '0';
+  });
 }
 
-// ===== CONFIG TABLE =====
 function renderConfigTable() {
-    const tbody = document.getElementById('configTableBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    if (pumps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma bomba encontrada</td></tr>';
-        return;
-    }
-
-    pumps.forEach((pump, index) => {
-        const row = document.createElement('tr');
-        const containerSize = pump.container_volume_ml || pump.container_size || 0;
-        const currentVolume = pump.current_volume_ml || pump.current_volume || 0;
-        const alarmPercent = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-        const maxDaily = pump.max_daily_ml || pump.daily_max || 0;
-        
-        row.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${pump.name || `P${index + 1}`}</td>
-            <td>${pump.enabled ? '✓ Ativa' : '✗ Inativa'}</td>
-            <td>${containerSize}</td>
-            <td>${currentVolume}</td>
-            <td>${alarmPercent}%</td>
-            <td>${maxDaily}</td>
-            <td><button class="btn-edit" onclick="openEditModal(${index})">Editar</button></td>
-        `;
-        tbody.appendChild(row);
-    });
+  if (!configTableBody) return;
+  
+  configTableBody.innerHTML = '';
+  
+  if (cachedPumps.length === 0) {
+    configTableBody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding: 20px;">
+          Nenhuma bomba configurada
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
+  cachedPumps.forEach((pump, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${pump.name || `Bomba ${idx + 1}`}</td>
+      <td>${pump.active ? '✓ Ativa' : '✗ Inativa'}</td>
+      <td>${pump.container_volume || 0} ml</td>
+      <td>${pump.current_volume || 0} ml</td>
+      <td>${pump.alarm_percentage || 0}%</td>
+      <td>${pump.max_daily_dose || 0} ml</td>
+      <td>
+        <button class="btn btn-sm" onclick="editPump(${pump.id})">Editar</button>
+      </td>
+    `;
+    configTableBody.appendChild(tr);
+  });
 }
 
-// ===== EDIT MODAL =====
-function openEditModal(index) {
-    const pump = pumps[index];
-    if (!pump) return;
+// ===== Schedules =====
 
-    document.getElementById('editPumpIndex').value = index;
-    document.getElementById('editName').value = pump.name || '';
-    document.getElementById('editContainerSize').value = pump.container_volume_ml || pump.container_size || 0;
-    document.getElementById('editCurrentVolume').value = pump.current_volume_ml || pump.current_volume || 0;
-    document.getElementById('editAlarmPercent').value = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-    document.getElementById('editDailyMax').value = pump.max_daily_ml || pump.daily_max || 0;
-
-    document.getElementById('editModal').style.display = 'flex';
-}
-
-function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-}
-
-async function saveEditModal() {
-    const index = parseInt(document.getElementById('editPumpIndex').value);
-
-    const data = {
-        name: document.getElementById('editName').value,
-        active: true,
-        container_size: parseInt(document.getElementById('editContainerSize').value) || 0,
-        current_volume: parseInt(document.getElementById('editCurrentVolume').value) || 0,
-        alarm_percent: parseInt(document.getElementById('editAlarmPercent').value) || 0,
-        daily_max: parseInt(document.getElementById('editDailyMax').value) || 0
-    };
-
-    console.log('💾 Salvando bomba:', index, data);
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${index}`,
-        'PUT',
-        data
-    );
-
-    if (result) {
-        showSuccess('Bomba atualizada com sucesso!');
-        closeEditModal();
-        await loadPumps(currentDevice.id);
-    }
-}
-
-// ===== SCHEDULES =====
 async function loadSchedules(deviceId, pumpIndex) {
-    if (!deviceId) {
-        console.error('❌ deviceId não fornecido');
-        return;
-    }
-
-    console.log('📅 Carregando agendas para:', deviceId, 'pump:', pumpIndex);
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
-        'GET'
+  const token = getAccessToken();
+  if (!token || !deviceId) return;
+  
+  try {
+    console.log('📅 Carregando agendas para pump:', pumpIndex);
+    
+    const res = await fetch(
+      `/api/v1/user/dosing/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
     );
-
-    schedules = result && result.data ? result.data : [];
-    console.log('✅ Agendas carregadas:', schedules.length);
-    renderScheduleTable();
+    
+    const json = await res.json();
+    
+    if (!res.ok) {
+      console.warn('⚠️ Nenhuma agenda encontrada');
+      cachedSchedules = [];
+      return;
+    }
+    
+    cachedSchedules = json.data || [];
+    console.log('✅ Agendas carregadas:', cachedSchedules.length);
+    
+  } catch (err) {
+    console.warn('⚠️ Erro ao carregar agendas:', err.message);
+    cachedSchedules = [];
+  }
 }
 
-function renderScheduleTable() {
-    const tbody = document.getElementById('scheduleTableBody');
-    if (!tbody) return;
+// ===== Actions =====
 
-    if (schedules.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Nenhuma agenda para esta bomba</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = '';
-
-    schedules.forEach(schedule => {
-        const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-        
-        // Converter days_of_week (array booleano) ou days_mask (número bitmask)
-        let activeDaysArray = [];
-        if (schedule.days_of_week && Array.isArray(schedule.days_of_week)) {
-            activeDaysArray = schedule.days_of_week;
-        } else if (schedule.days_mask !== undefined) {
-            // Converter bitmask para array
-            for (let i = 0; i < 7; i++) {
-                activeDaysArray[i] = (schedule.days_mask & (1 << i)) !== 0;
-            }
-        }
-        
-        const daysText = activeDaysArray
-            .map((active, i) => active ? days[i] : '')
-            .filter(d => d)
-            .join(', ');
-
-        const row = document.createElement('tr');
-        const startTime = schedule.start_time || '--';
-        const endTime = schedule.end_time || '--';
-        
-        row.innerHTML = `
-            <td><input type="checkbox" ${schedule.enabled ? 'checked' : ''} disabled></td>
-            <td>${daysText || '---'}</td>
-            <td>${schedule.doses_per_day || 0}</td>
-            <td>${startTime} - ${endTime}</td>
-            <td>${schedule.volume_per_day_ml || 0}</td>
-            <td><button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button></td>
-        `;
-        tbody.appendChild(row);
-    });
+function editPump(pumpId) {
+  const pump = cachedPumps.find(p => p.id === pumpId);
+  if (!pump) {
+    showError('Bomba não encontrada');
+    return;
+  }
+  
+  console.log('Editando bomba:', pump);
+  showSuccess(`Modo edição: ${pump.name}`);
+  // TODO: Implementar modal de edição
 }
 
-function openAgendaModal() {
-    document.getElementById('pumpSelectAgenda').value = currentPumpIndex;
-    document.getElementById('agendaModal').style.display = 'flex';
-}
+// ===== Init on page load =====
 
-function closeAgendaModal() {
-    document.getElementById('agendaModal').style.display = 'none';
-}
-
-async function createSchedule() {
-    const pumpIndex = parseInt(document.getElementById('pumpSelectAgenda').value);
-
-    const dayCheckboxes = document.querySelectorAll('.day-checkbox');
-    const activeDays = Array.from(dayCheckboxes).map(cb => cb.checked);
-
-    const data = {
-        active: true,
-        active_days: activeDays,
-        doses_per_day: parseInt(document.getElementById('dosesPerDay').value),
-        start_time: document.getElementById('startTime').value,
-        end_time: document.getElementById('endTime').value,
-        volume_per_day: parseInt(document.getElementById('volumePerDay').value)
-    };
-
-    console.log('📅 Criando agenda:', pumpIndex, data);
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
-        'POST',
-        data
-    );
-
-    if (result) {
-        showSuccess('Agenda criada com sucesso!');
-        closeAgendaModal();
-        await loadSchedules(currentDevice.id, pumpIndex);
-    }
-}
-
-async function deleteSchedule(scheduleId) {
-    if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
-        'DELETE'
-    );
-
-    if (result) {
-        showSuccess('Agenda deletada!');
-        await loadSchedules(currentDevice.id, currentPumpIndex);
-    }
-}
-
-// ===== MANUAL DOSE =====
-async function applyManualDose() {
-    const pumpIndex = parseInt(document.getElementById('pumpSelectManual').value);
-    const volume = parseInt(document.getElementById('manualVolume').value);
-
-    if (!volume || volume <= 0) {
-        showError('Digite um volume válido');
-        return;
-    }
-
-    console.log('💧 Aplicando dose manual:', pumpIndex, volume);
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
-        'POST',
-        { volume }
-    );
-
-    if (result) {
-        showSuccess(`Dose de ${volume}mL aplicada!`);
-        document.getElementById('manualVolume').value = '0';
-    }
-}
-
-// ===== CALIBRATION =====
-async function startCalibration() {
-    const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
-    const btn = event.target;
-
-    console.log('⚙️ Iniciando calibração:', pumpIndex);
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
-        'POST'
-    );
-
-    if (result) {
-        btn.disabled = true;
-        let countdown = 10;
-
-        const timer = setInterval(() => {
-            btn.textContent = `🔴 Go (${countdown}s)`;
-            countdown--;
-
-            if (countdown < 0) {
-                clearInterval(timer);
-                btn.disabled = false;
-                btn.textContent = '🔴 Go (10s)';
-            }
-        }, 1000);
-    }
-}
-
-async function saveCalibration() {
-    const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
-    const measuredVolume = parseFloat(document.getElementById('measuredVolume').value);
-
-    if (!measuredVolume || measuredVolume <= 0) {
-        showError('Digite um volume válido');
-        return;
-    }
-
-    console.log('⚙️ Salvando calibração:', pumpIndex, measuredVolume);
-
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
-        'POST',
-        { measured_volume: measuredVolume }
-    );
-
-    if (result) {
-        const rate = (measuredVolume / 10).toFixed(2);
-        showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
-        document.getElementById('measuredVolume').value = '';
-    }
-}
-
-// ===== TABS =====
-function switchTab(tabName, btnElement) {
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-
-    const tab = document.getElementById(tabName);
-    if (tab) {
-        tab.classList.add('active');
-    }
-
-    if (btnElement) {
-        btnElement.classList.add('active');
-    }
-}
-
-// ===== MODAL CLOSE =====
-window.addEventListener('click', (e) => {
-    const editModal = document.getElementById('editModal');
-    const agendaModal = document.getElementById('agendaModal');
-
-    if (e.target === editModal) editModal.style.display = 'none';
-    if (e.target === agendaModal) agendaModal.style.display = 'none';
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('📄 DOM carregado, iniciando dashboard...');
+  initDashboard();
 });
-
-// ===== INIT =====
-window.addEventListener('load', initDashboard);
