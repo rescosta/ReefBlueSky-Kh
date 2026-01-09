@@ -668,6 +668,10 @@ const JWT_SECRET = process.env.JWT_SECRET || '...';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...';
 
 
+// Body parser
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
 // ===== Middleware de autenticação de usuário (JWT - web) =====
 function authUserMiddleware(req, res, next) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
@@ -787,9 +791,7 @@ const syncLimiter = rateLimit({
 
 app.use(globalLimiter);
 
-// Body parser
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
 app.use('/api/display', displayRoutes);
 
 
