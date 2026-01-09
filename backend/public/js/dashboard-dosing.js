@@ -1,16 +1,13 @@
-// dashboard-dosing-novo.js
+// dashboard-dosing.js - Integrado com dashboard-common.js
+// Não precisa de fetch manual - usa apiFetch() do common.js
 
-const token = localStorage.getItem('token');
+const token = getAccessToken();
 let currentDevice = null;
 let currentPumpIndex = null;
 let cachedPumps = [];
 let cachedSchedules = [];
 
 // ===== DOM Elements =====
-const errorMsg = (id) => document.getElementById(id);
-const successMsg = (id) => document.getElementById(id);
-
-// Tabs
 const tabDashboard = document.getElementById('tabDashboard');
 const tabDevices = document.getElementById('tabDevices');
 const tabBombas = document.getElementById('tabBombas');
@@ -23,12 +20,10 @@ const bombasView = document.getElementById('bombasView');
 const agendasView = document.getElementById('agendasView');
 const historicoView = document.getElementById('historicoView');
 
-// Bombas
 const pumpSelectorDropdown = document.getElementById('pumpSelectorDropdown');
 const pumpConfigSection = document.getElementById('pumpConfigSection');
 const pumpConfigTitle = document.getElementById('pumpConfigTitle');
 
-// Pump Config
 const pumpName = document.getElementById('pumpName');
 const pumpActiveToggle = document.getElementById('pumpActiveToggle');
 const pumpActiveLabel = document.getElementById('pumpActiveLabel');
@@ -41,7 +36,6 @@ const pumpDailyMax = document.getElementById('pumpDailyMax');
 const savePumpBtn = document.getElementById('savePumpBtn');
 const cancelPumpBtn = document.getElementById('cancelPumpBtn');
 
-// Schedule
 const scheduleDosesPerDay = document.getElementById('scheduleDosesPerDay');
 const scheduleStartTime = document.getElementById('scheduleStartTime');
 const scheduleEndTime = document.getElementById('scheduleEndTime');
@@ -50,28 +44,28 @@ const saveScheduleBtn = document.getElementById('saveScheduleBtn');
 const cancelScheduleBtn = document.getElementById('cancelScheduleBtn');
 const schedulesTableBody = document.getElementById('schedulesTableBody');
 
-// Manual
 const manualDoseVolume = document.getElementById('manualDoseVolume');
 const applyManualDoseBtn = document.getElementById('applyManualDoseBtn');
 const cancelManualBtn = document.getElementById('cancelManualBtn');
 
-// Calibration
 const calibrationVolume = document.getElementById('calibrationVolume');
 const startCalibrationBtn = document.getElementById('startCalibrationBtn');
 const saveCalibrationBtn = document.getElementById('saveCalibrationBtn');
 const cancelCalibrationBtn = document.getElementById('cancelCalibrationBtn');
 
-// Tables
 const devicesBody = document.getElementById('devicesBody');
 const pumpsTableBody = document.getElementById('pumpsTableBody');
 const dashboardBody = document.getElementById('dashboardBody');
 const allSchedulesBody = document.getElementById('allSchedulesBody');
 const historyBody = document.getElementById('historyBody');
 
+const logoutBtn = document.getElementById('logoutBtn');
+const userMenu = document.getElementById('userMenu');
+
 // ===== Initialization =====
 document.addEventListener('DOMContentLoaded', () => {
     if (!token) {
-        alert('Não autenticado. Faça login.');
+        redirectToLogin();
         return;
     }
 
@@ -79,8 +73,22 @@ document.addEventListener('DOMContentLoaded', () => {
     initSubTabs();
     initPumpSelector();
     initEventListeners();
+    startTopbarClock();
+    
     loadDevices();
+    setupLogout();
 });
+
+// ===== Setup Logout =====
+function setupLogout() {
+    logoutBtn.addEventListener('click', () => {
+        redirectToLogin();
+    });
+    
+    userMenu.addEventListener('click', () => {
+        alert('Usuário: ' + (localStorage.getItem('userId') || 'Anônimo'));
+    });
+}
 
 // ===== Tab Navigation =====
 function initTabs() {
@@ -94,12 +102,10 @@ function initTabs() {
 
     tabs.forEach((tab) => {
         tab.btn.addEventListener('click', () => {
-            // Remove active de todos
             tabs.forEach((t) => {
                 t.btn.classList.remove('active');
                 t.view.classList.remove('active');
             });
-            // Adiciona active ao selecionado
             tab.btn.classList.add('active');
             tab.view.classList.add('active');
         });
@@ -111,12 +117,8 @@ function initSubTabs() {
     subTabBtns.forEach((btn) => {
         btn.addEventListener('click', () => {
             const target = btn.getAttribute('data-subtab');
-
-            // Remove active de todos os botões e views
             subTabBtns.forEach((b) => b.classList.remove('active'));
             document.querySelectorAll('.sub-view').forEach((v) => v.classList.remove('active'));
-
-            // Adiciona active ao selecionado
             btn.classList.add('active');
             document.getElementById(`${target}SubView`).classList.add('active');
         });
@@ -127,7 +129,7 @@ function initSubTabs() {
 function initPumpSelector() {
     pumpSelectorDropdown.addEventListener('change', (e) => {
         const pumpId = e.target.value;
-        if (pumpId) {
+        if (pumpId !== '') {
             loadPumpConfig(parseInt(pumpId));
         } else {
             pumpConfigSection.style.display = 'none';
@@ -144,10 +146,8 @@ function loadPumpConfig(pumpIndex) {
         return;
     }
 
-    // Atualiza title
     pumpConfigTitle.textContent = `Configuração - ${pump.name || `Bomba ${pumpIndex + 1}`}`;
 
-    // Atualiza campos
     pumpName.value = pump.name || `Pump ${pumpIndex + 1}`;
     pumpActiveToggle.classList.toggle('active', pump.active !== false);
     pumpActiveLabel.textContent = pump.active !== false ? 'Ativa' : 'Desativa';
@@ -161,23 +161,18 @@ function loadPumpConfig(pumpIndex) {
     pumpAlarmPercent.value = pump.alarm_percent || 10;
     pumpDailyMax.value = pump.daily_max || 100;
 
-    // Mostra a seção
     pumpConfigSection.style.display = 'block';
-
-    // Carrega agendas dessa bomba
     loadSchedulesForPump(pumpIndex);
 }
 
 // ===== Event Listeners =====
 function initEventListeners() {
-    // Pump Config
     savePumpBtn.addEventListener('click', savePumpConfiguration);
     cancelPumpBtn.addEventListener('click', () => {
         pumpConfigSection.style.display = 'none';
         pumpSelectorDropdown.value = '';
     });
 
-    // Range inputs
     pumpContainerSize.addEventListener('input', (e) => {
         pumpContainerValue.textContent = e.target.value;
     });
@@ -185,25 +180,21 @@ function initEventListeners() {
         pumpCurrentValue.textContent = e.target.value;
     });
 
-    // Active toggle
     pumpActiveToggle.addEventListener('click', () => {
         pumpActiveToggle.classList.toggle('active');
         pumpActiveLabel.textContent = pumpActiveToggle.classList.contains('active') ? 'Ativa' : 'Desativa';
     });
 
-    // Schedule
     saveScheduleBtn.addEventListener('click', saveSchedule);
     cancelScheduleBtn.addEventListener('click', () => {
-        document.querySelector('.sub-tab-btn').click(); // volta para settings
+        document.querySelector('.sub-tab-btn').click();
     });
 
-    // Manual
     applyManualDoseBtn.addEventListener('click', applyManualDose);
     cancelManualBtn.addEventListener('click', () => {
         manualDoseVolume.value = 0;
     });
 
-    // Calibration
     startCalibrationBtn.addEventListener('click', startCalibration);
     saveCalibrationBtn.addEventListener('click', saveCalibration);
     cancelCalibrationBtn.addEventListener('click', () => {
@@ -211,17 +202,14 @@ function initEventListeners() {
     });
 }
 
-// ===== API Calls =====
+// ===== API Calls (usando apiFetch do common.js) =====
 async function loadDevices() {
     try {
-        const res = await fetch('/api/v1/user/dosing/devices', {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch('/api/v1/user/dosing/devices');
         const data = await res.json();
 
         if (!res.ok) {
-            errorMsg('devicesError').textContent = data.error || 'Erro ao carregar devices';
-            errorMsg('devicesError').style.display = 'block';
+            showError('devicesError', data.error || 'Erro ao carregar devices');
             return;
         }
 
@@ -232,21 +220,17 @@ async function loadDevices() {
         }
     } catch (err) {
         console.error('Erro ao carregar devices:', err);
-        errorMsg('devicesError').textContent = 'Falha de comunicação';
-        errorMsg('devicesError').style.display = 'block';
+        showError('devicesError', 'Falha de comunicação');
     }
 }
 
 async function loadPumpsForDevice(deviceId) {
     try {
-        const res = await fetch(`/api/v1/user/dosing/devices/${deviceId}/pumps`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/v1/user/dosing/devices/${deviceId}/pumps`);
         const data = await res.json();
 
         if (!res.ok) {
-            errorMsg('bombasError').textContent = data.error || 'Erro ao carregar bombas';
-            errorMsg('bombasError').style.display = 'block';
+            showError('bombasError', data.error || 'Erro ao carregar bombas');
             return;
         }
 
@@ -255,18 +239,14 @@ async function loadPumpsForDevice(deviceId) {
         renderPumpsTable();
     } catch (err) {
         console.error('Erro ao carregar bombas:', err);
-        errorMsg('bombasError').textContent = 'Falha de comunicação';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Falha de comunicação');
     }
 }
 
 async function loadSchedulesForPump(pumpIndex) {
     try {
-        const res = await fetch(
-            `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
-            {
-                headers: { Authorization: `Bearer ${token}` },
-            }
+        const res = await apiFetch(
+            `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`
         );
         const data = await res.json();
 
@@ -292,36 +272,29 @@ async function savePumpConfiguration() {
     };
 
     try {
-        const res = await fetch(
+        const res = await apiFetch(
             `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}`,
             {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
                 body: JSON.stringify(payload),
             }
         );
 
         const data = await res.json();
         if (!res.ok) {
-            errorMsg('bombasError').textContent = data.error || 'Erro ao salvar';
-            errorMsg('bombasError').style.display = 'block';
+            showError('bombasError', data.error || 'Erro ao salvar');
             return;
         }
 
-        successMsg('bombasSuccess').textContent = 'Configuração salva com sucesso!';
-        successMsg('bombasSuccess').style.display = 'block';
+        showSuccess('bombasSuccess', 'Configuração salva com sucesso!');
         setTimeout(() => {
-            successMsg('bombasSuccess').style.display = 'none';
+            document.getElementById('bombasSuccess').style.display = 'none';
         }, 3000);
 
         loadPumpsForDevice(currentDevice.id);
     } catch (err) {
         console.error('Erro ao salvar bomba:', err);
-        errorMsg('bombasError').textContent = 'Falha de comunicação';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Falha de comunicação');
     }
 }
 
@@ -341,36 +314,29 @@ async function saveSchedule() {
     };
 
     try {
-        const res = await fetch(
+        const res = await apiFetch(
             `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
                 body: JSON.stringify(payload),
             }
         );
 
         const data = await res.json();
         if (!res.ok) {
-            errorMsg('bombasError').textContent = data.error || 'Erro ao criar agenda';
-            errorMsg('bombasError').style.display = 'block';
+            showError('bombasError', data.error || 'Erro ao criar agenda');
             return;
         }
 
-        successMsg('bombasSuccess').textContent = 'Agenda criada com sucesso!';
-        successMsg('bombasSuccess').style.display = 'block';
+        showSuccess('bombasSuccess', 'Agenda criada com sucesso!');
         setTimeout(() => {
-            successMsg('bombasSuccess').style.display = 'none';
+            document.getElementById('bombasSuccess').style.display = 'none';
         }, 3000);
 
         loadSchedulesForPump(currentPumpIndex);
     } catch (err) {
         console.error('Erro ao salvar agenda:', err);
-        errorMsg('bombasError').textContent = 'Falha de comunicação';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Falha de comunicação');
     }
 }
 
@@ -379,42 +345,34 @@ async function applyManualDose() {
 
     const volume = parseInt(manualDoseVolume.value);
     if (volume <= 0) {
-        errorMsg('bombasError').textContent = 'Informe um volume válido';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Informe um volume válido');
         return;
     }
 
     try {
-        const res = await fetch(
+        const res = await apiFetch(
             `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/manual`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
                 body: JSON.stringify({ volume }),
             }
         );
 
         const data = await res.json();
         if (!res.ok) {
-            errorMsg('bombasError').textContent = data.error || 'Erro ao aplicar dose';
-            errorMsg('bombasError').style.display = 'block';
+            showError('bombasError', data.error || 'Erro ao aplicar dose');
             return;
         }
 
-        successMsg('bombasSuccess').textContent = `Dose de ${volume}mL aplicada!`;
-        successMsg('bombasSuccess').style.display = 'block';
+        showSuccess('bombasSuccess', `Dose de ${volume}mL aplicada!`);
         setTimeout(() => {
-            successMsg('bombasSuccess').style.display = 'none';
+            document.getElementById('bombasSuccess').style.display = 'none';
         }, 3000);
 
         manualDoseVolume.value = 0;
     } catch (err) {
         console.error('Erro ao aplicar dose:', err);
-        errorMsg('bombasError').textContent = 'Falha de comunicação';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Falha de comunicação');
     }
 }
 
@@ -425,17 +383,15 @@ async function startCalibration() {
     startCalibrationBtn.textContent = 'Dosando... (10s)';
 
     try {
-        const res = await fetch(
+        const res = await apiFetch(
             `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/calibrate/start`,
             {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
             }
         );
 
         if (!res.ok) {
-            errorMsg('bombasError').textContent = 'Erro ao iniciar calibração';
-            errorMsg('bombasError').style.display = 'block';
+            showError('bombasError', 'Erro ao iniciar calibração');
         }
 
         setTimeout(() => {
@@ -444,8 +400,7 @@ async function startCalibration() {
         }, 10000);
     } catch (err) {
         console.error('Erro ao iniciar calibração:', err);
-        errorMsg('bombasError').textContent = 'Falha de comunicação';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Falha de comunicação');
         startCalibrationBtn.disabled = false;
         startCalibrationBtn.textContent = 'Go (10s)';
     }
@@ -456,43 +411,35 @@ async function saveCalibration() {
 
     const volume = parseInt(calibrationVolume.value);
     if (volume <= 0) {
-        errorMsg('bombasError').textContent = 'Informe o volume medido';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Informe o volume medido');
         return;
     }
 
     try {
-        const res = await fetch(
+        const res = await apiFetch(
             `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/calibrate/save`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
                 body: JSON.stringify({ measured_volume: volume }),
             }
         );
 
         const data = await res.json();
         if (!res.ok) {
-            errorMsg('bombasError').textContent = data.error || 'Erro ao salvar calibração';
-            errorMsg('bombasError').style.display = 'block';
+            showError('bombasError', data.error || 'Erro ao salvar calibração');
             return;
         }
 
-        successMsg('bombasSuccess').textContent = 'Calibração salva com sucesso!';
-        successMsg('bombasSuccess').style.display = 'block';
+        showSuccess('bombasSuccess', 'Calibração salva com sucesso!');
         setTimeout(() => {
-            successMsg('bombasSuccess').style.display = 'none';
+            document.getElementById('bombasSuccess').style.display = 'none';
         }, 3000);
 
         calibrationVolume.value = '';
         loadPumpsForDevice(currentDevice.id);
     } catch (err) {
         console.error('Erro ao salvar calibração:', err);
-        errorMsg('bombasError').textContent = 'Falha de comunicação';
-        errorMsg('bombasError').style.display = 'block';
+        showError('bombasError', 'Falha de comunicação');
     }
 }
 
@@ -576,4 +523,21 @@ function renderSchedulesTable() {
         `;
         schedulesTableBody.appendChild(tr);
     });
+}
+
+// ===== Utility Functions =====
+function showError(elementId, msg) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+}
+
+function showSuccess(elementId, msg) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
 }
