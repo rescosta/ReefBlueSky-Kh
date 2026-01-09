@@ -12,49 +12,39 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background-color: #f5f5f5;
             color: #333;
         }
 
-        /* ===== NAVBAR (do main.html) ===== */
+        /* Navbar Principal */
         nav.navbar {
-            background: linear-gradient(135deg, #1a7c79 0%, #0d7c6d 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
             color: white;
             padding: 0;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            position: sticky;
-            top: 0;
-            z-index: 100;
         }
 
         .navbar-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 20px;
+            padding: 0 30px;
             height: 60px;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
         }
 
         .navbar-brand {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: bold;
             display: flex;
             align-items: center;
-            gap: 8px;
-            white-space: nowrap;
+            gap: 10px;
         }
 
         .navbar-menu {
             display: flex;
             list-style: none;
             gap: 30px;
-            flex: 1;
-            margin-left: 40px;
-            align-items: center;
         }
 
         .navbar-menu li a {
@@ -63,9 +53,8 @@
             padding: 8px 0;
             border-bottom: 3px solid transparent;
             transition: all 0.3s;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
-            white-space: nowrap;
         }
 
         .navbar-menu li a:hover,
@@ -78,7 +67,6 @@
             align-items: center;
             gap: 15px;
             font-size: 12px;
-            margin-left: auto;
         }
 
         .device-status {
@@ -87,8 +75,7 @@
             border-radius: 20px;
             display: flex;
             align-items: center;
-            gap: 6px;
-            white-space: nowrap;
+            gap: 8px;
         }
 
         .status-dot {
@@ -96,17 +83,10 @@
             height: 8px;
             border-radius: 50%;
             background: #22c55e;
-            animation: pulse 2s infinite;
         }
 
         .status-dot.offline {
             background: #ef4444;
-            animation: none;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         .btn-logout {
@@ -116,18 +96,17 @@
             padding: 6px 12px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             transition: all 0.3s;
-            white-space: nowrap;
         }
 
         .btn-logout:hover {
             background: rgba(255,255,255,0.3);
         }
 
-        /* ===== PAGE HEADER ===== */
+        /* Header da Dosadora */
         .page-header {
-            background: linear-gradient(135deg, #0d7c6d 0%, #1a504d 100%);
+            background: linear-gradient(135deg, #1a504d 0%, #208080 100%);
             color: white;
             padding: 25px 30px;
             border-bottom: 3px solid #16a085;
@@ -143,7 +122,7 @@
             opacity: 0.9;
         }
 
-        /* ===== CONTAINER ===== */
+        /* Container Principal */
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -162,7 +141,6 @@
             padding: 15px;
             border-radius: 8px;
             border: 1px solid #e0e0e0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .control-group label {
@@ -180,7 +158,6 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 13px;
-            font-family: inherit;
         }
 
         #deviceInfo {
@@ -206,7 +183,7 @@
             background: #ef4444;
         }
 
-        /* ===== TABS ===== */
+        /* Tabs */
         .tabs {
             display: flex;
             gap: 10px;
@@ -246,7 +223,6 @@
             border-radius: 0 0 8px 8px;
             border: 1px solid #e0e0e0;
             border-top: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .tab-content.active {
@@ -276,7 +252,7 @@
             font-weight: 600;
             color: #555;
             border-bottom: 2px solid #ddd;
-            font-size: 11px;
+            font-size: 12px;
         }
 
         td {
@@ -295,7 +271,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
-            font-size: 11px;
+            font-size: 12px;
             transition: all 0.3s;
         }
 
@@ -325,7 +301,7 @@
             display: block;
             margin-bottom: 6px;
             font-weight: 500;
-            font-size: 12px;
+            font-size: 13px;
             color: #555;
         }
 
@@ -336,7 +312,6 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 13px;
-            font-family: inherit;
         }
 
         .form-row {
@@ -442,6 +417,19 @@
             clear: both;
         }
 
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+
         .alert {
             padding: 12px 15px;
             border-radius: 6px;
@@ -476,57 +464,34 @@
 
             .navbar-menu {
                 gap: 15px;
-                font-size: 11px;
-                margin-left: 20px;
-            }
-
-            .navbar-right {
-                gap: 10px;
-            }
-
-            table {
-                font-size: 11px;
-            }
-
-            th, td {
-                padding: 8px;
+                font-size: 12px;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Navbar (do main.html) -->
-    <nav class="navbar">
-        <div class="navbar-container">
-            <div class="navbar-brand">
-                <span>🌊</span> ReefBlueSky
-            </div>
-            <ul class="navbar-menu">
-                <li><a href="/">Principal</a></li>
-                <li><a href="/graficos.html">Gráficos</a></li>
-                <li><a href="/configuracoes.html">Configurações</a></li>
-                <li><a href="/sistema.html">Sistema</a></li>
-                <li><a href="/dashboard-dosing.html" class="active">Dosadora</a></li>
-                <li><a href="/dev.html">Dev</a></li>
-            </ul>
-            <div class="navbar-right">
-                <div class="device-status">
-                    <span class="status-dot" id="navDeviceStatus"></span>
-                    <span id="navDeviceInfo">Conectando...</span>
-                </div>
-                <button class="btn-logout" onclick="logout()">Sair</button>
-            </div>
-        </div>
-    </nav>
+  <div id="topbar-root"></div>
 
-    <!-- Header -->
+  <!-- painel lateral -->
+  <div id="sideMenu" class="side-menu">
+    <button id="closeMenu" class="side-close">×</button>
+    <a href="dashboard-main.html">Principal</a>
+    <a href="dashboard-graficos.html">Gráficos</a>
+    <a href="dashboard-config.html">Configurações</a>
+    <a href="dashboard-sistema.html">Sistema</a>
+    <a href="dashboard-logs.html">Dev</a>
+    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
+  </div>
+
+
+    <!-- Header Dosadora -->
     <div class="page-header">
         <h1>🌊 Dosadora Balling</h1>
         <p>Gerenciador de dosadoras automáticas para aquários marinhos</p>
     </div>
 
     <div class="container">
-        <!-- Alert Box -->
+        <!-- Alert -->
         <div id="alertBox"></div>
 
         <!-- Controls -->
@@ -537,6 +502,13 @@
             </div>
             <div class="control-group" id="deviceInfo">
                 Carregando...
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="pumpSelect">Bomba (Configurações):</label>
+                <select id="pumpSelect"></select>
             </div>
         </div>
 
@@ -565,7 +537,7 @@
                     </tr>
                 </thead>
                 <tbody id="configTableBody">
-                    <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+                    <tr><td colspan="8" style="text-align: center;" class="loading">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -591,7 +563,7 @@
                     </tr>
                 </thead>
                 <tbody id="scheduleTableBody">
-                    <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
+                    <tr><td colspan="6" style="text-align: center;" class="loading">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
