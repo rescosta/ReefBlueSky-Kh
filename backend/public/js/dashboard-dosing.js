@@ -1,4 +1,4 @@
-// Dashboard Dosadora - Script Principal - CORRIGIDO
+// Dashboard Dosadora
 // ================================================
 
 let currentDevice = null;
@@ -76,9 +76,15 @@ function renderDeviceSelector() {
     select.innerHTML = '';
 
     if (devices.length === 0) {
-        select.innerHTML = '<option>Nenhum device encontrado</option>';
+        select.innerHTML = '<option value="">Nenhum device encontrado</option>';
+        
+        // zera o estado visual se não tiver device
+        currentDevice = null;
+        updateDeviceInfo();
+        updateNavbarDeviceInfo();
         return;
     }
+
 
     devices.forEach(device => {
         const option = document.createElement('option');
