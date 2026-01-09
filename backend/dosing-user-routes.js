@@ -366,18 +366,21 @@ router.get('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) => 
 
         // Buscar agendas
         const schedules = await conn.query(
-            `SELECT
-                id, pump_id,
-                enabled, days_mask, doses_per_day,
-                TIME_FORMAT(start_time, '%H:%i') as start_time,
-                TIME_FORMAT(end_time, '%H:%i') as end_time,
-                volume_per_day_ml,
-                created_at
-            FROM dosing_schedules
-            WHERE pump_id = ?
-            ORDER BY start_time ASC`,
-            [pump[0].id]
+          `SELECT
+              s.id, s.pump_id,
+              s.enabled, s.days_mask, s.doses_per_day,
+              TIME_FORMAT(s.start_time, '%H:%i') as start_time,
+              TIME_FORMAT(s.end_time, '%H:%i') as end_time,
+              s.volume_per_day_ml,
+              s.created_at,
+              p.name AS pump_name
+           FROM dosing_schedules s
+           JOIN dosing_pumps p ON s.pump_id = p.id
+           WHERE s.pump_id = ?
+           ORDER BY s.start_time ASC`,
+          [pump[0].id]
         );
+
 
         // Converter days_mask para array de dias
         const schedulesWithDays = schedules.map(s => ({
