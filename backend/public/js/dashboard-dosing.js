@@ -1,6 +1,6 @@
 // Dashboard Dosadora
 // ================================================
-//02
+//03
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -554,6 +554,16 @@ window.addEventListener('click', (e) => {
     if (e.target === editModal) editModal.style.display = 'none';
     if (e.target === agendaModal) agendaModal.style.display = 'none';
 });
+
+function showSuccess(msg) {
+  console.log('SUCCESS:', msg);
+  // opcional: implementar toast depois
+}
+
+function showError(msg) {
+  console.error('ERROR:', msg);
+}
+
 
 // ===== INIT =====
 window.addEventListener('load', initDashboard);
