@@ -1,5 +1,5 @@
-// Dashboard Dosadora - Script Principal
-// =====================================
+// Dashboard Dosadora - Script Principal - CORRIGIDO
+// ================================================
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -14,7 +14,6 @@ async function initDashboard() {
     if (!isTokenValid()) return;
 
     try {
-        // Usar função do DashboardCommon para carregar devices
         const token = getToken();
         const userId = localStorage.getItem('userId');
         
@@ -44,9 +43,10 @@ async function initDashboard() {
         if (devices.length > 0) {
             currentDevice = devices[0];
             console.log('✅ Device inicial selecionado:', currentDevice);
+            updateDeviceInfo();
+            updateNavbarDeviceInfo();
             await loadPumps(currentDevice.id);
             await loadSchedules(currentDevice.id, currentPumpIndex);
-            updateDeviceInfo();
         } else {
             console.warn('⚠️ Nenhum device encontrado');
             showError('Nenhum device cadastrado');
@@ -95,6 +95,7 @@ async function onDeviceChange() {
 
     console.log('✅ Device selecionado:', currentDevice.name);
     updateDeviceInfo();
+    updateNavbarDeviceInfo();
     await loadPumps(currentDevice.id);
     await loadSchedules(currentDevice.id, currentPumpIndex);
 }
@@ -110,6 +111,20 @@ function updateDeviceInfo() {
         <span class="device-status-dot ${!currentDevice.online ? 'offline' : ''}"></span>
         <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type || 'N/A'} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
     `;
+}
+
+function updateNavbarDeviceInfo() {
+    if (!currentDevice) return;
+
+    const status = currentDevice.online ? '🟢 Online' : '🔴 Offline';
+    const info = document.getElementById('navDeviceInfo');
+    const dot = document.getElementById('navDeviceStatus');
+    
+    if (info) info.textContent = `${currentDevice.name} • ${status}`;
+    if (dot) {
+        dot.classList.remove('offline');
+        if (!currentDevice.online) dot.classList.add('offline');
+    }
 }
 
 // ===== PUMPS =====
@@ -170,14 +185,19 @@ function renderConfigTable() {
 
     pumps.forEach((pump, index) => {
         const row = document.createElement('tr');
+        const containerSize = pump.container_volume_ml || pump.container_size || 0;
+        const currentVolume = pump.current_volume_ml || pump.current_volume || 0;
+        const alarmPercent = pump.alarm_threshold_pct || pump.alarm_percent || 0;
+        const maxDaily = pump.max_daily_ml || pump.daily_max || 0;
+        
         row.innerHTML = `
             <td>${index + 1}</td>
             <td>${pump.name || `P${index + 1}`}</td>
-            <td>${pump.active ? '✓ Ativa' : '✗ Inativa'}</td>
-            <td>${pump.container_size || 0}</td>
-            <td>${pump.current_volume || 0}</td>
-            <td>${pump.alarm_percent || 0}%</td>
-            <td>${pump.daily_max || 0}</td>
+            <td>${pump.enabled ? '✓ Ativa' : '✗ Inativa'}</td>
+            <td>${containerSize}</td>
+            <td>${currentVolume}</td>
+            <td>${alarmPercent}%</td>
+            <td>${maxDaily}</td>
             <td><button class="btn-edit" onclick="openEditModal(${index})">Editar</button></td>
         `;
         tbody.appendChild(row);
@@ -191,10 +211,10 @@ function openEditModal(index) {
 
     document.getElementById('editPumpIndex').value = index;
     document.getElementById('editName').value = pump.name || '';
-    document.getElementById('editContainerSize').value = pump.container_size || 0;
-    document.getElementById('editCurrentVolume').value = pump.current_volume || 0;
-    document.getElementById('editAlarmPercent').value = pump.alarm_percent || 0;
-    document.getElementById('editDailyMax').value = pump.daily_max || 0;
+    document.getElementById('editContainerSize').value = pump.container_volume_ml || pump.container_size || 0;
+    document.getElementById('editCurrentVolume').value = pump.current_volume_ml || pump.current_volume || 0;
+    document.getElementById('editAlarmPercent').value = pump.alarm_threshold_pct || pump.alarm_percent || 0;
+    document.getElementById('editDailyMax').value = pump.max_daily_ml || pump.daily_max || 0;
 
     document.getElementById('editModal').style.display = 'flex';
 }
@@ -262,19 +282,33 @@ function renderScheduleTable() {
 
     schedules.forEach(schedule => {
         const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-        const activeDaysArray = Array.isArray(schedule.active_days) ? schedule.active_days : [];
+        
+        // Converter days_of_week (array booleano) ou days_mask (número bitmask)
+        let activeDaysArray = [];
+        if (schedule.days_of_week && Array.isArray(schedule.days_of_week)) {
+            activeDaysArray = schedule.days_of_week;
+        } else if (schedule.days_mask !== undefined) {
+            // Converter bitmask para array
+            for (let i = 0; i < 7; i++) {
+                activeDaysArray[i] = (schedule.days_mask & (1 << i)) !== 0;
+            }
+        }
+        
         const daysText = activeDaysArray
             .map((active, i) => active ? days[i] : '')
             .filter(d => d)
             .join(', ');
 
         const row = document.createElement('tr');
+        const startTime = schedule.start_time || '--';
+        const endTime = schedule.end_time || '--';
+        
         row.innerHTML = `
-            <td><input type="checkbox" ${schedule.active ? 'checked' : ''} disabled></td>
+            <td><input type="checkbox" ${schedule.enabled ? 'checked' : ''} disabled></td>
             <td>${daysText || '---'}</td>
             <td>${schedule.doses_per_day || 0}</td>
-            <td>${schedule.start_time || '--'} - ${schedule.end_time || '--'}</td>
-            <td>${schedule.volume_per_day || 0}</td>
+            <td>${startTime} - ${endTime}</td>
+            <td>${schedule.volume_per_day_ml || 0}</td>
             <td><button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button></td>
         `;
         tbody.appendChild(row);
