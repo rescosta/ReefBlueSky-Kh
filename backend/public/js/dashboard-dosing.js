@@ -257,8 +257,11 @@ function renderConfigTable() {
             <td>${index + 1}</td>
             <td>${pump.name || `P${index + 1}`}</td>
             <td>
-              <button class="btn-secondary" onclick="togglePump(${index})">
-                ${pump.enabled ? '✓ Ativa' : '✗ Inativa'}
+              <button
+                class="btn-status ${pump.enabled ? 'btn-on' : 'btn-off'}"
+                onclick="togglePump(${index})"
+              >
+                ${pump.enabled ? 'Ativada' : 'Desativada'}
               </button>
             </td>
             <td>${containerSize}</td>
