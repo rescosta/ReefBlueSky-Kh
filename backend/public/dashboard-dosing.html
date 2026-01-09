@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dosadora Balling - ReefBlueSky</title>
+    <title>Dosadora Balling</title>
     <style>
         * {
             margin: 0;
@@ -17,116 +17,137 @@
             color: #333;
         }
 
-        /* Navbar Principal */
-        nav.navbar {
-            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+
+        /* TOPBAR */
+        .topbar {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          /* antes: padding: 10px 24px; */
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
-        .navbar-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 30px;
-            height: 60px;
+        @supports (padding: max(0px)) {
+          .topbar {
+            padding-left: max(10px, env(safe-area-inset-left));
+            padding-right: max(10px, env(safe-area-inset-right));
+          }
         }
 
-        .navbar-brand {
-            font-size: 20px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .topbar-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .logo {
+          font-size: 22px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+        }
+        .nav {
+          display: flex;
+          gap: 16px;
+          font-size: 14px;
+        }
+        .nav a {
+          opacity: 0.8;
+          padding-bottom: 2px;
+          border-bottom: 2px solid transparent;
+        }
+        .nav a.active {
+          opacity: 1;
+          border-color: #facc15;
+        }
+        .topbar-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          font-size: 14px;
+        }
+        .badge-ok,
+        .badge-error,
+        .badge,
+        .badge-on,
+        .badge-off {
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .badge-ok {
+          background: #16a34a33;
+          border: 1px solid #22c55e;
+          color: #bbf7d0;
+        }
+        .badge-error {
+          background: #b91c1c33;
+          border: 1px solid #f97373;
+          color: #fecaca;
+        }
+        .badge-on {
+          background: #16a34a33;
+          border: 1px solid #22c55e;
+          color: #bbf7d0;
+        }
+        .badge-off {
+          background: #111827;
+          border: 1px solid #4b5563;
+          color: #9ca3af;
+        }
+        .btn-small {
+          border: none;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          background: #0f172a;
+          color: #e5e7eb;
+        }
+        .btn-small:hover {
+          background: #111827;
+        }
+        .device-selector {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+        }
+        .device-selector select {
+          background: #020617;
+          color: #e5e7eb;
+          border-radius: 6px;
+          border: 1px solid #374151;
+          padding: 4px 8px;
+          font-size: 13px;
         }
 
-        .navbar-menu {
-            display: flex;
-            list-style: none;
-            gap: 30px;
-        }
 
-        .navbar-menu li a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 0;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-            font-size: 13px;
-            font-weight: 500;
-        }
 
-        .navbar-menu li a:hover,
-        .navbar-menu li a.active {
-            border-bottom-color: white;
-        }
-
-        .navbar-right {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 12px;
-        }
-
-        .device-status {
-            background: rgba(255,255,255,0.2);
-            padding: 6px 12px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #22c55e;
-        }
-
-        .status-dot.offline {
-            background: #ef4444;
-        }
-
-        .btn-logout {
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.5);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s;
-        }
-
-        .btn-logout:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        /* Header da Dosadora */
-        .page-header {
+        .header {
             background: linear-gradient(135deg, #1a504d 0%, #208080 100%);
             color: white;
-            padding: 25px 30px;
+            padding: 30px;
+            text-align: left;
             border-bottom: 3px solid #16a085;
         }
 
-        .page-header h1 {
-            font-size: 26px;
+        .header h1 {
+            font-size: 28px;
             margin-bottom: 5px;
         }
 
-        .page-header p {
-            font-size: 13px;
+        .header p {
+            font-size: 14px;
             opacity: 0.9;
         }
 
-        /* Container Principal */
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 25px;
+            padding: 20px;
         }
 
         .controls {
@@ -148,7 +169,7 @@
             font-weight: 600;
             margin-bottom: 8px;
             color: #555;
-            font-size: 12px;
+            font-size: 13px;
         }
 
         .control-group select,
@@ -157,7 +178,7 @@
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 14px;
         }
 
         #deviceInfo {
@@ -167,32 +188,16 @@
             border-radius: 6px;
             font-size: 13px;
             border-left: 4px solid #16a085;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
-        .device-status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #22c55e;
-        }
-
-        .device-status-dot.offline {
-            background: #ef4444;
-        }
-
-        /* Tabs */
         .tabs {
             display: flex;
             gap: 10px;
-            margin-bottom: 0;
+            margin-bottom: 20px;
             border-bottom: 2px solid #e0e0e0;
             background: white;
             padding: 0;
             border-radius: 8px 8px 0 0;
-            overflow-x: auto;
         }
 
         .tab-btn {
@@ -204,7 +209,6 @@
             color: #666;
             border-bottom: 3px solid transparent;
             transition: all 0.3s;
-            white-space: nowrap;
         }
 
         .tab-btn:hover {
@@ -266,7 +270,7 @@
         }
 
         .btn-edit, .btn-delete, .btn-primary, .btn-secondary {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
@@ -395,6 +399,41 @@
             justify-content: flex-end;
         }
 
+        .procedure-list {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
+        .procedure-list ol {
+            margin-left: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .procedure-list li {
+            margin-bottom: 8px;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+
         .btn-new-agenda {
             background: #16a085;
             color: white;
@@ -417,38 +456,6 @@
             clear: both;
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-            font-size: 14px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #999;
-        }
-
-        .alert {
-            padding: 12px 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 13px;
-        }
-
-        .alert-error {
-            background: #fee;
-            color: #c33;
-            border-left: 4px solid #c33;
-        }
-
-        .alert-success {
-            background: #efe;
-            color: #3c3;
-            border-left: 4px solid #3c3;
-        }
-
         @media (max-width: 768px) {
             .controls {
                 grid-template-columns: 1fr;
@@ -462,38 +469,33 @@
                 grid-template-columns: repeat(2, 1fr);
             }
 
-            .navbar-menu {
-                gap: 15px;
-                font-size: 12px;
+            .header h1 {
+                font-size: 20px;
             }
         }
     </style>
 </head>
 <body>
-  <div id="topbar-root"></div>
+    <div id="topbar-root"></div>
 
-  <!-- painel lateral -->
-  <div id="sideMenu" class="side-menu">
-    <button id="closeMenu" class="side-close">×</button>
-    <a href="dashboard-main.html">Principal</a>
-    <a href="dashboard-graficos.html">Gráficos</a>
-    <a href="dashboard-config.html">Configurações</a>
-    <a href="dashboard-sistema.html">Sistema</a>
-    <a href="dashboard-logs.html">Dev</a>
-    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
-  </div>
+    <!-- painel lateral -->
+    <div id="sideMenu" class="side-menu">
+      <button id="closeMenu" class="side-close">×</button>
+      <a href="dashboard-main.html">Principal</a>
+      <a href="dashboard-graficos.html">Gráficos</a>
+      <a href="dashboard-config.html">Configurações</a>
+      <a href="dashboard-sistema.html">Sistema</a>
+      <a href="dashboard-logs.html">Dev</a>
+      <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
+    </div>
 
-
-    <!-- Header Dosadora -->
-    <div class="page-header">
+    <!-- Header -->
+    <div class="header">
         <h1>🌊 Dosadora Balling</h1>
         <p>Gerenciador de dosadoras automáticas para aquários marinhos</p>
     </div>
 
     <div class="container">
-        <!-- Alert -->
-        <div id="alertBox"></div>
-
         <!-- Controls -->
         <div class="controls">
             <div class="control-group">
@@ -514,10 +516,11 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('configTab', this)">Configurações</button>
-            <button class="tab-btn" onclick="switchTab('agendaTab', this)">Agenda</button>
-            <button class="tab-btn" onclick="switchTab('manualTab', this)">Manual</button>
-            <button class="tab-btn" onclick="switchTab('calibrationTab', this)">Calibração</button>
+            <button class="tab-btn active" onclick="switchTab('configTab')">Configurações</button>
+            <button class="tab-btn" onclick="switchTab('agendaTab')">Agenda</button>
+            <button class="tab-btn" onclick="switchTab('timersTab')">Timers</button>
+            <button class="tab-btn" onclick="switchTab('manualTab')">Manual</button>
+            <button class="tab-btn" onclick="switchTab('calibrationTab')">Calibração</button>
         </div>
 
         <!-- Config Tab -->
@@ -537,7 +540,7 @@
                     </tr>
                 </thead>
                 <tbody id="configTableBody">
-                    <tr><td colspan="8" style="text-align: center;" class="loading">Carregando...</td></tr>
+                    <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -549,7 +552,7 @@
             </div>
             <h2>Agendas</h2>
             <div class="info-box">
-                📅 Define os horários e frequência de dosagem.
+                📅 Define os horários e frequência de dosagem. As doses/dia e o volume total serão divididos igualmente entre os horários.
             </div>
             <table>
                 <thead>
@@ -563,9 +566,18 @@
                     </tr>
                 </thead>
                 <tbody id="scheduleTableBody">
-                    <tr><td colspan="6" style="text-align: center;" class="loading">Carregando...</td></tr>
+                    <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Timers Tab -->
+        <div id="timersTab" class="tab-content">
+            <h2>Timers / Histórico</h2>
+            <div class="info-box">
+                ⏱️ Histórico de dosagens realizadas (futuro)
+            </div>
+            <div class="empty-state">Em desenvolvimento...</div>
         </div>
 
         <!-- Manual Tab -->
@@ -595,14 +607,16 @@
                 <label for="pumpSelectCalibration">Selecionar Bomba:</label>
                 <select id="pumpSelectCalibration"></select>
             </div>
-            <h3 style="margin-top: 20px;">Procedimento:</h3>
-            <ol style="margin-left: 20px; font-size: 13px; line-height: 1.6;">
-                <li>Coloque um recipiente graduado sob a bomba</li>
-                <li>Clique em "Go (10s)" para iniciar a dosagem de teste</li>
-                <li>Após 10 segundos, meça o volume dispensado</li>
-                <li>Digite o volume medido e clique "Salvar Taxa"</li>
-            </ol>
-            <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Go (10s)</button>
+            <h3>Procedimento:</h3>
+            <div class="procedure-list">
+                <ol>
+                    <li>Coloque um recipiente graduado sob a bomba</li>
+                    <li>Clique em "Go (10s)" para iniciar a dosagem de teste</li>
+                    <li>Após 10 segundos, meça o volume dispensado</li>
+                    <li>Digite o volume medido e clique "Salvar Taxa"</li>
+                </ol>
+            </div>
+            <button class="btn-primary" id="goBtn" onclick="startCalibration()">🔴 Go (10s)</button>
             <div class="form-group" style="margin-top: 20px;">
                 <label for="measuredVolume">Volume Medido (mL):</label>
                 <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10.5">
@@ -713,8 +727,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Scripts -->
     <script src="js/dashboard-common.js"></script>
     <script src="js/dashboard-dosing.js"></script>
 </body>
