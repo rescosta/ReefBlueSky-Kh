@@ -8,14 +8,17 @@ let devices = [];
 let pumps = [];
 let schedules = [];
 
+
+// ===== AUTH =====
+function getToken() {
+  // se o login grava em 'authToken', usa esse
+  return localStorage.getItem('authToken') || localStorage.getItem('token') || '';
+}
+
+
 // ===== INITIALIZATION =====
 async function initDashboard() {
     console.log('🚀 Iniciando Dashboard Dosadora...');
-
-    function getToken() {
-      return localStorage.getItem('token');
-    }
-
 
     try {
         const token = getToken();
