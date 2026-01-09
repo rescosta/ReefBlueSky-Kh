@@ -1,6 +1,6 @@
 // Dashboard Dosadora
 // ================================================
-//03
+//05
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -367,30 +367,40 @@ function renderScheduleTable() {
         // Converter days_of_week (array booleano) ou days_mask (número bitmask)
         let activeDaysArray = [];
         if (schedule.days_of_week && Array.isArray(schedule.days_of_week)) {
-            activeDaysArray = schedule.days_of_week;
+          // schedule.days_of_week é algo como [0,2,4]
+          activeDaysArray = Array(7).fill(false);
+          schedule.days_of_week.forEach(i => {
+            if (i >= 0 && i < 7) activeDaysArray[i] = true;
+          });
         } else if (schedule.days_mask !== undefined) {
-            // Converter bitmask para array
-            for (let i = 0; i < 7; i++) {
-                activeDaysArray[i] = (schedule.days_mask & (1 << i)) !== 0;
-            }
+          activeDaysArray = Array(7).fill(false);
+          for (let i = 0; i < 7; i++) {
+            activeDaysArray[i] = (schedule.days_mask & (1 << i)) !== 0;
+          }
         }
-        
+
         const daysText = activeDaysArray
-            .map((active, i) => active ? days[i] : '')
-            .filter(d => d)
-            .join(', ');
+          .map((active, i) => active ? days[i] : '')
+          .filter(d => d)
+          .join(', ');
 
         const row = document.createElement('tr');
         const startTime = schedule.start_time || '--';
         const endTime = schedule.end_time || '--';
         
         row.innerHTML = `
-            <td><input type="checkbox" ${schedule.enabled ? 'checked' : ''} disabled></td>
-            <td>${daysText || '---'}</td>
-            <td>${schedule.doses_per_day || 0}</td>
-            <td>${startTime} - ${endTime}</td>
-            <td>${schedule.volume_per_day_ml || 0}</td>
-            <td><button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button></td>
+              <td>
+                <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
+                  ${schedule.enabled ? 'Ativa' : 'Inativa'}
+                </button>
+              </td>
+              <td>${daysText || '---'}</td>
+              <td>${schedule.doses_per_day || 0}</td>
+              <td>${startTime} - ${endTime}</td>
+              <td>${schedule.volume_per_day_ml || 0}</td>
+              <td>
+                <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
+              </td>
         `;
         tbody.appendChild(row);
     });
@@ -409,11 +419,14 @@ async function createSchedule() {
   const pumpIndex = parseInt(document.getElementById('pumpSelectAgenda').value, 10);
 
   const dayCheckboxes = document.querySelectorAll('.day-checkbox');
-  const activeDays = Array.from(dayCheckboxes).map(cb => cb.checked);
+  const activeDays = [];
+  dayCheckboxes.forEach((cb, idx) => {
+    if (cb.checked) activeDays.push(idx); // 0 = Dom, 1 = Seg, ...
+  });
 
   const data = {
     active: true,
-    active_days: activeDays,
+    days_of_week: activeDays, // <-- nome e formato que o backend usa
     doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10),
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
@@ -434,6 +447,7 @@ async function createSchedule() {
     await loadSchedules(currentDevice.id, pumpIndex);
   }
 }
+
 
 
 
@@ -527,6 +541,24 @@ async function saveCalibration() {
     const rate = (measuredVolume / 10).toFixed(2);
     showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
     document.getElementById('measuredVolume').value = '';
+  }
+}
+
+
+async function toggleSchedule(scheduleId) {
+  const sched = schedules.find(s => s.id === scheduleId);
+  if (!sched) return;
+  const newEnabled = !sched.enabled;
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
+    'PUT',
+    { enabled: newEnabled }
+  );
+
+  if (result) {
+    sched.enabled = newEnabled;
+    renderScheduleTable();
   }
 }
 
