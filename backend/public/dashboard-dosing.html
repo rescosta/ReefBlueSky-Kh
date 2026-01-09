@@ -11,10 +11,91 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #0f1419;
             color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #topbar {
+            background: linear-gradient(135deg, #1a1f26 0%, #0d0e12 100%);
+            border-bottom: 1px solid #333;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+            flex-shrink: 0;
+            z-index: 1000;
+        }
+
+        .topbar-logo {
+            font-size: 18px;
+            font-weight: 700;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .topbar-center {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #currentTime {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #aaa;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .user-menu:hover {
+            color: #667eea;
+        }
+
+        .logout-btn {
+            padding: 6px 12px;
+            background: #c0392b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #a93226;
+        }
+
+        #app {
+            flex: 1;
+            overflow-y: auto;
             padding: 20px;
         }
 
@@ -363,311 +444,339 @@
             .tabs {
                 flex-wrap: wrap;
             }
+
+            #topbar {
+                flex-wrap: wrap;
+                height: auto;
+            }
+
+            .topbar-center {
+                order: 3;
+                width: 100%;
+                margin-top: 8px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>💧 Dosadora Balling</h1>
-            <p>Gerenciador de doses automáticas</p>
-        </header>
-
-        <!-- Abas principais -->
-        <div class="tabs">
-            <button id="tabDashboard" class="active">Dashboard</button>
-            <button id="tabDevices">Devices</button>
-            <button id="tabBombas">Bombas</button>
-            <button id="tabAgendas">Agendas</button>
-            <button id="tabHistorico">Histórico</button>
+    <!-- Topbar com common.js -->
+    <div id="topbar">
+        <div class="topbar-logo">💧 Dosadora Balling</div>
+        <div class="topbar-center">
+            <div id="currentTime">00:00</div>
         </div>
-
-        <!-- View: Dashboard -->
-        <div id="dashboardView" class="view active">
-            <div class="error-msg" id="dashboardError"></div>
-            <p>Resumo dos devices e status das dosagens...</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Device</th>
-                        <th>Status</th>
-                        <th>Última Comunicação</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="dashboardBody"></tbody>
-            </table>
+        <div class="topbar-right">
+            <div class="user-menu" id="userMenu">👤 User</div>
+            <button class="logout-btn" id="logoutBtn">Sair</button>
         </div>
+    </div>
 
-        <!-- View: Devices -->
-        <div id="devicesView" class="view">
-            <div class="error-msg" id="devicesError"></div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Tipo HW</th>
-                        <th>Status</th>
-                        <th>Último Contato</th>
-                        <th>Bombas</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="devicesBody"></tbody>
-            </table>
-        </div>
+    <!-- Conteúdo principal -->
+    <div id="app">
+        <div class="container">
+            <header>
+                <h1>💧 Dosadora Balling</h1>
+                <p>Gerenciador de doses automáticas</p>
+            </header>
 
-        <!-- View: Bombas -->
-        <div id="bombasView" class="view">
-            <div class="error-msg" id="bombasError"></div>
-            <div class="success-msg" id="bombasSuccess"></div>
-
-            <!-- Seletor de Bomba -->
-            <div class="pump-selector">
-                <label>Selecionar Bomba</label>
-                <select id="pumpSelectorDropdown">
-                    <option value="">-- Escolha uma bomba --</option>
-                </select>
+            <!-- Abas principais -->
+            <div class="tabs">
+                <button id="tabDashboard" class="active">Dashboard</button>
+                <button id="tabDevices">Devices</button>
+                <button id="tabBombas">Bombas</button>
+                <button id="tabAgendas">Agendas</button>
+                <button id="tabHistorico">Histórico</button>
             </div>
 
-            <!-- Configuração da Bomba Selecionada -->
-            <div id="pumpConfigSection" class="pump-config" style="display: none;">
-                <h3 id="pumpConfigTitle">Configuração - Bomba 1</h3>
+            <!-- View: Dashboard -->
+            <div id="dashboardView" class="view active">
+                <div class="error-msg" id="dashboardError"></div>
+                <p>Resumo dos devices e status das dosagens...</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Device</th>
+                            <th>Status</th>
+                            <th>Última Comunicação</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboardBody"></tbody>
+                </table>
+            </div>
 
-                <!-- Sub-abas -->
-                <div class="sub-tabs">
-                    <button class="sub-tab-btn active" data-subtab="settings">⚙️ Configuração</button>
-                    <button class="sub-tab-btn" data-subtab="schedule">📅 Agenda</button>
-                    <button class="sub-tab-btn" data-subtab="manual">⚡ Manual</button>
-                    <button class="sub-tab-btn" data-subtab="calibration">🔧 Calibração</button>
+            <!-- View: Devices -->
+            <div id="devicesView" class="view">
+                <div class="error-msg" id="devicesError"></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo HW</th>
+                            <th>Status</th>
+                            <th>Último Contato</th>
+                            <th>Bombas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="devicesBody"></tbody>
+                </table>
+            </div>
+
+            <!-- View: Bombas -->
+            <div id="bombasView" class="view">
+                <div class="error-msg" id="bombasError"></div>
+                <div class="success-msg" id="bombasSuccess"></div>
+
+                <!-- Seletor de Bomba -->
+                <div class="pump-selector">
+                    <label>Selecionar Bomba</label>
+                    <select id="pumpSelectorDropdown">
+                        <option value="">-- Escolha uma bomba --</option>
+                    </select>
                 </div>
 
-                <!-- Sub-view: Configuração -->
-                <div id="settingsSubView" class="sub-view active">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Nome da Bomba</label>
-                            <input type="text" id="pumpName" placeholder="Ex: KH, Cálcio, Magnésio">
-                        </div>
-                        <div class="form-group">
-                            <label>Bomba Ativa</label>
-                            <div class="toggle-group">
-                                <button class="toggle-switch active" id="pumpActiveToggle"></button>
-                                <span class="toggle-label" id="pumpActiveLabel">Ativa</span>
+                <!-- Configuração da Bomba Selecionada -->
+                <div id="pumpConfigSection" class="pump-config" style="display: none;">
+                    <h3 id="pumpConfigTitle">Configuração - Bomba 1</h3>
+
+                    <!-- Sub-abas -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab-btn active" data-subtab="settings">⚙️ Configuração</button>
+                        <button class="sub-tab-btn" data-subtab="schedule">📅 Agenda</button>
+                        <button class="sub-tab-btn" data-subtab="manual">⚡ Manual</button>
+                        <button class="sub-tab-btn" data-subtab="calibration">🔧 Calibração</button>
+                    </div>
+
+                    <!-- Sub-view: Configuração -->
+                    <div id="settingsSubView" class="sub-view active">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Nome da Bomba</label>
+                                <input type="text" id="pumpName" placeholder="Ex: KH, Cálcio, Magnésio">
                             </div>
+                            <div class="form-group">
+                                <label>Bomba Ativa</label>
+                                <div class="toggle-group">
+                                    <button class="toggle-switch active" id="pumpActiveToggle"></button>
+                                    <span class="toggle-label" id="pumpActiveLabel">Ativa</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Volume do Recipiente (mL)</label>
+                                <div class="range-group">
+                                    <input type="range" id="pumpContainerSize" min="0" max="5000" value="500" step="10">
+                                    <span class="range-value" id="pumpContainerValue">500</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Volume Atual (mL)</label>
+                                <div class="range-group">
+                                    <input type="range" id="pumpCurrentVolume" min="0" max="5000" value="500" step="10">
+                                    <span class="range-value" id="pumpCurrentValue">500</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Alarme (%)</label>
+                                <input type="number" id="pumpAlarmPercent" value="10" min="0" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label>Máximo Diário (mL)</label>
+                                <input type="number" id="pumpDailyMax" value="100" min="0">
+                            </div>
+                        </div>
+
+                        <div class="btn-group">
+                            <button class="btn" id="savePumpBtn">Salvar Configuração</button>
+                            <button class="btn btn-secondary" id="cancelPumpBtn">Cancelar</button>
                         </div>
                     </div>
 
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Volume do Recipiente (mL)</label>
-                            <div class="range-group">
-                                <input type="range" id="pumpContainerSize" min="0" max="5000" value="500" step="10">
-                                <span class="range-value" id="pumpContainerValue">500</span>
+                    <!-- Sub-view: Agenda -->
+                    <div id="scheduleSubView" class="sub-view">
+                        <p style="margin-bottom: 15px; color: #999;">Defina os horários e dias para esta bomba.</p>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Doses por Dia</label>
+                                <input type="number" id="scheduleDosesPerDay" value="1" min="1" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Horário de Início</label>
+                                <input type="time" id="scheduleStartTime" value="12:00">
+                            </div>
+                            <div class="form-group">
+                                <label>Horário de Fim</label>
+                                <input type="time" id="scheduleEndTime" value="18:00">
+                            </div>
+                            <div class="form-group">
+                                <label>Volume Diário (mL)</label>
+                                <input type="number" id="scheduleVolumePerDay" value="36" min="0">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Volume Atual (mL)</label>
-                            <div class="range-group">
-                                <input type="range" id="pumpCurrentVolume" min="0" max="5000" value="500" step="10">
-                                <span class="range-value" id="pumpCurrentValue">500</span>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Dias da Semana</label>
+                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="0" checked> Segunda
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="1" checked> Terça
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="2" checked> Quarta
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="3" checked> Quinta
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="4" checked> Sexta
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="5" checked> Sábado
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                                        <input type="checkbox" class="schedule-day" value="6" checked> Domingo
+                                    </label>
+                                </div>
                             </div>
+                        </div>
+
+                        <div class="btn-group">
+                            <button class="btn" id="saveScheduleBtn">Criar Agenda</button>
+                            <button class="btn btn-secondary" id="cancelScheduleBtn">Cancelar</button>
+                        </div>
+
+                        <div class="table-section">
+                            <h3>Agendas Cadastradas</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Bomba</th>
+                                        <th>Ativa</th>
+                                        <th>Dias</th>
+                                        <th>Doses/Dia</th>
+                                        <th>Janela</th>
+                                        <th>Volume (mL/dia)</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="schedulesTableBody">
+                                    <tr>
+                                        <td colspan="7" class="empty-state" style="border: none; padding: 20px;">
+                                            Nenhuma agenda para esta bomba.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Alarme (%)</label>
-                            <input type="number" id="pumpAlarmPercent" value="10" min="0" max="100">
+                    <!-- Sub-view: Manual -->
+                    <div id="manualSubView" class="sub-view">
+                        <p style="margin-bottom: 15px; color: #999;">Aplique uma dose manual instantânea.</p>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Volume a Dosar (mL)</label>
+                                <input type="number" id="manualDoseVolume" value="0" min="0">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Máximo Diário (mL)</label>
-                            <input type="number" id="pumpDailyMax" value="100" min="0">
+                        <div class="btn-group">
+                            <button class="btn" id="applyManualDoseBtn">Aplicar Dose</button>
+                            <button class="btn btn-secondary" id="cancelManualBtn">Cancelar</button>
                         </div>
                     </div>
 
-                    <div class="btn-group">
-                        <button class="btn" id="savePumpBtn">Salvar Configuração</button>
-                        <button class="btn btn-secondary" id="cancelPumpBtn">Cancelar</button>
+                    <!-- Sub-view: Calibração -->
+                    <div id="calibrationSubView" class="sub-view">
+                        <p style="margin-bottom: 15px; color: #999;">
+                            Coloque um recipiente graduado sob a bomba. Pressione "Go" e depois de 10 segundos, insira o volume medido e salve.
+                        </p>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Volume Medido (mL)</label>
+                                <input type="number" id="calibrationVolume" placeholder="0" min="0">
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn" id="startCalibrationBtn">Go (10s)</button>
+                            <button class="btn" id="saveCalibrationBtn">Salvar Taxa</button>
+                            <button class="btn btn-secondary" id="cancelCalibrationBtn">Cancelar</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Sub-view: Agenda -->
-                <div id="scheduleSubView" class="sub-view">
-                    <p style="margin-bottom: 15px; color: #999;">Defina os horários e dias para esta bomba.</p>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Doses por Dia</label>
-                            <input type="number" id="scheduleDosesPerDay" value="1" min="1" max="10">
-                        </div>
-                        <div class="form-group">
-                            <label>Horário de Início</label>
-                            <input type="time" id="scheduleStartTime" value="12:00">
-                        </div>
-                        <div class="form-group">
-                            <label>Horário de Fim</label>
-                            <input type="time" id="scheduleEndTime" value="18:00">
-                        </div>
-                        <div class="form-group">
-                            <label>Volume Diário (mL)</label>
-                            <input type="number" id="scheduleVolumePerDay" value="36" min="0">
-                        </div>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Dias da Semana</label>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="0" checked> Segunda
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="1" checked> Terça
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="2" checked> Quarta
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="3" checked> Quinta
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="4" checked> Sexta
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="5" checked> Sábado
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                                    <input type="checkbox" class="schedule-day" value="6" checked> Domingo
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="btn-group">
-                        <button class="btn" id="saveScheduleBtn">Criar Agenda</button>
-                        <button class="btn btn-secondary" id="cancelScheduleBtn">Cancelar</button>
-                    </div>
-
-                    <div class="table-section">
-                        <h3>Agendas Cadastradas</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Bomba</th>
-                                    <th>Ativa</th>
-                                    <th>Dias</th>
-                                    <th>Doses/Dia</th>
-                                    <th>Janela</th>
-                                    <th>Volume (mL/dia)</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="schedulesTableBody">
-                                <tr>
-                                    <td colspan="7" class="empty-state" style="border: none; padding: 20px;">
-                                        Nenhuma agenda para esta bomba.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Sub-view: Manual -->
-                <div id="manualSubView" class="sub-view">
-                    <p style="margin-bottom: 15px; color: #999;">Aplique uma dose manual instantânea.</p>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Volume a Dosar (mL)</label>
-                            <input type="number" id="manualDoseVolume" value="0" min="0">
-                        </div>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn" id="applyManualDoseBtn">Aplicar Dose</button>
-                        <button class="btn btn-secondary" id="cancelManualBtn">Cancelar</button>
-                    </div>
-                </div>
-
-                <!-- Sub-view: Calibração -->
-                <div id="calibrationSubView" class="sub-view">
-                    <p style="margin-bottom: 15px; color: #999;">
-                        Coloque um recipiente graduado sob a bomba. Pressione "Go" e depois de 10 segundos, insira o volume medido e salve.
-                    </p>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Volume Medido (mL)</label>
-                            <input type="number" id="calibrationVolume" placeholder="0" min="0">
-                        </div>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn" id="startCalibrationBtn">Go (10s)</button>
-                        <button class="btn" id="saveCalibrationBtn">Salvar Taxa</button>
-                        <button class="btn btn-secondary" id="cancelCalibrationBtn">Cancelar</button>
-                    </div>
+                <!-- Tabela com todas as 6 bombas -->
+                <div class="table-section">
+                    <h3>Configurar Bombas</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bomba</th>
+                                <th>Nome</th>
+                                <th>Ativa</th>
+                                <th>Vol. Recipiente</th>
+                                <th>Vol. Atual</th>
+                                <th>Alarme %</th>
+                                <th>Máx. Diário</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pumpsTableBody">
+                            <tr>
+                                <td colspan="8" class="empty-state" style="border: none; padding: 20px;">
+                                    Carregando bombas...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- Tabela com todas as 6 bombas -->
-            <div class="table-section">
-                <h3>Configurar Bombas</h3>
+            <!-- View: Agendas -->
+            <div id="agendasView" class="view">
+                <p>Visão geral de todas as agendas cadastradas...</p>
                 <table>
                     <thead>
                         <tr>
                             <th>Bomba</th>
-                            <th>Nome</th>
-                            <th>Ativa</th>
-                            <th>Vol. Recipiente</th>
-                            <th>Vol. Atual</th>
-                            <th>Alarme %</th>
-                            <th>Máx. Diário</th>
+                            <th>Status</th>
+                            <th>Próxima Dose</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="pumpsTableBody">
+                    <tbody id="allSchedulesBody"></tbody>
+                </table>
+            </div>
+
+            <!-- View: Histórico -->
+            <div id="historicoView" class="view">
+                <p>Histórico de dosagens realizadas...</p>
+                <table>
+                    <thead>
                         <tr>
-                            <td colspan="8" class="empty-state" style="border: none; padding: 20px;">
-                                Carregando bombas...
-                            </td>
+                            <th>Data/Hora</th>
+                            <th>Bomba</th>
+                            <th>Volume</th>
+                            <th>Status</th>
                         </tr>
-                    </tbody>
+                    </thead>
+                    <tbody id="historyBody"></tbody>
                 </table>
             </div>
         </div>
-
-        <!-- View: Agendas -->
-        <div id="agendasView" class="view">
-            <p>Visão geral de todas as agendas cadastradas...</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Bomba</th>
-                        <th>Status</th>
-                        <th>Próxima Dose</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="allSchedulesBody"></tbody>
-            </table>
-        </div>
-
-        <!-- View: Histórico -->
-        <div id="historicoView" class="view">
-            <p>Histórico de dosagens realizadas...</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Data/Hora</th>
-                        <th>Bomba</th>
-                        <th>Volume</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="historyBody"></tbody>
-            </table>
-        </div>
     </div>
 
-    <script src="dashboard-dosing-novo.js"></script>
+    <!-- Scripts: common.js primeiro (não mexer), depois dosing.js -->
+    <script src="js/dashboard-common.js"></script>
+    <script src="js/dashboard-dosing.js"></script>
 </body>
 </html>
