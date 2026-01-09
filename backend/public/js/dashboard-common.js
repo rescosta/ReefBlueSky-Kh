@@ -523,6 +523,11 @@ function setDosingStatus(status) {
   const el = document.getElementById('dosingStatusIcon');
   if (!el) return;
 
+  if (status !== 'online' && el.textContent === 'DOS ON') {
+    return;
+  }
+
+
   if (status === undefined || status === null) return;
 
   if (status === 'never') {
