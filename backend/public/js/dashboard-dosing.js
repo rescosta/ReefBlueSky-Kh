@@ -256,7 +256,11 @@ function renderConfigTable() {
         row.innerHTML = `
             <td>${index + 1}</td>
             <td>${pump.name || `P${index + 1}`}</td>
-            <td>${pump.enabled ? '✓ Ativa' : '✗ Inativa'}</td>
+            <td>
+              <button class="btn-secondary" onclick="togglePump(${index})">
+                ${pump.enabled ? '✓ Ativa' : '✗ Inativa'}
+              </button>
+            </td>
             <td>${containerSize}</td>
             <td>${currentVolume}</td>
             <td>${alarmPercent}%</td>
@@ -314,6 +318,37 @@ async function saveEditModal() {
 }
 
 
+async function togglePump(index) {
+  const pump = pumps[index];
+  if (!pump) return;
+
+  const newActive = !pump.enabled;
+
+  const data = {
+    name: pump.name,
+    active: newActive,
+    container_size: pump.container_volume_ml,
+    current_volume: pump.current_volume_ml,
+    alarm_percent: pump.alarm_threshold_pct,
+    daily_max: pump.max_daily_ml
+  };
+
+  console.log('🔁 Toggling pump:', index, data);
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${index}`,
+    'PUT',
+    data
+  );
+
+  if (result) {
+    pump.enabled = newActive;
+    renderConfigTable();       // atualiza texto Ativa/Inativa
+    // opcional: também recarregar agendas se quiser refletir visualmente
+    // await loadSchedules(currentDevice.id, currentPumpIndex);
+  }
+}
+
 
 // ===== SCHEDULES =====
 async function loadSchedules(deviceId, pumpIndex) {
@@ -352,7 +387,22 @@ async function loadSchedules(deviceId, pumpIndex) {
 
 function renderScheduleTable() {
     const tbody = document.getElementById('scheduleTableBody');
+    const warningBox = document.getElementById('agendaWarning');
     if (!tbody) return;
+
+      // aviso de bomba inativa
+      const currentPump = pumps[currentPumpIndex];
+      if (warningBox) {
+        if (currentPump && !currentPump.enabled) {
+          warningBox.innerHTML = `
+            <div class="info-box" style="background:#fee;border-left-color:#c33;color:#822;">
+              ⚠️ Bomba inativa: os agendamentos desta bomba estão pausados e não serão executados até que ela seja ativada.
+            </div>
+          `;
+        } else {
+          warningBox.innerHTML = '';
+        }
+      }
 
     if (schedules.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Nenhuma agenda para esta bomba</td></tr>';
