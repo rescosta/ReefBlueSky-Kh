@@ -479,6 +479,26 @@ async function checkDevicesOnlineStatus() {
       }
     }
 
+
+    // --- NOVO: Atualizar dosing_status por usuário com base em dosing_devices ---
+    const dosingRows = await conn.query(
+      `SELECT id, user_id, last_seen, online
+         FROM dosing_devices`
+    );
+
+    for (const drow of dosingRows) {
+      const lastMs = drow.last_seen ? new Date(drow.last_seen).getTime() : 0;
+      const isRecent = lastMs && (now - lastMs <= OFFLINE_THRESHOLD_MS);
+      const isOnline = drow.online === 1 && isRecent;
+      const newStatus = isOnline ? 'online' : 'offline';
+
+      await conn.query(
+        'UPDATE devices SET dosing_status = ? WHERE userId = ?',
+        [newStatus, drow.user_id]
+      );
+    }
+
+
     // alerta de LCD offline ---
     const lcdRows = await conn.query(
       `SELECT d.id,
@@ -619,6 +639,7 @@ async function checkDevicesOnlineStatus() {
               `Último ping em: ${nowBr} (Brasília).`
             );
           }
+          
         } catch (err) {
           console.error('[ALERT] Erro ao limpar flag de LCD offline para', row.deviceId, err.message);
         }
@@ -1702,7 +1723,6 @@ app.post('/api/user/telegram/test', authUserMiddleware, async (req, res) => {
 });
 
 
-
 // ===== ENDPOINTS WEB: DISPOSITIVOS DO USUÁRIO =====
 // Lista devices do usuário logado (opcional: ?type=KH ou ?type=LCD)
 app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
@@ -1723,16 +1743,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
         d.local_ip AS localIp,
         d.last_seen AS lastSeen,
         d.lcd_status,
-        (
-          SELECT MAX(
-                   CASE
-                     WHEN dd.last_seen >= NOW() - INTERVAL 5 MINUTE THEN 1
-                     ELSE 0
-                   END
-                 )
-          FROM dosing_devices dd
-          WHERE dd.user_id = d.userId
-        ) AS dosing_online,
+        d.dosing_status,
         d.createdAt,
         d.updatedAt
       FROM devices d
@@ -1751,7 +1762,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
 
     const devices = rows.map((r) => {
       const dosingStatus =
-        r.dosing_online === 1 ? 'online' : 'offline'; 
+        r.dosing_status === 'online' ? 'online' : 'offline';
 
       return {
         id:        r.id,
@@ -1787,6 +1798,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
     }
   }
 });
+
 
 
 // Histórico de medições de um device do usuário
