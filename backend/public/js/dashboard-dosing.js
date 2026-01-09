@@ -15,6 +15,34 @@ function getToken() {
   return localStorage.getItem('authToken') || localStorage.getItem('token') || '';
 }
 
+async function apiCall(url, method = 'GET', body = null) {
+  const token = getToken();
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : null,
+  });
+
+  let json = null;
+  try {
+    json = await res.json();
+  } catch (_) {
+    // se não tiver body JSON, ignora
+  }
+
+  if (!res.ok) {
+    console.error('❌ apiCall error', res.status, json);
+    throw new Error(json && json.error ? json.error : `HTTP ${res.status}`);
+  }
+
+  return json; // retorna o JSON pra quem chamou
+}
+
 
 // ===== INITIALIZATION =====
 async function initDashboard() {
