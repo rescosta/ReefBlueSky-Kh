@@ -3143,9 +3143,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
 
     const cfg = rows[0];
     const dosingStatus =
-      cfg.dosing_online === 1 ? 'online' :
-      cfg.dosing_online === 0 ? 'offline' :
-      'never';
+      cfg.dosing_online === 1 ? 'online' : 'offline';
 
     return res.json({
       success: true,
