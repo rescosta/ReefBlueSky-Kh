@@ -459,16 +459,17 @@
     </style>
 </head>
 <body>
-    <!-- Topbar com common.js -->
-    <div id="topbar">
-        <div class="topbar-logo">💧 Dosadora Balling</div>
-        <div class="topbar-center">
-            <div id="currentTime">00:00</div>
-        </div>
-        <div class="topbar-right">
-            <div class="user-menu" id="userMenu">👤 User</div>
-            <button class="logout-btn" id="logoutBtn">Sair</button>
-        </div>
+    <div id="topbar-root"></div>
+
+    <!-- painel lateral -->
+    <div id="sideMenu" class="side-menu">
+     <button id="closeMenu" class="side-close">×</button>
+        <a href="dashboard-main.html">Principal</a>
+        <a href="dashboard-graficos.html">Gráficos</a>
+        <a href="dashboard-config.html">Configurações</a>
+        <a href="dashboard-sistema.html">Sistema</a>
+        <a href="dashboard-logs.html">Dev</a>
+      <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
     </div>
 
     <!-- Conteúdo principal -->
