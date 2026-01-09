@@ -1,6 +1,6 @@
 // Dashboard Dosadora
 // ================================================
-
+//01
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -287,31 +287,33 @@ function closeEditModal() {
 }
 
 async function saveEditModal() {
-    const index = parseInt(document.getElementById('editPumpIndex').value);
+  const index = parseInt(document.getElementById('editPumpIndex').value);
+  const pumpId = pumps[index].id; // id real do banco
 
-    const data = {
-        name: document.getElementById('editName').value,
-        active: true,
-        container_size: parseInt(document.getElementById('editContainerSize').value) || 0,
-        current_volume: parseInt(document.getElementById('editCurrentVolume').value) || 0,
-        alarm_percent: parseInt(document.getElementById('editAlarmPercent').value) || 0,
-        daily_max: parseInt(document.getElementById('editDailyMax').value) || 0
-    };
+  const data = {
+    name: document.getElementById('editName').value,
+    active: true,
+    container_size: parseInt(document.getElementById('editContainerSize').value) || 0,
+    current_volume: parseInt(document.getElementById('editCurrentVolume').value) || 0,
+    alarm_percent: parseInt(document.getElementById('editAlarmPercent').value) || 0,
+    daily_max: parseInt(document.getElementById('editDailyMax').value) || 0
+  };
 
-    console.log('💾 Salvando bomba:', index, data);
+  console.log('💾 Salvando bomba:', pumpId, data);
 
-    const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${index}`,
-        'PUT',
-        data
-    );
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpId}`,
+    'PUT',
+    data
+  );
 
-    if (result) {
-        showSuccess('Bomba atualizada com sucesso!');
-        closeEditModal();
-        await loadPumps(currentDevice.id);
-    }
+  if (result) {
+    showSuccess('Bomba atualizada com sucesso!');
+    closeEditModal();
+    await loadPumps(currentDevice.id);
+  }
 }
+
 
 // ===== SCHEDULES =====
 async function loadSchedules(deviceId, pumpIndex) {
