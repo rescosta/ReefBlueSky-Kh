@@ -470,29 +470,19 @@
     </style>
 </head>
 <body>
-    <!-- Navbar Principal -->
-    <nav class="navbar">
-        <div class="navbar-container">
-            <div class="navbar-brand">
-                <span>🌊</span> ReefBlueSky
-            </div>
-            <ul class="navbar-menu">
-                <li><a href="/">Principal</a></li>
-                <li><a href="/graficos.html">Gráficos</a></li>
-                <li><a href="/configuracoes.html">Configurações</a></li>
-                <li><a href="/sistema.html">Sistema</a></li>
-                <li><a href="/dashboard-dosing.html" class="active">Dosadora</a></li>
-                <li><a href="/dev.html">Dev</a></li>
-            </ul>
-            <div class="navbar-right">
-                <div class="device-status">
-                    <span class="status-dot" id="navDeviceStatus"></span>
-                    <span id="navDeviceInfo">Carregando...</span>
-                </div>
-                <button class="btn-logout" onclick="logout()">Sair</button>
-            </div>
-        </div>
-    </nav>
+  <div id="topbar-root"></div>
+
+  <!-- painel lateral -->
+  <div id="sideMenu" class="side-menu">
+    <button id="closeMenu" class="side-close">×</button>
+    <a href="dashboard-main.html">Principal</a>
+    <a href="dashboard-graficos.html">Gráficos</a>
+    <a href="dashboard-config.html">Configurações</a>
+    <a href="dashboard-sistema.html">Sistema</a>
+    <a href="dashboard-logs.html">Dev</a>
+    <a href="#" id="menuLogout">Sair</a>   <!-- novo -->
+  </div>
+
 
     <!-- Header Dosadora -->
     <div class="page-header">
