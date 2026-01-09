@@ -1,6 +1,6 @@
 // Dashboard Dosadora
 // ================================================
-//05
+//06
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -389,18 +389,19 @@ function renderScheduleTable() {
         const endTime = schedule.end_time || '--';
         
         row.innerHTML = `
-              <td>
-                <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
-                  ${schedule.enabled ? 'Ativa' : 'Inativa'}
-                </button>
-              </td>
-              <td>${daysText || '---'}</td>
-              <td>${schedule.doses_per_day || 0}</td>
-              <td>${startTime} - ${endTime}</td>
-              <td>${schedule.volume_per_day_ml || 0}</td>
-              <td>
-                <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
-              </td>
+          <td>
+            <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
+              ${schedule.enabled ? 'Ativa' : 'Inativa'}
+            </button>
+          </td>
+          <td>${schedule.pump_name || `Bomba ${currentPumpIndex + 1}`}</td>
+          <td>${daysText || '---'}</td>
+          <td>${schedule.doses_per_day || 0}</td>
+          <td>${startTime} - ${endTime}</td>
+          <td>${schedule.volume_per_day_ml || 0}</td>
+          <td>
+            <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
+          </td>
         `;
         tbody.appendChild(row);
     });
