@@ -80,25 +80,26 @@ router.post('/devices', async (req, res) => {
         const pumpNames = ['KH', 'Cálcio', 'Magnésio', 'Iodo', 'Reserva 1', 'Reserva 2'];
         
         for (let i = 0; i < 6; i++) {
-            pumps.push([
-                deviceId,
-                pumpNames[i],
-                i,                      // index_on_device 0..5
-                500,                    // container_volume_ml
-                500,                    // current_volume_ml
-                10,                     // alarm_threshold_pct
-                1.0,                    // calibration_rate_ml_s
-                100                     // max_daily_ml
-            ]);
+          pumps.push([
+            deviceId,
+            pumpNames[i],
+            i,
+            500,
+            500,
+            10,
+            1.0,
+            100,
+            0          // enabled = 0 (desativada)
+          ]);
         }
 
         await conn.batch(
-            `INSERT INTO dosing_pumps
-            (device_id, name, index_on_device,
+          `INSERT INTO dosing_pumps
+           (device_id, name, index_on_device,
             container_volume_ml, current_volume_ml,
-            alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            pumps
+            alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml, enabled)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          pumps
         );
 
         res.status(201).json({ data: { id: deviceId, name, hw_type } });
@@ -231,27 +232,28 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
             for (let i = 0; i < 6; i++) {
                 if (!existingIndices.has(i)) {
                     const result = await conn.query(
-                        `INSERT INTO dosing_pumps
-                        (device_id, name, index_on_device,
+                      `INSERT INTO dosing_pumps
+                       (device_id, name, index_on_device,
                         container_volume_ml, current_volume_ml,
-                        alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
-                        VALUES (?, ?, ?, 500, 500, 10, 1.0, 100)`,
-                        [deviceId, pumpNames[i], i]
+                        alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml, enabled)
+                       VALUES (?, ?, ?, 500, 500, 10, 1.0, 100, 0)`,
+                      [deviceId, pumpNames[i], i]
                     );
 
                     pumps.push({
-                        id: result.insertId,
-                        device_id: deviceId,
-                        name: pumpNames[i],
-                        index_on_device: i,
-                        enabled: 1,
-                        container_volume_ml: 500,
-                        current_volume_ml: 500,
-                        alarm_threshold_pct: 10,
-                        calibration_rate_ml_s: 1.0,
-                        max_daily_ml: 100,
-                        created_at: new Date().toISOString()
+                      id: result.insertId,
+                      device_id: deviceId,
+                      name: pumpNames[i],
+                      index_on_device: i,
+                      enabled: 0,
+                      container_volume_ml: 500,
+                      current_volume_ml: 500,
+                      alarm_threshold_pct: 10,
+                      calibration_rate_ml_s: 1.0,
+                      max_daily_ml: 100,
+                      created_at: new Date().toISOString()
                     });
+
                 }
             }
 
