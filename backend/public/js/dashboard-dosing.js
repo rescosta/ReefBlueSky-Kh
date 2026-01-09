@@ -1,5 +1,5 @@
-// Dashboard Dosadora - Script Principal - CORRIGIDO
-// ================================================
+// Dashboard Dosadora - Script Principal
+// =====================================
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -14,68 +14,51 @@ async function initDashboard() {
     if (!isTokenValid()) return;
 
     try {
-        const token = getToken();
-        const userId = localStorage.getItem('userId');
-        
-        if (!token || !userId) {
-            console.error('❌ Token ou userId não encontrado');
-            showError('Sessão expirada. Faça login novamente.');
-            window.location.href = '/login.html';
-            return;
-        }
-
-        console.log('📱 Carregando devices para user:', userId);
-
-        // Chamar API com token correto
-        const result = await apiCall('/api/v1/user/dosing/devices', 'GET');
-        
-        if (!result || !result.data) {
-            console.error('❌ Resposta inválida da API:', result);
-            showError('Erro ao carregar devices');
-            return;
-        }
-
-        devices = result.data;
-        console.log('✅ Devices carregados:', devices);
-        
-        renderDeviceSelector();
-        
+        await loadDevices();
         if (devices.length > 0) {
             currentDevice = devices[0];
-            console.log('✅ Device inicial selecionado:', currentDevice);
-            updateDeviceInfo();
-            updateNavbarDeviceInfo();
             await loadPumps(currentDevice.id);
             await loadSchedules(currentDevice.id, currentPumpIndex);
+            updateNavbarDeviceStatus(currentDevice);
         } else {
-            console.warn('⚠️ Nenhum device encontrado');
             showError('Nenhum device cadastrado');
         }
     } catch (err) {
-        console.error('❌ Erro ao inicializar:', err);
+        console.error('Erro ao inicializar:', err);
         showError('Erro ao carregar dashboard');
     }
 }
 
 // ===== DEVICES =====
-function renderDeviceSelector() {
-    const select = document.getElementById('deviceSelect');
-    if (!select) {
-        console.error('❌ deviceSelect não encontrado');
+async function loadDevices() {
+    console.log('📱 Carregando devices...');
+
+    const result = await apiCall(`${API_BASE}/devices`);
+    if (!result || !result.data) {
+        showError('Erro ao carregar devices');
         return;
     }
+
+    devices = result.data;
+    renderDeviceSelector();
+}
+
+function renderDeviceSelector() {
+    const select = document.getElementById('deviceSelect');
+    if (!select) return;
 
     select.innerHTML = '';
 
     if (devices.length === 0) {
         select.innerHTML = '<option>Nenhum device encontrado</option>';
+        showError('Nenhum device cadastrado no sistema');
         return;
     }
 
     devices.forEach(device => {
         const option = document.createElement('option');
         option.value = device.id;
-        option.textContent = device.name || `Device ${device.id}`;
+        option.textContent = device.name;
         select.appendChild(option);
     });
 
@@ -88,14 +71,12 @@ async function onDeviceChange() {
     currentPumpIndex = 0;
 
     if (!currentDevice) {
-        console.error('❌ Device não encontrado');
         showError('Device não encontrado');
         return;
     }
 
-    console.log('✅ Device selecionado:', currentDevice.name);
     updateDeviceInfo();
-    updateNavbarDeviceInfo();
+    updateNavbarDeviceStatus(currentDevice);
     await loadPumps(currentDevice.id);
     await loadSchedules(currentDevice.id, currentPumpIndex);
 }
@@ -109,50 +90,27 @@ function updateDeviceInfo() {
 
     info.innerHTML = `
         <span class="device-status-dot ${!currentDevice.online ? 'offline' : ''}"></span>
-        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type || 'N/A'} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
+        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
     `;
-}
-
-function updateNavbarDeviceInfo() {
-    if (!currentDevice) return;
-
-    const status = currentDevice.online ? '🟢 Online' : '🔴 Offline';
-    const info = document.getElementById('navDeviceInfo');
-    const dot = document.getElementById('navDeviceStatus');
-    
-    if (info) info.textContent = `${currentDevice.name} • ${status}`;
-    if (dot) {
-        dot.classList.remove('offline');
-        if (!currentDevice.online) dot.classList.add('offline');
-    }
 }
 
 // ===== PUMPS =====
 async function loadPumps(deviceId) {
-    if (!deviceId) {
-        console.error('❌ deviceId não fornecido');
-        return;
-    }
-
     console.log('💧 Carregando bombas para device:', deviceId);
 
-    const result = await apiCall(`/api/v1/user/dosing/devices/${deviceId}/pumps`, 'GET');
-    
+    const result = await apiCall(`${API_BASE}/devices/${deviceId}/pumps`);
     if (!result || !result.data) {
-        console.error('❌ Erro ao carregar bombas:', result);
         showError('Erro ao carregar bombas');
         return;
     }
 
     pumps = result.data;
-    console.log('✅ Bombas carregadas:', pumps.length);
-    
     renderPumpSelectors();
     renderConfigTable();
 }
 
 function renderPumpSelectors() {
-    const selectors = ['pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
+    const selectors = ['pumpSelect', 'pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
 
     selectors.forEach(selectorId => {
         const select = document.getElementById(selectorId);
@@ -163,12 +121,21 @@ function renderPumpSelectors() {
         pumps.forEach((pump, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = `${index + 1} - ${pump.name || `Bomba ${index + 1}`}`;
+            option.textContent = `${index + 1} - ${pump.name}`;
             select.appendChild(option);
         });
 
         select.value = '0';
+        select.addEventListener('change', onPumpChange);
     });
+}
+
+function onPumpChange(e) {
+    if (e.target.id === 'pumpSelect') {
+        currentPumpIndex = parseInt(e.target.value);
+        loadSchedules(currentDevice.id, currentPumpIndex);
+        renderConfigTable();
+    }
 }
 
 // ===== CONFIG TABLE =====
@@ -178,26 +145,16 @@ function renderConfigTable() {
 
     tbody.innerHTML = '';
 
-    if (pumps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma bomba encontrada</td></tr>';
-        return;
-    }
-
     pumps.forEach((pump, index) => {
         const row = document.createElement('tr');
-        const containerSize = pump.container_volume_ml || pump.container_size || 0;
-        const currentVolume = pump.current_volume_ml || pump.current_volume || 0;
-        const alarmPercent = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-        const maxDaily = pump.max_daily_ml || pump.daily_max || 0;
-        
         row.innerHTML = `
             <td>${index + 1}</td>
-            <td>${pump.name || `P${index + 1}`}</td>
-            <td>${pump.enabled ? '✓ Ativa' : '✗ Inativa'}</td>
-            <td>${containerSize}</td>
-            <td>${currentVolume}</td>
-            <td>${alarmPercent}%</td>
-            <td>${maxDaily}</td>
+            <td>${pump.name}</td>
+            <td>${pump.active ? '✓ Ativa' : '✗ Inativa'}</td>
+            <td>${pump.container_size || 0}</td>
+            <td>${pump.current_volume || 0}</td>
+            <td>${pump.alarm_percent || 0}%</td>
+            <td>${pump.daily_max || 0}</td>
             <td><button class="btn-edit" onclick="openEditModal(${index})">Editar</button></td>
         `;
         tbody.appendChild(row);
@@ -210,11 +167,11 @@ function openEditModal(index) {
     if (!pump) return;
 
     document.getElementById('editPumpIndex').value = index;
-    document.getElementById('editName').value = pump.name || '';
-    document.getElementById('editContainerSize').value = pump.container_volume_ml || pump.container_size || 0;
-    document.getElementById('editCurrentVolume').value = pump.current_volume_ml || pump.current_volume || 0;
-    document.getElementById('editAlarmPercent').value = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-    document.getElementById('editDailyMax').value = pump.max_daily_ml || pump.daily_max || 0;
+    document.getElementById('editName').value = pump.name;
+    document.getElementById('editContainerSize').value = pump.container_size || 0;
+    document.getElementById('editCurrentVolume').value = pump.current_volume || 0;
+    document.getElementById('editAlarmPercent').value = pump.alarm_percent || 0;
+    document.getElementById('editDailyMax').value = pump.daily_max || 0;
 
     document.getElementById('editModal').style.display = 'flex';
 }
@@ -238,7 +195,7 @@ async function saveEditModal() {
     console.log('💾 Salvando bomba:', index, data);
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${index}`,
+        `${API_BASE}/devices/${currentDevice.id}/pumps/${index}`,
         'PUT',
         data
     );
@@ -252,20 +209,13 @@ async function saveEditModal() {
 
 // ===== SCHEDULES =====
 async function loadSchedules(deviceId, pumpIndex) {
-    if (!deviceId) {
-        console.error('❌ deviceId não fornecido');
-        return;
-    }
-
-    console.log('📅 Carregando agendas para:', deviceId, 'pump:', pumpIndex);
+    console.log('📅 Carregando agendas para:', deviceId, pumpIndex);
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
-        'GET'
+        `${API_BASE}/devices/${deviceId}/pumps/${pumpIndex}/schedules`
     );
 
     schedules = result && result.data ? result.data : [];
-    console.log('✅ Agendas carregadas:', schedules.length);
     renderScheduleTable();
 }
 
@@ -282,33 +232,18 @@ function renderScheduleTable() {
 
     schedules.forEach(schedule => {
         const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-        
-        // Converter days_of_week (array booleano) ou days_mask (número bitmask)
-        let activeDaysArray = [];
-        if (schedule.days_of_week && Array.isArray(schedule.days_of_week)) {
-            activeDaysArray = schedule.days_of_week;
-        } else if (schedule.days_mask !== undefined) {
-            // Converter bitmask para array
-            for (let i = 0; i < 7; i++) {
-                activeDaysArray[i] = (schedule.days_mask & (1 << i)) !== 0;
-            }
-        }
-        
-        const daysText = activeDaysArray
+        const daysText = schedule.active_days
             .map((active, i) => active ? days[i] : '')
             .filter(d => d)
             .join(', ');
 
         const row = document.createElement('tr');
-        const startTime = schedule.start_time || '--';
-        const endTime = schedule.end_time || '--';
-        
         row.innerHTML = `
-            <td><input type="checkbox" ${schedule.enabled ? 'checked' : ''} disabled></td>
-            <td>${daysText || '---'}</td>
+            <td><input type="checkbox" ${schedule.active ? 'checked' : ''} disabled></td>
+            <td>${daysText}</td>
             <td>${schedule.doses_per_day || 0}</td>
-            <td>${startTime} - ${endTime}</td>
-            <td>${schedule.volume_per_day_ml || 0}</td>
+            <td>${schedule.start_time} - ${schedule.end_time}</td>
+            <td>${schedule.volume_per_day || 0}</td>
             <td><button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button></td>
         `;
         tbody.appendChild(row);
@@ -342,7 +277,7 @@ async function createSchedule() {
     console.log('📅 Criando agenda:', pumpIndex, data);
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
+        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
         'POST',
         data
     );
@@ -358,7 +293,7 @@ async function deleteSchedule(scheduleId) {
     if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
+        `${API_BASE}/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
         'DELETE'
     );
 
@@ -381,7 +316,7 @@ async function applyManualDose() {
     console.log('💧 Aplicando dose manual:', pumpIndex, volume);
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
+        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
         'POST',
         { volume }
     );
@@ -400,7 +335,7 @@ async function startCalibration() {
     console.log('⚙️ Iniciando calibração:', pumpIndex);
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
+        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
         'POST'
     );
 
@@ -433,7 +368,7 @@ async function saveCalibration() {
     console.log('⚙️ Salvando calibração:', pumpIndex, measuredVolume);
 
     const result = await apiCall(
-        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
+        `${API_BASE}/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
         'POST',
         { measured_volume: measuredVolume }
     );
