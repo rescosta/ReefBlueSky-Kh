@@ -12,7 +12,10 @@ let schedules = [];
 async function initDashboard() {
     console.log('🚀 Iniciando Dashboard Dosadora...');
 
-    if (!isTokenValid()) return;
+    function getToken() {
+      return localStorage.getItem('token');
+    }
+
 
     try {
         const token = getToken();
@@ -28,7 +31,7 @@ async function initDashboard() {
         console.log('📱 Carregando devices para user:', userId);
 
         // Buscar devices com Bearer token direto
-        const res = await fetch('/api/v1/user/devices', {
+        const res = await fetch('/api/v1/user/dosing/devices', {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -153,7 +156,7 @@ async function loadPumps(deviceId) {
 
     const token = getToken(); // reaproveita sua função existente
     try {
-        const res = await fetch(`/api/v1/user/devices/${deviceId}/pumps`, {
+        const res = await fetch(`/api/v1/user/dosing/devices/${deviceId}/pumps`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -267,7 +270,7 @@ async function saveEditModal() {
     console.log('💾 Salvando bomba:', index, data);
 
     const result = await apiCall(
-        `/api/v1/user/devices/${currentDevice.id}/pumps/${index}`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${index}`,
         'PUT',
         data
     );
@@ -291,7 +294,7 @@ async function loadSchedules(deviceId, pumpIndex) {
     const token = getToken();
     try {
         const res = await fetch(
-            `/api/v1/user/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
+            `/api/v1/user/dosing/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
             {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -390,7 +393,7 @@ async function createSchedule() {
     console.log('📅 Criando agenda:', pumpIndex, data);
 
     const result = await apiCall(
-        `/api/v1/user/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules`,
         'POST',
         data
     );
@@ -406,7 +409,7 @@ async function deleteSchedule(scheduleId) {
     if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
 
     const result = await apiCall(
-        `/api/v1/user/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
         'DELETE'
     );
 
@@ -429,7 +432,7 @@ async function applyManualDose() {
     console.log('💧 Aplicando dose manual:', pumpIndex, volume);
 
     const result = await apiCall(
-        `/api/v1/user/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
         'POST',
         { volume }
     );
@@ -448,7 +451,7 @@ async function startCalibration() {
     console.log('⚙️ Iniciando calibração:', pumpIndex);
 
     const result = await apiCall(
-        `/api/v1/user/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
         'POST'
     );
 
@@ -481,7 +484,7 @@ async function saveCalibration() {
     console.log('⚙️ Salvando calibração:', pumpIndex, measuredVolume);
 
     const result = await apiCall(
-        `/api/v1/user/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
+        `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
         'POST',
         { measured_volume: measuredVolume }
     );
