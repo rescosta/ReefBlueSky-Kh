@@ -785,10 +785,20 @@ async function toggleSchedule(scheduleId) {
   const pumpIndex = sched.pump_index != null ? Number(sched.pump_index) : 0;
   const newEnabled = !sched.enabled;
 
+  // monta payload completo, reaproveitando os dados atuais
+  const data = {
+    enabled: newEnabled,
+    days_of_week: Array.isArray(sched.days_of_week) ? sched.days_of_week : [],
+    doses_per_day: sched.doses_per_day || 0,
+    start_time: sched.start_time || '',
+    end_time: sched.end_time || '',
+    volume_per_day_ml: sched.volume_per_day_ml || 0
+  };
+
   const result = await apiCall(
     `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${idNum}`,
     'PUT',
-    { enabled: newEnabled }
+    data
   );
 
   if (result) {
@@ -796,6 +806,7 @@ async function toggleSchedule(scheduleId) {
     renderScheduleTableAll();
   }
 }
+
 
 
 
