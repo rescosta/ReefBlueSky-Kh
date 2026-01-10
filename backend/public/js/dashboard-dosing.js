@@ -150,7 +150,7 @@ async function onDeviceChange() {
     updateDeviceInfo();
     updateNavbarDeviceInfo();
     await loadPumps(currentDevice.id);
-    await loadSchedules(currentDevice.id,currentPumpIndex);
+    await loadAllSchedules(currentDevice.id);
 }
 
 function updateDeviceInfo() {
@@ -334,7 +334,9 @@ function openEditScheduleModal(scheduleId) {
   editingScheduleData = { ...schedule };
   
 
-  document.getElementById('editPumpSelectAgenda').value = currentPumpIndex;
+  document.getElementById('editPumpSelectAgenda').value =
+    schedule.pump_index != null ? schedule.pump_index : 0;
+
 
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
   dayCheckboxes.forEach((cb, idx) => {
@@ -385,8 +387,9 @@ async function saveEditScheduleModal() {
   if (result) {
     showSuccess('Agenda atualizada!');
     closeEditScheduleModal();
-    await loadSchedules(currentDevice.id, currentPumpIndex);
+    await loadAllSchedules(currentDevice.id);   // recarrega tudo
   }
+
 }
 
 async function loadAllSchedules(deviceId) {
@@ -642,11 +645,12 @@ async function createSchedule() {
     data
   );
 
-  if (result) {
+   if (result) {
     showSuccess('Agenda criada com sucesso!');
     closeAgendaModal();
-    await loadSchedules(currentDevice.id, pumpIndex);
+    await loadAllSchedules(currentDevice.id);
   }
+
 }
 
 
@@ -662,7 +666,7 @@ async function deleteSchedule(scheduleId) {
 
   if (result) {
     showSuccess('Agenda deletada!');
-    await loadSchedules(currentDevice.id, currentPumpIndex);
+    await loadAllSchedules(currentDevice.id);
   }
 }
 
@@ -759,7 +763,7 @@ async function toggleSchedule(scheduleId) {
 
   if (result) {
     sched.enabled = newEnabled;
-    renderScheduleTable();
+    renderScheduleTableAll();
   }
 }
 
