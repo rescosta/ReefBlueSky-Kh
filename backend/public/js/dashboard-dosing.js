@@ -329,25 +329,26 @@ function openEditScheduleModal(scheduleId) {
   const schedule = schedules.find(s => s.id === scheduleId);
   if (!schedule) return;
 
-  editingScheduleData = { ...schedule }; // backup
-  
-  // Preencher formulário (iguais ao create, mas com IDs 'edit...')
+  editingScheduleData = { ...schedule };
+
   document.getElementById('editPumpSelectAgenda').value = currentPumpIndex;
-  
-  // Days checkboxes (precisa ter .edit-day-checkbox no HTML)
+
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
   dayCheckboxes.forEach((cb, idx) => {
-    cb.checked = schedule.days_of_week?.includes(idx) || ((schedule.days_mask & (1 << idx)) !== 0);
+    cb.checked = Array.isArray(schedule.days_of_week) 
+      ? schedule.days_of_week.includes(idx)
+      : false;
   });
-  
+
   document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
   document.getElementById('editStartTime').value = schedule.start_time || '';
   document.getElementById('editEndTime').value = schedule.end_time || '';
   document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
-  document.getElementById('editScheduleEnabled').checked = schedule.enabled;
+  document.getElementById('editScheduleEnabled').checked = !!schedule.enabled;
 
-  document.getElementById('editScheduleModal').style.display = 'flex'; // ← seu modal HTML
+  document.getElementById('editScheduleModal').style.display = 'flex';
 }
+
 
 function closeEditScheduleModal() {
   document.getElementById('editScheduleModal').style.display = 'none';
