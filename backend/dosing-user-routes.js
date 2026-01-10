@@ -558,6 +558,66 @@ router.delete('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async
     }
 });
 
+// GET /api/v1/user/dosing/devices/:deviceId/schedules
+// Lista todas as agendas de todas as bombas de um device
+router.get('/devices/:deviceId/schedules', async (req, res) => {
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = req.user.userId;
+    const { deviceId } = req.params;
+
+    conn = await pool.getConnection();
+
+    // Garantir que o device é do usuário
+    const dev = await conn.query(
+      `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
+      [deviceId, userId]
+    );
+    if (!dev || dev.length === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Buscar TODAS as agendas de TODAS as bombas desse device
+    const rows = await conn.query(
+      `SELECT
+         s.id,
+         s.pump_id,
+         p.index_on_device   AS pump_index,
+         p.name              AS pump_name,
+         s.enabled,
+         s.days_mask,
+         s.doses_per_day,
+         TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
+         TIME_FORMAT(s.end_time,   '%H:%i') AS end_time,
+         s.volume_per_day_ml,
+         s.created_at
+       FROM dosing_schedules s
+       JOIN dosing_pumps p   ON s.pump_id = p.id
+       WHERE p.device_id = ?
+       ORDER BY p.index_on_device ASC, s.start_time ASC`,
+      [deviceId]
+    );
+
+    const data = rows.map(s => ({
+      ...s,
+      days_of_week: convertDaysMaskToArray(s.days_mask)
+    }));
+
+    res.json({ data });
+  } catch (err) {
+    console.error('Error fetching all schedules:', err);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
+
 // ============================================
 // MANUAL DOSE
 // ============================================
