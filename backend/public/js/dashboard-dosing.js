@@ -785,7 +785,6 @@ async function toggleSchedule(scheduleId) {
   const pumpIndex = sched.pump_index != null ? Number(sched.pump_index) : 0;
   const newEnabled = !sched.enabled;
 
-  // monta payload completo, reaproveitando os dados atuais
   const data = {
     enabled: newEnabled,
     days_of_week: Array.isArray(sched.days_of_week) ? sched.days_of_week : [],
@@ -806,8 +805,6 @@ async function toggleSchedule(scheduleId) {
     renderScheduleTableAll();
   }
 }
-
-
 
 
 // ===== TABS =====
