@@ -767,6 +767,76 @@
             </div>
         </div>
     </div>
+    <!-- Edit Schedule Modal (cópia do Agenda Modal) -->
+    <div id="editScheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar Agenda</h2>
+                <span class="close" onclick="closeEditScheduleModal()">×</span>
+            </div>
+            <div class="form-group">
+                <label for="editPumpSelectAgenda">Bomba:</label>
+                <select id="editPumpSelectAgenda" disabled></select>
+            </div>
+            <div class="form-group">
+                <label>Dias da Semana:</label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="0"> <label>Dom</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="1"> <label>Seg</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="2"> <label>Ter</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="3"> <label>Qua</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="4"> <label>Qui</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="5"> <label>Sex</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" class="edit-day-checkbox" data-day="6"> <label>Sab</label>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editDosesPerDay">Doses por Dia:</label>
+                    <input type="number" id="editDosesPerDay" min="1" value="2">
+                </div>
+                <div class="form-group">
+                    <label for="editVolumePerDay">Volume Diário (mL):</label>
+                    <input type="number" id="editVolumePerDay" min="0" step="0.1" value="36">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editStartTime">Horário Inicial:</label>
+                    <input type="time" id="editStartTime" value="08:00">
+                </div>
+                <div class="form-group">
+                    <label for="editEndTime">Horário Final:</label>
+                    <input type="time" id="editEndTime" value="20:00">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="editScheduleEnabled" checked> Agenda Ativa
+                </label>
+            </div>
+            <div class="button-group">
+                <button class="btn-secondary" onclick="closeEditScheduleModal()">Cancelar</button>
+                <button class="btn-primary" onclick="saveEditScheduleModal()">💾 Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+
 
     <!-- Scripts -->
     <script src="js/dashboard-common.js"></script>
