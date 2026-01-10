@@ -478,7 +478,7 @@ function renderScheduleTableAll() {
           ${schedule.enabled ? 'Ativa' : 'Inativa'}
         </button>
       </td>
-      <td>${schedule.pump_name || \`Bomba ${schedule.pump_index + 1}\`}</td>
+      <td>${schedule.pump_name || ('Bomba ' + (schedule.pump_index + 1))}</td>
       <td>${daysText || '---'}</td>
       <td>${schedule.doses_per_day || 0}</td>
       <td>${startTime} - ${endTime}</td>
@@ -490,6 +490,7 @@ function renderScheduleTableAll() {
         <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
       </td>
     `;
+
     tbody.appendChild(row);
   });
 }
