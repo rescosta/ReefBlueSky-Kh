@@ -388,6 +388,29 @@ async function saveEditScheduleModal() {
   }
 }
 
+async function loadAllSchedules(deviceId) {
+  if (!deviceId) return;
+
+  const token = getToken();
+  try {
+    const res = await fetch(
+      `/api/v1/user/dosing/devices/${deviceId}/schedules`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    const json = await res.json();
+    schedules = json?.data || [];
+  } catch (err) {
+    console.error('❌ Erro ao carregar todas as agendas:', err);
+    schedules = [];
+  }
+  renderScheduleTableAll(); // nova função de render com coluna BOMBA usando pump_name
+}
+
 
 async function togglePump(index) {
   const pump = pumps[index];
