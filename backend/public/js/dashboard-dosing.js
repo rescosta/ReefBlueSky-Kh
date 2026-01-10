@@ -91,7 +91,7 @@ async function initDashboard() {
             updateDeviceInfo();
             updateNavbarDeviceInfo();
             await loadPumps(currentDevice.id);
-            await loadAllSchedules(currentDevice.id, currentPumpIndex);
+            await loadAllSchedules(currentDevice.id);
 
         } else {
             console.warn('⚠️ Nenhum device encontrado');
@@ -409,7 +409,7 @@ async function loadAllSchedules(deviceId) {
     console.error('❌ Erro ao carregar todas as agendas:', err);
     schedules = [];
   }
-  renderScheduleTableAll(); // nova função de render com coluna BOMBA usando pump_name
+  renderScheduleTableAll();
 }
 
 
@@ -442,6 +442,56 @@ async function togglePump(index) {
     // opcional: também recarregar agendas se quiser refletir visualmente
     // await loadSchedules(currentDevice.id, currentPumpIndex);
   }
+}
+
+function renderScheduleTableAll() {
+  const tbody = document.getElementById('scheduleTableBody');
+  if (!tbody) return;
+
+  if (schedules.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Nenhuma agenda</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+
+  const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+
+  schedules.forEach(schedule => {
+    const activeDaysArray = Array(7).fill(false);
+    (schedule.days_of_week || []).forEach(i => {
+      if (i >= 0 && i < 7) activeDaysArray[i] = true;
+    });
+
+    const daysText = activeDaysArray
+      .map((a,i) => a ? days[i] : '')
+      .filter(Boolean)
+      .join(', ');
+
+    const row = document.createElement('tr');
+    const startTime = schedule.start_time || '--';
+    const endTime   = schedule.end_time   || '--';
+
+    row.innerHTML = `
+      <td>
+        <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
+          ${schedule.enabled ? 'Ativa' : 'Inativa'}
+        </button>
+      </td>
+      <td>${schedule.pump_name || \`Bomba ${schedule.pump_index + 1}\`}</td>
+      <td>${daysText || '---'}</td>
+      <td>${schedule.doses_per_day || 0}</td>
+      <td>${startTime} - ${endTime}</td>
+      <td>${schedule.volume_per_day_ml || 0}</td>
+      <td>
+        <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
+      </td>
+      <td>
+        <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
 }
 
 
