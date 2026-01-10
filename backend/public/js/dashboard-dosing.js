@@ -476,13 +476,13 @@ function renderScheduleTableAll() {
       .filter(Boolean)
       .join(', ');
 
-    const row = document.createElement('tr');
     const startTime = schedule.start_time || '--';
     const endTime   = schedule.end_time   || '--';
 
     const statusClass = schedule.enabled ? 'btn-on' : 'btn-off';
     const statusLabel = schedule.enabled ? 'Ativada' : 'Desativada';
 
+    const row = document.createElement('tr');
     row.innerHTML = `
       <td>
         <button class="btn-status ${statusClass}" onclick="toggleSchedule(${schedule.id})">
@@ -501,7 +501,6 @@ function renderScheduleTableAll() {
         <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
       </td>
     `;
-
     tbody.appendChild(row);
   });
 }
