@@ -150,7 +150,7 @@ async function onDeviceChange() {
     updateDeviceInfo();
     updateNavbarDeviceInfo();
     await loadPumps(currentDevice.id);
-    await loadSchedules(currentDevice.id);
+    await loadSchedules(currentDevice.id,currentPumpIndex);
 }
 
 function updateDeviceInfo() {
