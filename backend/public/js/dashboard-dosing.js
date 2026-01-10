@@ -657,8 +657,10 @@ async function createSchedule() {
 async function deleteSchedule(scheduleId) {
   if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
 
-  // achar o schedule correspondente
-  const sched = schedules.find(s => s.id === scheduleId);
+  const idNum = parseInt(scheduleId, 10);
+
+  // procurar na lista atual
+  const sched = schedules.find(s => parseInt(s.id, 10) === idNum);
   if (!sched) {
     showError('Agenda não encontrada na lista atual');
     return;
@@ -667,7 +669,7 @@ async function deleteSchedule(scheduleId) {
   const pumpIndex = sched.pump_index != null ? sched.pump_index : 0;
 
   const result = await apiCall(
-    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${scheduleId}`,
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${idNum}`,
     'DELETE'
   );
 
@@ -676,6 +678,7 @@ async function deleteSchedule(scheduleId) {
     await loadAllSchedules(currentDevice.id);
   }
 }
+
 
 
 // ===== MANUAL DOSE =====
