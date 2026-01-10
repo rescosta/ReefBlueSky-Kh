@@ -91,7 +91,8 @@ async function initDashboard() {
             updateDeviceInfo();
             updateNavbarDeviceInfo();
             await loadPumps(currentDevice.id);
-            await loadSchedules(currentDevice.id, currentPumpIndex);
+            await loadAllSchedules(currentDevice.id);
+
         } else {
             console.warn('⚠️ Nenhum device encontrado');
             showError('Nenhum device cadastrado');
