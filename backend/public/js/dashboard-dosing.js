@@ -7,6 +7,9 @@ let currentPumpIndex = 0;
 let devices = [];
 let pumps = [];
 let schedules = [];
+let editingScheduleId = null; 
+let editingScheduleData = {}; 
+
 
 
 // ===== AUTH =====
@@ -320,6 +323,66 @@ async function saveEditModal() {
   }
 }
 
+// ===== EDIT SCHEDULE MODAL =====
+function openEditScheduleModal(scheduleId) {
+  editingScheduleId = scheduleId;
+  const schedule = schedules.find(s => s.id === scheduleId);
+  if (!schedule) return;
+
+  editingScheduleData = { ...schedule }; // backup
+  
+  // Preencher formulário (iguais ao create, mas com IDs 'edit...')
+  document.getElementById('editPumpSelectAgenda').value = currentPumpIndex;
+  
+  // Days checkboxes (precisa ter .edit-day-checkbox no HTML)
+  const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
+  dayCheckboxes.forEach((cb, idx) => {
+    cb.checked = schedule.days_of_week?.includes(idx) || ((schedule.days_mask & (1 << idx)) !== 0);
+  });
+  
+  document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
+  document.getElementById('editStartTime').value = schedule.start_time || '';
+  document.getElementById('editEndTime').value = schedule.end_time || '';
+  document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
+  document.getElementById('editScheduleEnabled').checked = schedule.enabled;
+
+  document.getElementById('editScheduleModal').style.display = 'flex'; // ← seu modal HTML
+}
+
+function closeEditScheduleModal() {
+  document.getElementById('editScheduleModal').style.display = 'none';
+  editingScheduleId = null;
+}
+
+async function saveEditScheduleModal() {
+  const pumpIndex = parseInt(document.getElementById('editPumpSelectAgenda').value);
+  
+  const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
+  const activeDays = [];
+  dayCheckboxes.forEach((cb, idx) => cb.checked && activeDays.push(idx));
+
+  const data = {
+    enabled: document.getElementById('editScheduleEnabled').checked,
+    days_of_week: activeDays,
+    doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
+    start_time: document.getElementById('editStartTime').value,
+    end_time: document.getElementById('editEndTime').value,
+    volume_per_day_ml: parseInt(document.getElementById('editVolumePerDay').value) || 0
+  };
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${editingScheduleId}`,
+    'PUT',
+    data
+  );
+
+  if (result) {
+    showSuccess('Agenda atualizada!');
+    closeEditScheduleModal();
+    await loadSchedules(currentDevice.id, currentPumpIndex);
+  }
+}
+
 
 async function togglePump(index) {
   const pump = pumps[index];
@@ -453,8 +516,12 @@ function renderScheduleTable() {
           <td>${startTime} - ${endTime}</td>
           <td>${schedule.volume_per_day_ml || 0}</td>
           <td>
+            <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
+          </td>
+          <td>
             <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
           </td>
+
         `;
         tbody.appendChild(row);
     });
@@ -636,6 +703,9 @@ function switchTab(tabName, btnElement) {
 window.addEventListener('click', (e) => {
     const editModal = document.getElementById('editModal');
     const agendaModal = document.getElementById('agendaModal');
+    const editScheduleModal = document.getElementById('editScheduleModal');
+    
+    if (e.target === editScheduleModal) editScheduleModal.style.display = 'none';
 
     if (e.target === editModal) editModal.style.display = 'none';
     if (e.target === agendaModal) agendaModal.style.display = 'none';
