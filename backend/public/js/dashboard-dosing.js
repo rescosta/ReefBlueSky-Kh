@@ -654,13 +654,20 @@ async function createSchedule() {
 }
 
 
-
-
 async function deleteSchedule(scheduleId) {
   if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
 
+  // achar o schedule correspondente
+  const sched = schedules.find(s => s.id === scheduleId);
+  if (!sched) {
+    showError('Agenda não encontrada na lista atual');
+    return;
+  }
+
+  const pumpIndex = sched.pump_index != null ? sched.pump_index : 0;
+
   const result = await apiCall(
-    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${scheduleId}`,
     'DELETE'
   );
 
