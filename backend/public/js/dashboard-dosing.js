@@ -325,20 +325,23 @@ async function saveEditModal() {
 
 // ===== EDIT SCHEDULE MODAL =====
 function openEditScheduleModal(scheduleId) {
+  console.log('openEditScheduleModal chamado para', scheduleId, schedules);
   editingScheduleId = scheduleId;
   const schedule = schedules.find(s => s.id === scheduleId);
   if (!schedule) return;
 
   editingScheduleData = { ...schedule };
+  
 
   document.getElementById('editPumpSelectAgenda').value = currentPumpIndex;
 
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
   dayCheckboxes.forEach((cb, idx) => {
-    cb.checked = Array.isArray(schedule.days_of_week) 
+    cb.checked = Array.isArray(schedule.days_of_week)
       ? schedule.days_of_week.includes(idx)
       : false;
   });
+
 
   document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
   document.getElementById('editStartTime').value = schedule.start_time || '';
@@ -346,6 +349,7 @@ function openEditScheduleModal(scheduleId) {
   document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
   document.getElementById('editScheduleEnabled').checked = !!schedule.enabled;
 
+  console.log('Pré-display modal edição', scheduleId);
   document.getElementById('editScheduleModal').style.display = 'flex';
 }
 
