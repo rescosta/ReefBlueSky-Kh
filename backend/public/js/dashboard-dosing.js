@@ -327,16 +327,22 @@ async function saveEditModal() {
 // ===== EDIT SCHEDULE MODAL =====
 function openEditScheduleModal(scheduleId) {
   console.log('openEditScheduleModal chamado para', scheduleId, schedules);
-  editingScheduleId = scheduleId;
-  const schedule = schedules.find(s => s.id === scheduleId);
-  if (!schedule) return;
+  const idNum = Number(scheduleId);
 
+  const schedule = Array.isArray(schedules)
+    ? schedules.find(s => Number(s.id) === idNum)
+    : null;
+
+  if (!schedule) {
+    showError('Agenda não encontrada para edição');
+    return;
+  }
+
+  editingScheduleId = idNum;
   editingScheduleData = { ...schedule };
-  
 
   document.getElementById('editPumpSelectAgenda').value =
     schedule.pump_index != null ? schedule.pump_index : 0;
-
 
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
   dayCheckboxes.forEach((cb, idx) => {
@@ -345,16 +351,15 @@ function openEditScheduleModal(scheduleId) {
       : false;
   });
 
-
   document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
   document.getElementById('editStartTime').value = schedule.start_time || '';
   document.getElementById('editEndTime').value = schedule.end_time || '';
   document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
   document.getElementById('editScheduleEnabled').checked = !!schedule.enabled;
 
-  console.log('Pré-display modal edição', scheduleId);
   document.getElementById('editScheduleModal').style.display = 'flex';
 }
+
 
 
 function closeEditScheduleModal() {
@@ -767,12 +772,21 @@ async function saveCalibration() {
 
 
 async function toggleSchedule(scheduleId) {
-  const sched = schedules.find(s => s.id === scheduleId);
-  if (!sched) return;
+  const idNum = Number(scheduleId);
+
+  const sched = Array.isArray(schedules)
+    ? schedules.find(s => Number(s.id) === idNum)
+    : null;
+  if (!sched) {
+    showError('Agenda não encontrada para alternar');
+    return;
+  }
+
+  const pumpIndex = sched.pump_index != null ? Number(sched.pump_index) : 0;
   const newEnabled = !sched.enabled;
 
   const result = await apiCall(
-    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${currentPumpIndex}/schedules/${scheduleId}`,
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${idNum}`,
     'PUT',
     { enabled: newEnabled }
   );
@@ -782,6 +796,7 @@ async function toggleSchedule(scheduleId) {
     renderScheduleTableAll();
   }
 }
+
 
 
 // ===== TABS =====
