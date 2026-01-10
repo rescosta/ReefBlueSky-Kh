@@ -80,27 +80,27 @@ router.post('/devices', async (req, res) => {
         const pumpNames = ['KH', 'Cálcio', 'Magnésio', 'Iodo', 'Reserva 1', 'Reserva 2'];
         
         for (let i = 0; i < 6; i++) {
-          pumps.push([
-            deviceId,
-            pumpNames[i],
-            i,
-            500,
-            500,
-            10,
-            1.0,
-            100,
-            0          // enabled = 0 (desativada)
-          ]);
+            pumps.push([
+                deviceId,
+                pumpNames[i],
+                i,                      // index_on_device 0..5
+                500,                    // container_volume_ml
+                500,                    // current_volume_ml
+                10,                     // alarm_threshold_pct
+                1.0,                    // calibration_rate_ml_s
+                100                     // max_daily_ml
+            ]);
         }
 
         await conn.batch(
-          `INSERT INTO dosing_pumps
-           (device_id, name, index_on_device,
+            `INSERT INTO dosing_pumps
+            (device_id, name, index_on_device,
             container_volume_ml, current_volume_ml,
-            alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml, enabled)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          pumps
+            alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            pumps
         );
+
 
         res.status(201).json({ data: { id: deviceId, name, hw_type } });
     } catch (err) {
@@ -232,26 +232,26 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
             for (let i = 0; i < 6; i++) {
                 if (!existingIndices.has(i)) {
                     const result = await conn.query(
-                      `INSERT INTO dosing_pumps
-                       (device_id, name, index_on_device,
+                        `INSERT INTO dosing_pumps
+                        (device_id, name, index_on_device,
                         container_volume_ml, current_volume_ml,
-                        alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml, enabled)
-                       VALUES (?, ?, ?, 500, 500, 10, 1.0, 100, 0)`,
-                      [deviceId, pumpNames[i], i]
+                        alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
+                        VALUES (?, ?, ?, 500, 500, 10, 1.0, 100)`,
+                        [deviceId, pumpNames[i], i]
                     );
 
                     pumps.push({
-                      id: result.insertId,
-                      device_id: deviceId,
-                      name: pumpNames[i],
-                      index_on_device: i,
-                      enabled: 0,
-                      container_volume_ml: 500,
-                      current_volume_ml: 500,
-                      alarm_threshold_pct: 10,
-                      calibration_rate_ml_s: 1.0,
-                      max_daily_ml: 100,
-                      created_at: new Date().toISOString()
+                        id: result.insertId,
+                        device_id: deviceId,
+                        name: pumpNames[i],
+                        index_on_device: i,
+                        enabled: 1,
+                        container_volume_ml: 500,
+                        current_volume_ml: 500,
+                        alarm_threshold_pct: 10,
+                        calibration_rate_ml_s: 1.0,
+                        max_daily_ml: 100,
+                        created_at: new Date().toISOString()
                     });
 
                 }
@@ -385,11 +385,11 @@ router.get('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) => 
 
 
         // Converter days_mask para array de dias
-        const schedulesWithDays = schedules.map(s => ({
-            ...s,
-            days_of_week: convertDaysMaskToArray(s.days_mask),
-            pump_name: undefined // Dashboard não precisa
-        }));
+    const schedulesWithDays = schedules.map(s => ({
+      ...s,
+      days_of_week: convertDaysMaskToArray(s.days_mask)
+      // mantém s.pump_name vindo do JOIN
+    }));
 
         res.json({ data: schedulesWithDays });
     } catch (err) {
@@ -473,7 +473,14 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
 
     const userId = req.user.userId;
     const { deviceId, pumpIndex, scheduleId } = req.params;
-    const { enabled } = req.body;
+    const { 
+      enabled, 
+      days_of_week, 
+      doses_per_day, 
+      start_time, 
+      end_time, 
+      volume_per_day_ml 
+    } = req.body;  // ← ADICIONAR todos fields
 
     conn = await pool.getConnection();
 
@@ -491,12 +498,18 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
       return res.status(404).json({ error: 'Schedule not found' });
     }
 
-    await conn.query(
-      `UPDATE dosing_schedules SET enabled = ? WHERE id = ?`,
-      [enabled ? 1 : 0, scheduleId]
-    );
+    // Converter days_of_week para days_mask
+    const daysMask = convertDaysArrayToMask(days_of_week || []);
 
-    res.json({ data: { id: scheduleId, enabled: !!enabled } });
+    await conn.query(
+      `UPDATE dosing_schedules 
+       SET enabled = ?, days_mask = ?, doses_per_day = ?, 
+           start_time = ?, end_time = ?, volume_per_day_ml = ?
+       WHERE id = ?`,
+      [enabled ? 1 : 0, daysMask, doses_per_day, start_time, end_time, volume_per_day_ml, scheduleId]
+    );  // ← UPDATE todos fields
+
+    res.json({ data: { id: scheduleId, success: true } });
   } catch (err) {
     console.error('Error updating schedule:', err);
     res.status(500).json({ error: 'Database error' });
@@ -504,6 +517,7 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
     if (conn) conn.release();
   }
 });
+
 
 
 // DELETE /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId
