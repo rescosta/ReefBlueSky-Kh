@@ -480,10 +480,13 @@ function renderScheduleTableAll() {
     const startTime = schedule.start_time || '--';
     const endTime   = schedule.end_time   || '--';
 
+    const statusClass = schedule.enabled ? 'btn-sched-on' : 'btn-sched-off';
+    const statusLabel = schedule.enabled ? 'Ativada' : 'Desativada';
+
     row.innerHTML = `
       <td>
-        <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
-          ${schedule.enabled ? 'Ativa' : 'Inativa'}
+        <button class="btn-schedule ${statusClass}" onclick="toggleSchedule(${schedule.id})">
+          ${statusLabel}
         </button>
       </td>
       <td>${schedule.pump_name || ('Bomba ' + (schedule.pump_index + 1))}</td>
