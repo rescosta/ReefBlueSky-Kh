@@ -80,23 +80,20 @@ async function initDashboard() {
             return;
         }
 
-        devices = json.data;
-        console.log('✅ Devices carregados:', devices);
+      devices = json.data;
+      console.log('✅ Devices carregados:', devices);
 
-        renderDeviceSelector();
-
-        if (devices.length > 0) {
-            currentDevice = devices[0];
-            console.log('✅ Device inicial selecionado:', currentDevice);
-            updateDeviceInfo();
-            updateNavbarDeviceInfo();
-            await loadPumps(currentDevice.id);
-            await loadAllSchedules(currentDevice.id);
-
-        } else {
-            console.warn('⚠️ Nenhum device encontrado');
-            showError('Nenhum device cadastrado');
-        }
+      if (devices.length > 0) {
+          currentDevice = devices[0];        // sempre primeiro device do usuário
+          console.log('✅ Device inicial selecionado:', currentDevice);
+          updateDeviceInfo();
+          updateNavbarDeviceInfo();
+          await loadPumps(currentDevice.id);
+          await loadAllSchedules(currentDevice.id);
+      } else {
+          console.warn('⚠️ Nenhum device encontrado');
+          showError('Nenhum device cadastrado');
+      }
 
     } catch (err) {
         console.error('❌ Erro ao inicializar:', err);
@@ -104,6 +101,7 @@ async function initDashboard() {
     }
 }
 
+/*
 // ===== DEVICES =====
 function renderDeviceSelector() {
     const select = document.getElementById('deviceSelect');
@@ -152,6 +150,7 @@ async function onDeviceChange() {
     await loadPumps(currentDevice.id);
     await loadAllSchedules(currentDevice.id);
 }
+*/
 
 function updateDeviceInfo() {
     if (!currentDevice) return;
