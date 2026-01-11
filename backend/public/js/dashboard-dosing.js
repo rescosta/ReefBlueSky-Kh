@@ -621,7 +621,7 @@ function renderScheduleTable() {
         row.innerHTML = `
           <td>
             <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
-              ${schedule.enabled ? 'Ativa' : 'Inativa'}
+              ${schedule.enabled ? 'ON' : 'OFF'}
             </button>
           </td>
           <td>${schedule.pump_name || `Bomba ${currentPumpIndex + 1}`}</td>
