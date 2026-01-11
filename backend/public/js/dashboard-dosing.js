@@ -152,18 +152,43 @@ async function onDeviceChange() {
 }
 */
 
-function updateDeviceInfo() {
-    if (!currentDevice) return;
+function formatLastSeenText(lastSeenIso) {
+  if (!lastSeenIso) return 'Nunca conectado';
 
-    const status = currentDevice.online ? '🟢 Online' : '🔴 Offline';
-    const info = document.getElementById('deviceInfo');
-    if (!info) return;
+  const last = new Date(lastSeenIso);
+  const now  = new Date();
+  const diffSec = Math.floor((now - last) / 1000);
 
-    info.innerHTML = `
-        <span class="device-status-dot ${!currentDevice.online ? 'offline' : ''}"></span>
-        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type || 'N/A'} • ${status} • ${currentDevice.pump_count || 6} bombas</span>
-    `;
+  if (diffSec < 60) return `há ${diffSec}s`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `há ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  return `há ${diffH} h`;
 }
+
+function updateDeviceInfo() {
+  if (!currentDevice) return;
+
+  const info = document.getElementById('deviceInfo');
+  if (!info) return;
+
+  const online = currentDevice.online;
+  const statusText   = online ? '🟢 Online' : '🔴 Offline';
+  const lastSeenText = formatLastSeenText(currentDevice.last_seen);
+
+  info.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <div>
+        <span class="device-status-dot ${!online ? 'offline' : ''}"></span>
+        <span><strong>${currentDevice.name}</strong> • ${currentDevice.hw_type || 'N/A'} • ${currentDevice.pump_count || 6} bombas</span>
+      </div>
+      <div style="font-size:13px; color:#9ca3af;">
+        ${statusText} • Último contato: ${lastSeenText}
+      </div>
+    </div>
+  `;
+}
+
 
 function updateNavbarDeviceInfo() {
     if (!currentDevice) return;
