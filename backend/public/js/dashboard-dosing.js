@@ -289,7 +289,7 @@ function renderConfigTable() {
                 class="btn-status ${pump.enabled ? 'btn-on' : 'btn-off'}"
                 onclick="togglePump(${index})"
               >
-                ${pump.enabled ? 'ON' : 'OFF'}  // ← era 'Ativada' : 'Desativada'
+                ${pump.enabled ? 'ON' : 'OFF'}
               </button>
             </td>
             <td>${containerSize}</td>
