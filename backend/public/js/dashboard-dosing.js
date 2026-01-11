@@ -504,12 +504,11 @@ function renderScheduleTableAll() {
     const endTime   = schedule.end_time   || '--';
 
     const statusClass = schedule.enabled ? 'btn-on' : 'btn-off';
-    const statusLabel = schedule.enabled ? 'ON' : 'OFF';
 
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>
-        <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
+        <button class="btn-status ${statusClass}" onclick="toggleSchedule(${schedule.id})">
           ${schedule.enabled ? 'ON' : 'OFF'}
         </button>
       </td>
