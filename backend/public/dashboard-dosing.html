@@ -170,7 +170,7 @@
         }
 
 
-        
+
         /* CARD STATUS */
         .status-circles {
           display: flex;
@@ -1092,5 +1092,13 @@
     <!-- Scripts -->
     <script src="js/dashboard-common.js"></script>
     <script src="js/dashboard-dosing.js"></script>
+      <!-- Inicialização do topbar -->
+      <script>
+        window.addEventListener("DOMContentLoaded", () => {
+          if (window.DashboardCommon) {
+            DashboardCommon.initTopbar();
+          }
+        });
+      </script>
 </body>
 </html>
