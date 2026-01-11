@@ -322,42 +322,24 @@
             margin-bottom: 30px;
         }
 
-        .control-group {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        .control-group,
+        #deviceInfo {
+          background: #020617;
+          border-radius: 10px;
+          border: 1px solid #1f2937;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+          color: #e5e7eb;
         }
 
         .control-group label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #555;
-            font-size: 12px;
+          color: #9ca3af;
         }
 
         .control-group select,
         .control-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 13px;
-            font-family: inherit;
-        }
-
-        #deviceInfo {
-            background: #e8f5f1;
-            color: #1a504d;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            border-left: 4px solid #16a085;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+          background: #020617;
+          border: 1px solid #374151;
+          color: #e5e7eb;
         }
 
         .device-status-dot {
@@ -373,45 +355,36 @@
 
         /* ===== TABS ===== */
         .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 0;
-            border-bottom: 2px solid #e0e0e0;
-            background: white;
-            padding: 0;
-            border-radius: 8px 8px 0 0;
-            overflow-x: auto;
+          display: flex;
+          gap: 16px;
+          margin-bottom: 16px;
+          border-bottom: 1px solid #374151;
+          background: transparent;
+          padding: 0 4px;
+          border-radius: 0;
         }
 
         .tab-btn {
-            padding: 12px 20px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-weight: 500;
-            color: #666;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-            white-space: nowrap;
-        }
-
-        .tab-btn:hover {
-            color: #16a085;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-weight: 500;
+          color: #9ca3af;
+          padding: 10px 0;
+          border-bottom: 2px solid transparent;
         }
 
         .tab-btn.active {
-            color: #16a085;
-            border-bottom-color: #16a085;
+          color: #ffffff;
+          border-bottom-color: #60a5fa;
         }
 
         .tab-content {
-            display: none;
-            background: white;
-            padding: 25px;
-            border-radius: 0 0 8px 8px;
-            border: 1px solid #e0e0e0;
-            border-top: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          background: #020617;
+          border: 1px solid #1f2937;
+          border-radius: 12px;
+          padding: 20px 24px;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.6);
         }
 
         .tab-content.active {
@@ -419,39 +392,29 @@
         }
 
         .info-box {
-            background: #e8f5f1;
-            border-left: 4px solid #16a085;
-            padding: 12px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-            font-size: 13px;
-            color: #1a504d;
+          background: #020617;
+          border-left: 4px solid #16a085;
+          color: #e5e7eb;
         }
 
         table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 16px;
         }
 
         th {
-            background: #f0f0f0;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #555;
-            border-bottom: 2px solid #ddd;
-            font-size: 11px;
+          background: #020617;
+          color: #9ca3af;
+          border-bottom: 1px solid #1f2937;
         }
 
         td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 13px;
+          border-bottom: 1px solid #111827;
         }
 
         tr:hover {
-            background: #f9f9f9;
+          background: #030712;
         }
 
         .btn-edit, .btn-delete, .btn-primary, .btn-secondary {
@@ -474,34 +437,28 @@
         }
 
         .btn-delete, .btn-secondary {
-            background: #e0e0e0;
-            color: #666;
+          background: #111827;
+          color: #e5e7eb;
+          border: 1px solid #4b5563;
         }
 
         .btn-delete:hover, .btn-secondary:hover {
-            background: #d0d0d0;
+          background: #1f2937;
         }
-
+        
         .form-group {
             margin-bottom: 15px;
         }
 
         .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 500;
-            font-size: 12px;
-            color: #555;
+          color: #9ca3af;
         }
 
         .form-group input,
         .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 13px;
-            font-family: inherit;
+          background: #020617;
+          border: 1px solid #374151;
+          color: #e5e7eb;
         }
 
         .form-row {
@@ -524,12 +481,9 @@
         }
 
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+          background: #020617;
+          border: 1px solid #1f2937;
+          color: #e5e7eb;
         }
 
         .modal-header {
@@ -540,14 +494,11 @@
         }
 
         .modal-header h2 {
-            font-size: 18px;
-            color: #333;
+          color: #e5e7eb;
         }
 
         .modal-header .close {
-            font-size: 24px;
-            cursor: pointer;
-            color: #999;
+          color: #9ca3af;
         }
 
         .modal-header .close:hover {
@@ -615,15 +566,15 @@
         }
 
         .alert-error {
-            background: #fee;
-            color: #c33;
-            border-left: 4px solid #c33;
+          background: #450a0a;
+          color: #fecaca;
+          border-left: 4px solid #ef4444;
         }
 
         .alert-success {
-            background: #efe;
-            color: #3c3;
-            border-left: 4px solid #3c3;
+          background: #022c22;
+          color: #bbf7d0;
+          border-left: 4px solid #16a34a;
         }
 
 
