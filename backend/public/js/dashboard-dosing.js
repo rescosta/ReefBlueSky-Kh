@@ -281,7 +281,7 @@ function renderConfigTable() {
         const alarmPercent = pump.alarm_threshold_pct || pump.alarm_percent || 0;
         const maxDaily = pump.max_daily_ml || pump.daily_max || 0;
         
-        row.innerHTML = `
+          row.innerHTML = `
             <td>${index + 1}</td>
             <td>${pump.name || `P${index + 1}`}</td>
             <td>
@@ -289,7 +289,7 @@ function renderConfigTable() {
                 class="btn-status ${pump.enabled ? 'btn-on' : 'btn-off'}"
                 onclick="togglePump(${index})"
               >
-                ${pump.enabled ? 'Ativada' : 'Desativada'}
+                ${pump.enabled ? 'ON' : 'OFF'}  // ← era 'Ativada' : 'Desativada'
               </button>
             </td>
             <td>${containerSize}</td>
@@ -504,13 +504,13 @@ function renderScheduleTableAll() {
     const endTime   = schedule.end_time   || '--';
 
     const statusClass = schedule.enabled ? 'btn-on' : 'btn-off';
-    const statusLabel = schedule.enabled ? 'Ativada' : 'Desativada';
+    const statusLabel = schedule.enabled ? 'ON' : 'OFF';
 
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>
-        <button class="btn-status ${statusClass}" onclick="toggleSchedule(${schedule.id})">
-          ${statusLabel}
+        <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
+          ${schedule.enabled ? 'ON' : 'OFF'}
         </button>
       </td>
       <td>${schedule.pump_name || ('Bomba ' + (schedule.pump_index + 1))}</td>
