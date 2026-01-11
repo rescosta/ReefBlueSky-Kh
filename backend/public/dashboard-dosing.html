@@ -17,6 +17,269 @@
             color: #333;
         }
 
+
+        /* TOPBAR */
+        .topbar {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          /* antes: padding: 10px 24px; */
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        @supports (padding: max(0px)) {
+          .topbar {
+            padding-left: max(10px, env(safe-area-inset-left));
+            padding-right: max(10px, env(safe-area-inset-right));
+          }
+        }
+
+        .topbar-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .logo {
+          font-size: 22px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+        }
+        .nav {
+          display: flex;
+          gap: 16px;
+          font-size: 14px;
+        }
+        .nav a {
+          opacity: 0.8;
+          padding-bottom: 2px;
+          border-bottom: 2px solid transparent;
+        }
+        .nav a.active {
+          opacity: 1;
+          border-color: #facc15;
+        }
+        .topbar-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          font-size: 14px;
+        }
+        .badge-ok,
+        .badge-error,
+        .badge,
+        .badge-on,
+        .badge-off {
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .badge-ok {
+          background: #16a34a33;
+          border: 1px solid #22c55e;
+          color: #bbf7d0;
+        }
+        .badge-error {
+          background: #b91c1c33;
+          border: 1px solid #f97373;
+          color: #fecaca;
+        }
+        .badge-on {
+          background: #16a34a33;
+          border: 1px solid #22c55e;
+          color: #bbf7d0;
+        }
+        .badge-off {
+          background: #111827;
+          border: 1px solid #4b5563;
+          color: #9ca3af;
+        }
+        .btn-small {
+          border: none;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          background: #0f172a;
+          color: #e5e7eb;
+        }
+        .btn-small:hover {
+          background: #111827;
+        }
+        .device-selector {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+        }
+        .device-selector select {
+          background: #020617;
+          color: #e5e7eb;
+          border-radius: 6px;
+          border: 1px solid #374151;
+          padding: 4px 8px;
+          font-size: 13px;
+        }
+
+        /* LAYOUT PRINCIPAL */
+        .content {
+          flex: 1;
+          /* antes: padding: 16px 24px 24px; */
+          padding: 12px 10px 16px;
+          display: grid;
+          grid-template-columns: 2fr 1.5fr;
+          gap: 16px;
+        }
+
+        @media (max-width: 960px) {
+          .content {
+            grid-template-columns: 1fr;
+          }
+        }
+        .left-col,
+        .right-col {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .card {
+          background: #020617;
+          border-radius: 10px;
+          padding: 14px 16px;
+          border: 1px solid #1f2937;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+        }
+        .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        .card-title {
+          font-size: 13px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #9ca3af;
+        }
+        .card-subtitle {
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+
+        
+        /* CARD STATUS */
+        .status-circles {
+          display: flex;
+          gap: 16px;
+          justify-content: space-between;
+        }
+        .status-circle {
+          flex: 1;
+          text-align: center;
+        }
+        .status-label {
+          font-size: 12px;
+          color: #9ca3af;
+          margin-top: 6px;
+        }
+        .status-badge {
+          font-size: 22px;
+          font-weight: 600;
+          padding: 18px 0;
+          border-radius: 999px;
+          background: #022c22;
+          border: 1px solid #16a34a;
+          color: #bbf7d0;
+        }
+        .status-badge.off {
+          background: #111827;
+          border-color: #4b5563;
+          color: #9ca3af;
+        }
+
+        /* CARD MEDIÇÃO */
+        .measure-info {
+          font-size: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .measure-info span.label {
+          color: #9ca3af;
+        }
+        .measure-info span.value {
+          color: #e5e7eb;
+        }
+
+        /* CARD LISTA DE MEDIÇÕES */
+        .table-small {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          margin-top: 4px;
+        }
+        .table-small th,
+        .table-small td {
+          padding: 4px 6px;
+          border-bottom: 1px solid #1f2937;
+        }
+        .table-small th {
+          text-align: left;
+          color: #9ca3af;
+          font-weight: 500;
+        }
+        .table-small tbody tr:hover {
+          background: #030712;
+        }
+
+        .progress-wrapper { font-size: 12px; }
+        .progress-label { margin-bottom: 4px; color: #9ca3af; }
+        .progress-bar {
+          width: 100%;
+          height: 6px;
+          border-radius: 999px;
+          background: #020617;
+          border: 1px solid #1f2937;
+          overflow: hidden;
+        }
+        .progress-fill {
+          height: 100%;
+          width: 0%;
+          background: linear-gradient(90deg, #22c55e, #eab308);
+          transition: width 0.3s linear;
+        }
+
+        /* BARRA INFERIOR */
+        .footer {
+          font-size: 11px;
+          color: #6b7280;
+          /* antes: padding: 6px 24px 10px; */
+          padding: 6px 10px 10px;
+          display: flex;
+          justify-content: space-between;
+        }
+
+
+        .status-badge.good {
+          background: #022c22;
+          border-color: #16a34a;
+          color: #bbf7d0;
+        }
+        .status-badge.warn {
+          background: #451a03;
+          border-color: #f59e0b;
+          color: #fed7aa;
+        }
+        .status-badge.bad {
+          background: #450a0a;
+          border-color: #ef4444;
+          color: #fecaca;
+        }
+
         /* ===== NAVBAR (do main.html) ===== */
         nav.navbar {
             background: linear-gradient(135deg, #1a7c79 0%, #0d7c6d 100%);
@@ -525,29 +788,8 @@
     </style>
 </head>
 <body>
-    <!-- Navbar (do main.html) -->
-    <nav class="navbar">
-        <div class="navbar-container">
-            <div class="navbar-brand">
-                <span>🌊</span> ReefBlueSky
-            </div>
-            <ul class="navbar-menu">
-                <li><a href="/">Principal</a></li>
-                <li><a href="/graficos.html">Gráficos</a></li>
-                <li><a href="/configuracoes.html">Configurações</a></li>
-                <li><a href="/sistema.html">Sistema</a></li>
-                <li><a href="/dashboard-dosing.html" class="active">Dosadora</a></li>
-                <li><a href="/dev.html">Dev</a></li>
-            </ul>
-            <div class="navbar-right">
-                <div class="device-status">
-                    <span class="status-dot" id="navDeviceStatus"></span>
-                    <span id="navDeviceInfo">Conectando...</span>
-                </div>
-                <button class="btn-logout" onclick="logout()">Sair</button>
-            </div>
-        </div>
-    </nav>
+
+    <div id="topbar-root"></div>
 
     <!-- Header -->
     <div class="page-header">
@@ -842,7 +1084,10 @@
         </div>
     </div>
 
-
+     <div class="footer">
+        <div id="userInfo">Usuário --</div>
+        <div>ReefBlueSky KH Monitor — Dashboard web</div>
+    </div>
 
     <!-- Scripts -->
     <script src="js/dashboard-common.js"></script>
