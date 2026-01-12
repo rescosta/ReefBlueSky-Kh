@@ -750,7 +750,7 @@
         <div id="calibrationTab" class="tab-content">
             <h2>Calibração</h2>
             <div class="info-box">
-                ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 10 segundos.
+                ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
             </div>
             <div class="form-group">
                 <label for="pumpSelectCalibration">Selecionar Bomba:</label>
@@ -758,12 +758,12 @@
             </div>
             <h3 style="margin-top: 20px;">Procedimento:</h3>
             <ol style="margin-left: 20px; font-size: 13px; line-height: 1.6;">
-                <li>Coloque um recipiente graduado sob a bomba</li>
-                <li>Clique em "Go (10s)" para iniciar a dosagem de teste</li>
-                <li>Após 10 segundos, meça o volume dispensado</li>
-                <li>Digite o volume medido e clique "Salvar Taxa"</li>
+              <li>Coloque um recipiente graduado sob a bomba</li>
+              <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
+              <li>Após 60 segundos, meça o volume dispensado</li>
+              <li>Digite o volume medido e clique "Salvar Taxa"</li>    
             </ol>
-            <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Go (10s)</button>
+            <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
             <div class="form-group" style="margin-top: 20px;">
                 <label for="measuredVolume">Volume Medido (mL):</label>
                 <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10.5">
@@ -817,6 +817,11 @@
             <div class="modal-header">
                 <h2>Nova Agenda</h2>
                 <span class="close" onclick="closeAgendaModal()">×</span>
+            </div>
+            <div class="form-group">
+              <label>Intervalo mín. entre bombas:</label>
+              <input type="number" id="minGapMinutes" min="5" max="120" value="30" style="width:80px;">
+              <small>minutos (padrão 30)</small>
             </div>
             <div class="form-group">
                 <label for="pumpSelectAgenda">Selecionar Bomba:</label>
@@ -936,12 +941,42 @@
                     <input type="checkbox" id="editScheduleEnabled" checked> Agenda Ativa
                 </label>
             </div>
+            <div class="form-group">
+              <label for="editMinGapMinutes">Intervalo mín. entre bombas:</label>
+              <input type="number" id="editMinGapMinutes" min="5" max="120" value="30" style="width:80px;">
+              <small>minutos (padrão 30)</small>
+            </div>
+
             <div class="button-group">
                 <button class="btn-secondary" onclick="closeEditScheduleModal()">Cancelar</button>
                 <button class="btn-primary" onclick="saveEditScheduleModal()">💾 Salvar Alterações</button>
             </div>
         </div>
     </div>
+
+    <div id="calibrationOverlay" class="modal">
+      <div class="modal-content" style="max-width:420px; padding:20px;">
+        <h2>Calibração em andamento</h2>
+        <p id="calibrationCountdownText" style="margin-top:10px; font-size:13px;">
+          Restam 60 segundos...
+        </p>
+
+        <div style="margin-top:12px; margin-bottom:16px;">
+          <div style="font-size:12px; color:#9ca3af; margin-bottom:4px;">
+            Progresso
+          </div>
+          <div class="progress-bar">
+            <div id="calibrationProgressFill" class="progress-fill"></div>
+          </div>
+        </div>
+
+        <button class="btn-secondary" id="abortCalibrationBtn">
+          ✖ Abortar teste
+        </button>
+      </div>
+    </div>
+
+
 
      <div class="footer">
         <div id="userInfo">Usuário --</div>
