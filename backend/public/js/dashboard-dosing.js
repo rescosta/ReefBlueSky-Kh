@@ -860,29 +860,26 @@ async function saveCalibration() {
     return;
   }
 
-  const pump = pumps[pumpIndex];
-  if (!pump || !pump.id) {
-    showError('Bomba inválida');
+  if (!currentDevice) {
+    showError('Device inválido');
     return;
   }
 
-  console.log('⚙️ Salvando calibração (60s):', pumpIndex, measuredVolume);
+  console.log('⚙️ Salvando calibração (10s):', pumpIndex, measuredVolume);
 
   const result = await apiCall(
-    `/api/v1/user/dosing/pumps/${pump.id}/calibrate`,
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
     'POST',
-    {
-      measured_volume_ml: measuredVolume,
-      run_seconds: 60
-    }
+    { measured_volume: measuredVolume }
   );
 
-  if (result) {
-    const rate = result.calibration_rate_ml_s.toFixed(3);
+  if (result && result.data && typeof result.data.ml_per_second === 'number') {
+    const rate = result.data.ml_per_second.toFixed(2);
     showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
     document.getElementById('measuredVolume').value = '';
   }
 }
+
 
 
 
