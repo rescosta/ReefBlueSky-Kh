@@ -776,8 +776,8 @@ const globalLimiter = rateLimit({
 
 // Rate limiting para autenticação (5 tentativas por 15 minutos)
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
+    windowMs: 1 * 60 * 1000,
+    max: 50,
     message: 'Muitas tentativas de login, tente novamente mais tarde',
     skipSuccessfulRequests: true
 });
