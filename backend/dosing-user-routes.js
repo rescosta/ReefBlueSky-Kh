@@ -335,135 +335,145 @@ router.put('/devices/:deviceId/pumps/:pumpIndex', async (req, res) => {
 // GET /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules
 // Lista agendas de uma bomba
 router.get('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) => {
-    let conn;
-    try {
-        if (!req.user || !req.user.userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.user.userId;
-        const { deviceId, pumpIndex } = req.params;
-        const { 
-            doses_per_day, start_time, end_time, volume_per_day_ml, 
-            days_of_week, min_gap_minutes = 30 
-        } = req.body;
-
-        conn = await pool.getConnection();
-
-        // Verificar device + pump (código existente)
-        const dev = await conn.query(`SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`, [deviceId, userId]);
-        if (!dev?.length) return res.status(404).json({ error: 'Device not found' });
-
-        const pump = await conn.query(`SELECT id, name FROM dosing_pumps WHERE device_id = ? AND index_on_device = ? LIMIT 1`, [deviceId, pumpIndex]);
-        if (!pump?.length) return res.status(404).json({ error: 'Pump not found' });
-        const pumpId = pump[0].id;
-        const pumpName = pump[0].name;
-
-        // ✅ VALIDAÇÃO E AJUSTE AUTOMÁTICO
-        const scheduleData = {
-            pump_name: pumpName,
-            doses_per_day,
-            start_time,
-            end_time,
-            volume_per_day_ml,
-            days_of_week,
-            min_gap_minutes: parseInt(min_gap_minutes)
-        };
-        const validatedSchedule = await validateAndAdjustSchedule(conn, deviceId, scheduleData);
-
-        // Converter dias
-        const daysMask = convertDaysArrayToMask(validatedSchedule.days_of_week || [0,1,2,3,4,5,6]);
-
-        // ✅ SALVAR com adjusted_times
-        const result = await conn.query(
-            `INSERT INTO dosing_schedules 
-             (pump_id, enabled, days_mask, doses_per_day, start_time, end_time, 
-              volume_per_day_ml, min_gap_minutes, adjusted_times)
-             VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)`,
-            [pumpId, daysMask, validatedSchedule.doses_per_day, validatedSchedule.start_time, 
-             validatedSchedule.end_time, validatedSchedule.volume_per_day_ml, 
-             validatedSchedule.min_gap_minutes, JSON.stringify(validatedSchedule.adjusted_times)]
-        );
-
-        res.status(201).json({
-            data: { 
-                id: result.insertId,
-                ...validatedSchedule,
-                days_of_week,
-                message: `Agendado com sucesso! ${validatedSchedule.adjusted_times.length > 1 ? '(horários ajustados)' : ''}`
-            }
-        });
-    } catch (err) {
-        console.error('Error creating schedule:', err);
-        res.status(400).json({ error: err.message || 'Validation failed' });
-    } finally {
-        if (conn) conn.release();
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    const userId = req.user.userId;
+    const { deviceId, pumpIndex } = req.params;
+
+    conn = await pool.getConnection();
+
+    const dev = await conn.query(
+      `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
+      [deviceId, userId]
+    );
+    if (!dev?.length) return res.status(404).json({ error: 'Device not found' });
+
+    const pump = await conn.query(
+      `SELECT id, name FROM dosing_pumps WHERE device_id = ? AND index_on_device = ? LIMIT 1`,
+      [deviceId, pumpIndex]
+    );
+    if (!pump?.length) return res.status(404).json({ error: 'Pump not found' });
+
+    const rows = await conn.query(
+      `SELECT
+         s.id, s.enabled, s.days_mask, s.doses_per_day,
+         TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
+         TIME_FORMAT(s.end_time,   '%H:%i') AS end_time,
+         s.volume_per_day_ml, s.min_gap_minutes, s.adjusted_times
+       FROM dosing_schedules s
+       WHERE s.pump_id = ?
+       ORDER BY s.start_time ASC`,
+      [pump[0].id]
+    );
+
+    const data = rows.map(s => ({
+      ...s,
+      days_of_week: convertDaysMaskToArray(s.days_mask)
+    }));
+
+    res.json({ data });
+  } catch (err) {
+    console.error('Error fetching schedules:', err);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
 
 // POST /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules
 // Criar agenda
 router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) => {
-    let conn;
-    try {
-        if (!req.user || !req.user.userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.user.userId;
-        const { deviceId, pumpIndex } = req.params;
-        const { doses_per_day, start_time, end_time, volume_per_day, days_of_week } = req.body;
-
-        conn = await pool.getConnection();
-
-        // Verificar device
-        const dev = await conn.query(
-            `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
-            [deviceId, userId]
-        );
-
-        if (!dev || dev.length === 0) {
-            return res.status(404).json({ error: 'Device not found' });
-        }
-
-        // Buscar pump
-        const pump = await conn.query(
-            `SELECT id FROM dosing_pumps WHERE device_id = ? AND index_on_device = ? LIMIT 1`,
-            [deviceId, pumpIndex]
-        );
-
-        if (!pump || pump.length === 0) {
-            return res.status(404).json({ error: 'Pump not found' });
-        }
-
-        // Converter dias para bitmask
-        const daysMask = convertDaysArrayToMask(days_of_week || [0, 1, 2, 3, 4, 5, 6]);
-
-        // Criar agenda
-        const result = await conn.query(
-            `INSERT INTO dosing_schedules
-            (pump_id, enabled, days_mask, doses_per_day, start_time, end_time, volume_per_day_ml)
-            VALUES (?, 1, ?, ?, ?, ?, ?)`,
-            [pump[0].id, daysMask, doses_per_day, start_time, end_time, volume_per_day]
-        );
-
-        res.status(201).json({
-            data: {
-                id: result.insertId,
-                doses_per_day,
-                start_time,
-                end_time,
-                volume_per_day,
-                days_of_week
-            }
-        });
-    } catch (err) {
-        console.error('Error creating schedule:', err);
-        res.status(500).json({ error: 'Database error' });
-    } finally {
-        if (conn) conn.release();
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    const userId = req.user.userId;
+    const { deviceId, pumpIndex } = req.params;
+    const {
+      doses_per_day,
+      start_time,
+      end_time,
+      volume_per_day,
+      days_of_week,
+      min_gap_minutes = 30
+    } = req.body;
+
+    conn = await pool.getConnection();
+
+    // Verificar device
+    const dev = await conn.query(
+      `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
+      [deviceId, userId]
+    );
+    if (!dev || dev.length === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Buscar pump
+    const pump = await conn.query(
+      `SELECT id, name FROM dosing_pumps WHERE device_id = ? AND index_on_device = ? LIMIT 1`,
+      [deviceId, pumpIndex]
+    );
+    if (!pump || pump.length === 0) {
+      return res.status(404).json({ error: 'Pump not found' });
+    }
+
+    const pumpRow = pump[0];
+
+    // Montar dados para validação/ajuste
+    const scheduleData = {
+      pump_name: pumpRow.name,
+      doses_per_day,
+      start_time,
+      end_time,
+      volume_per_day_ml: volume_per_day,
+      days_of_week,
+      min_gap_minutes: parseInt(min_gap_minutes) || 30
+    };
+
+    const validatedSchedule = await validateAndAdjustSchedule(conn, deviceId, scheduleData);
+
+    const daysMask = convertDaysArrayToMask(validatedSchedule.days_of_week || [0,1,2,3,4,5,6]);
+
+    const result = await conn.query(
+      `INSERT INTO dosing_schedules
+       (pump_id, enabled, days_mask, doses_per_day, start_time, end_time,
+        volume_per_day_ml, min_gap_minutes, adjusted_times)
+       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        pumpRow.id,
+        daysMask,
+        validatedSchedule.doses_per_day,
+        validatedSchedule.start_time,
+        validatedSchedule.end_time,
+        validatedSchedule.volume_per_day_ml,
+        validatedSchedule.min_gap_minutes,
+        JSON.stringify(validatedSchedule.adjusted_times)
+      ]
+    );
+
+    res.status(201).json({
+      data: {
+        id: result.insertId,
+        ...validatedSchedule,
+        days_of_week
+      }
+    });
+  } catch (err) {
+    console.error('Error creating schedule:', err);
+    res.status(400).json({ error: err.message || 'Validation failed' });
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
 
 router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (req, res) => {
     let conn;
@@ -749,83 +759,6 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/calibrate/start', async (req, r
     }
 });
 
-// Valida conflitos e ajusta horários automaticamente
-async function validateAndAdjustSchedule(deviceId, newSchedule) {
-  const minGap = newSchedule.min_gap_minutes || 30; // default 30min
-  const allSchedules = await db.query(`
-    SELECT s.*, p.pump_index, p.name as pump_name 
-    FROM dosing_schedules s 
-    JOIN dosing_pumps p ON s.pump_id = p.id 
-    WHERE s.device_id = ? AND s.enabled = 1
-  `, [deviceId]);
-  
-  // Converte newSchedule para horários absolutos
-  const newTimes = calculateDoseTimes(newSchedule); // ver abaixo
-  
-  // Lista todas ativações ordenadas (existentes + nova)
-  let allEvents = [];
-  allSchedules.forEach(s => {
-    const times = calculateDoseTimes(s);
-    times.forEach(t => allEvents.push({time: t, pump: s.pump_name, scheduleId: s.id}));
-  });
-  newTimes.forEach((t, i) => allEvents.push({time: t, pump: newSchedule.pump_name, scheduleId: 'new', doseIndex: i+1}));
-  
-  allEvents.sort((a,b) => a.time - b.time);
-  
-  // Tenta ajustar intermediárias da nova (índices 1 a N-2)
-  const adjustableIndices = newTimes.length >= 3 ? [1,2,...,newTimes.length-2] : [];
-  if (tryAdjustTimes(allEvents, newTimes, adjustableIndices, minGap)) {
-    // Salva horários ajustados
-    newSchedule.adjusted_times = newTimes;
-    return newSchedule;
-  } else {
-    throw new Error(`Impossível agendar sem gap ≥${minGap}min entre bombas. Reduza doses ou expanda intervalo.`);
-  }
-}
-
-
-
-function calculateDoseTimes(schedule) {
-  const start = parseTime(schedule.start_time); // HH:MM → minutes desde midnight
-  const end = parseTime(schedule.end_time);
-  const durationMin = (end - start + 1440) % 1440; // lida com midnight cross
-  const doses = parseInt(schedule.num_doses);
-  
-  let times = [start];
-  if (doses >= 2) times.push(end);
-  
-  if (doses > 2) {
-    const slots = doses - 1;
-    const gap = durationMin / slots;
-    for (let i = 1; i < doses - 1; i++) {
-      times.splice(1 + i - 1, 0, start + gap * i);
-    }
-  }
-  return times.map(t => formatTime(t % 1440));
-}
-
-function tryAdjustTimes(events, newTimes, adjustable, minGap) {
-  // Algoritmo iterativo simples: shift cada intermediária ±15min até ok ou max tentativas
-  for (let attempt = 0; attempt < 30; attempt++) {
-    let valid = true;
-    for (let i = 0; i < events.length - 1; i++) {
-      if (Math.abs(events[i+1].time - events[i].time) < minGap && 
-          (events[i].scheduleId !== 'new' || !adjustable.includes(events[i].doseIndex-1)) &&
-          (events[i+1].scheduleId !== 'new' || !adjustable.includes(events[i+1].doseIndex-1))) {
-        valid = false; break;
-      }
-    }
-    if (valid) return true;
-    // Shift random pequeno nas ajustáveis (implementar aqui)
-    adjustable.forEach(idx => {
-      newTimes[1+idx] += (Math.random() > 0.5 ? 5 : -5); // ±5min exemplo
-    });
-    // Rebuild events...
-  }
-  return false;
-}
-
-
 // POST /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/calibrate/save
 // Salvar taxa de calibração
 router.post('/devices/:deviceId/pumps/:pumpIndex/calibrate/save', async (req, res) => {
@@ -924,6 +857,8 @@ async function validateAndAdjustSchedule(conn, deviceId, scheduleData) {
         throw new Error(`Impossível agendar sem intervalo ≥${minGap}min entre bombas. Sugestões: reduza doses, expanda horário ou aumente intervalo.`);
     }
 }
+
+//ok
 
 function calculateDoseTimes(schedule) {
     const startMin = parseTime(schedule.start_time);
