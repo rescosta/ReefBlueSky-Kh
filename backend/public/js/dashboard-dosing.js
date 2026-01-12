@@ -415,35 +415,40 @@ function closeEditScheduleModal() {
 }
 
 async function saveEditScheduleModal() {
-  const pumpIndex = parseInt(document.getElementById('editPumpIndex').value, 10);
+  try {
+    const pumpIndex = parseInt(document.getElementById('editPumpIndex').value, 10);
 
-  const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
-  const activeDays = [];
-  dayCheckboxes.forEach(cb => {
-    const day = parseInt(cb.dataset.day, 10);
-    if (cb.checked) activeDays.push(day);
-  });
+    const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
+    const activeDays = [];
+    dayCheckboxes.forEach(cb => {
+      const day = parseInt(cb.dataset.day, 10);
+      if (cb.checked) activeDays.push(day);
+    });
 
-  const data = {
-    enabled: editingScheduleData.enabled, // ON/OFF controlado no botão da tabela
-    days_of_week: activeDays,
-    doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
-    start_time: document.getElementById('editStartTime').value,
-    end_time: document.getElementById('editEndTime').value,
-    volume_per_day_ml: parseFloat(document.getElementById('editVolumePerDay').value) || 0,
-    min_gap_minutes: parseInt(document.getElementById('editMinGapMinutes').value) || 30
-  };
+    const data = {
+      enabled: editingScheduleData.enabled,
+      days_of_week: activeDays,
+      doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
+      start_time: document.getElementById('editStartTime').value,
+      end_time: document.getElementById('editEndTime').value,
+      volume_per_day_ml: parseFloat(document.getElementById('editVolumePerDay').value) || 0,
+      min_gap_minutes: parseInt(document.getElementById('editMinGapMinutes').value) || 30
+    };
 
-  const result = await apiCall(
-    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${editingScheduleId}`,
-    'PUT',
-    data
-  );
+    console.log('PUT data =>', data);
 
-  if (result) {
+    const result = await apiCall(
+      `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${editingScheduleId}`,
+      'PUT',
+      data
+    );
+
     showSuccess('Agenda atualizada!');
     closeEditScheduleModal();
     await loadAllSchedules(currentDevice.id);
+  } catch (err) {
+    console.error('saveEditScheduleModal erro:', err);
+    showError(err.message || 'Erro ao atualizar agenda');
   }
 }
 
