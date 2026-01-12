@@ -777,53 +777,45 @@ async function applyManualDose() {
 
 // ===== CALIBRATION =====
 async function startCalibration() {
-  const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
+  const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
   const btn = event.target;
 
   console.log('⚙️ Iniciando calibração (60s):', pumpIndex);
 
-  const result = await apiCall(
-    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
-    'POST'
-  );
+  // Nenhuma chamada de API aqui; só animação de 60s
+  btn.disabled = true;
 
-  if (result) {
-    btn.disabled = true;
+  const overlay = document.getElementById('calibrationOverlay');
+  const textEl  = document.getElementById('calibrationCountdownText');
+  const barEl   = document.getElementById('calibrationProgressFill');
 
-    const overlay = document.getElementById('calibrationOverlay');
-    const textEl  = document.getElementById('calibrationCountdownText');
-    const barEl   = document.getElementById('calibrationProgressFill');
+  calibrationSecondsTotal = 60;
+  calibrationSecondsLeft  = 60;
 
-    calibrationSecondsTotal = 60;
-    calibrationSecondsLeft  = 60;
+  if (overlay) overlay.style.display = 'flex';
+  if (barEl) barEl.style.width = '0%';
+  if (textEl) textEl.textContent = `Restam ${calibrationSecondsLeft} segundos...`;
 
-    if (overlay) overlay.style.display = 'flex';
+  if (calibrationTimer) clearInterval(calibrationTimer);
+  calibrationTimer = setInterval(() => {
+    calibrationSecondsLeft--;
 
-    if (barEl) barEl.style.width = '0%';
-    if (textEl) textEl.textContent = `Restam ${calibrationSecondsLeft} segundos...`;
+    const pct = ((calibrationSecondsTotal - calibrationSecondsLeft) / calibrationSecondsTotal) * 100;
+    if (barEl) barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
 
-    if (calibrationTimer) clearInterval(calibrationTimer);
-    calibrationTimer = setInterval(() => {
-      calibrationSecondsLeft--;
+    const s = calibrationSecondsLeft <= 0 ? 0 : calibrationSecondsLeft;
+    if (textEl) textEl.textContent = `Restam ${s} segundos...`;
 
-      const pct = ((calibrationSecondsTotal - calibrationSecondsLeft) /
-                   calibrationSecondsTotal) * 100;
-      if (barEl) barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-      if (textEl) {
-        const s = calibrationSecondsLeft <= 0 ? 0 : calibrationSecondsLeft;
-        textEl.textContent = `Restam ${s} segundos...`;
-      }
-
-      if (calibrationSecondsLeft <= 0) {
-        clearInterval(calibrationTimer);
-        calibrationTimer = null;
-        if (overlay) overlay.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = '🔴 Iniciar Calibração';
-      }
-    }, 1000);
-  }
+    if (calibrationSecondsLeft <= 0) {
+      clearInterval(calibrationTimer);
+      calibrationTimer = null;
+      if (overlay) overlay.style.display = 'none';
+      btn.disabled = false;
+      btn.textContent = '🔴 Iniciar Calibração';
+    }
+  }, 1000);
 }
+
 
 async function abortCalibration() {
   const overlay = document.getElementById('calibrationOverlay');
@@ -862,7 +854,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 async function saveCalibration() {
-  const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
+  const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
   const measuredVolume = parseFloat(document.getElementById('measuredVolume').value);
 
   if (!measuredVolume || measuredVolume <= 0) {
@@ -870,20 +862,30 @@ async function saveCalibration() {
     return;
   }
 
+  const pump = pumps[pumpIndex];
+  if (!pump || !pump.id) {
+    showError('Bomba inválida');
+    return;
+  }
+
   console.log('⚙️ Salvando calibração (60s):', pumpIndex, measuredVolume);
 
   const result = await apiCall(
-    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
+    `/api/v1/user/dosing/pumps/${pump.id}/calibrate`,
     'POST',
-    { measured_volume: measuredVolume }      // backend continua recebendo volume total
+    {
+      measured_volume_ml: measuredVolume,
+      run_seconds: 60
+    }
   );
 
   if (result) {
-    const rate = (measuredVolume / 60).toFixed(2);  // mL/s com base em 60 s
+    const rate = result.calibration_rate_ml_s.toFixed(3);
     showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
     document.getElementById('measuredVolume').value = '';
   }
 }
+
 
 
 async function toggleSchedule(scheduleId) {
