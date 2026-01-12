@@ -368,15 +368,25 @@ function openEditScheduleModal(scheduleId) {
   editingScheduleId = idNum;
   editingScheduleData = { ...schedule };
 
-  // bomba da agenda
-  document.getElementById('editPumpSelectAgenda').value =
-    schedule.pump_index != null ? schedule.pump_index : 0;
+  // mostrar nome da bomba
+  const pump = pumps.find(p => p.index_on_device === schedule.pump_index);
+  const pumpNameEl = document.getElementById('editPumpName');
+  if (pumpNameEl) {
+    pumpNameEl.textContent = pump ? pump.name : `Bomba ${schedule.pump_index + 1}`;
+  }
+
+  // guardar pump_index em hidden
+  const pumpIndexInput = document.getElementById('editPumpIndex');
+  if (pumpIndexInput) {
+    pumpIndexInput.value = schedule.pump_index;
+  }
 
   // dias da semana
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
-  dayCheckboxes.forEach((cb, idx) => {
+  dayCheckboxes.forEach(cb => {
+    const day = parseInt(cb.dataset.day, 10);
     cb.checked = Array.isArray(schedule.days_of_week)
-      ? schedule.days_of_week.includes(idx)
+      ? schedule.days_of_week.includes(day)
       : false;
   });
 
@@ -391,11 +401,12 @@ function openEditScheduleModal(scheduleId) {
   document.getElementById('editStartTime').value   = schedule.start_time || '';
   document.getElementById('editEndTime').value     = schedule.end_time || '';
   document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
-  document.getElementById('editScheduleEnabled').checked = !!schedule.enabled;
 
   // abre modal
   document.getElementById('editScheduleModal').style.display = 'flex';
 }
+
+
 
 
 function closeEditScheduleModal() {
@@ -404,19 +415,22 @@ function closeEditScheduleModal() {
 }
 
 async function saveEditScheduleModal() {
-  const pumpIndex = parseInt(document.getElementById('editPumpSelectAgenda').value);
-  
+  const pumpIndex = parseInt(document.getElementById('editPumpIndex').value, 10);
+
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
   const activeDays = [];
-  dayCheckboxes.forEach((cb, idx) => cb.checked && activeDays.push(idx));
+  dayCheckboxes.forEach(cb => {
+    const day = parseInt(cb.dataset.day, 10);
+    if (cb.checked) activeDays.push(day);
+  });
 
   const data = {
-    enabled: document.getElementById('editScheduleEnabled').checked,
+    enabled: editingScheduleData.enabled, // ON/OFF controlado no botão da tabela
     days_of_week: activeDays,
     doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
     start_time: document.getElementById('editStartTime').value,
     end_time: document.getElementById('editEndTime').value,
-    volume_per_day_ml: parseInt(document.getElementById('editVolumePerDay').value) || 0,
+    volume_per_day_ml: parseFloat(document.getElementById('editVolumePerDay').value) || 0,
     min_gap_minutes: parseInt(document.getElementById('editMinGapMinutes').value) || 30
   };
 
@@ -432,6 +446,7 @@ async function saveEditScheduleModal() {
     await loadAllSchedules(currentDevice.id);
   }
 }
+
 
 
 async function loadAllSchedules(deviceId) {
