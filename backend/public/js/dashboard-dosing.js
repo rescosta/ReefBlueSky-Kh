@@ -828,15 +828,17 @@ async function abortCalibration() {
 
   if (overlay) overlay.style.display = 'none';
 
-  // opcional: avisar o device para parar a bomba, se houver endpoint
   try {
-    const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
-    await apiCall(
-      `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/abort`,
-      'POST'
-    );
+    const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
+    const pump = pumps[pumpIndex];
+    if (pump && pump.id) {
+      await apiCall(
+        `/api/v1/user/dosing/pumps/${pump.id}/calibrate/abort`,
+        'POST'
+      );
+    }
   } catch (e) {
-    console.warn('Falha ao chamar abort no device (pode não existir endpoint específico)', e);
+    console.warn('Falha ao chamar abort no device', e);
   }
 
   if (btn) {
@@ -847,10 +849,6 @@ async function abortCalibration() {
   showError('Calibração abortada pelo usuário');
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  const abortBtn = document.getElementById('abortCalibrationBtn');
-  if (abortBtn) abortBtn.addEventListener('click', abortCalibration);
-});
 
 
 async function saveCalibration() {
