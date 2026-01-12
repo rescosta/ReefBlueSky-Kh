@@ -887,6 +887,10 @@
                 <span class="close" onclick="closeEditScheduleModal()">×</span>
             </div>
             <div class="form-group">
+                <label for="editPumpSelectAgenda">Bomba:</label>
+                <select id="editPumpSelectAgenda" disabled></select>
+            </div>
+            <div class="form-group">
                 <label>Dias da Semana:</label>
                 <div class="checkbox-group">
                     <div class="checkbox-item">
@@ -931,6 +935,11 @@
                     <label for="editEndTime">Horário Final:</label>
                     <input type="time" id="editEndTime" value="20:00">
                 </div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="editScheduleEnabled" checked> Agenda Ativa
+                </label>
             </div>
             <div class="form-group">
               <label for="editMinGapMinutes">Intervalo mín. entre bombas:</label>
