@@ -10,6 +10,9 @@ let schedules = [];
 let editingScheduleId = null; 
 let editingScheduleData = {}; 
 
+let calibrationTimer = null;
+let calibrationSecondsTotal = 60;
+let calibrationSecondsLeft = 0;
 
 
 // ===== AUTH =====
@@ -365,9 +368,11 @@ function openEditScheduleModal(scheduleId) {
   editingScheduleId = idNum;
   editingScheduleData = { ...schedule };
 
+  // bomba da agenda
   document.getElementById('editPumpSelectAgenda').value =
     schedule.pump_index != null ? schedule.pump_index : 0;
 
+  // dias da semana
   const dayCheckboxes = document.querySelectorAll('.edit-day-checkbox');
   dayCheckboxes.forEach((cb, idx) => {
     cb.checked = Array.isArray(schedule.days_of_week)
@@ -375,15 +380,22 @@ function openEditScheduleModal(scheduleId) {
       : false;
   });
 
+  // intervalo mínimo entre bombas
+  const editMinGap = document.getElementById('editMinGapMinutes');
+  if (editMinGap) {
+    editMinGap.value = schedule.min_gap_minutes || 30;
+  }
+
+  // demais campos
   document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
-  document.getElementById('editStartTime').value = schedule.start_time || '';
-  document.getElementById('editEndTime').value = schedule.end_time || '';
+  document.getElementById('editStartTime').value   = schedule.start_time || '';
+  document.getElementById('editEndTime').value     = schedule.end_time || '';
   document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
   document.getElementById('editScheduleEnabled').checked = !!schedule.enabled;
 
+  // abre modal
   document.getElementById('editScheduleModal').style.display = 'flex';
 }
-
 
 
 function closeEditScheduleModal() {
@@ -404,7 +416,8 @@ async function saveEditScheduleModal() {
     doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
     start_time: document.getElementById('editStartTime').value,
     end_time: document.getElementById('editEndTime').value,
-    volume_per_day_ml: parseInt(document.getElementById('editVolumePerDay').value) || 0
+    volume_per_day_ml: parseInt(document.getElementById('editVolumePerDay').value) || 0,
+    min_gap_minutes: parseInt(document.getElementById('editMinGapMinutes').value) || 30
   };
 
   const result = await apiCall(
@@ -416,10 +429,10 @@ async function saveEditScheduleModal() {
   if (result) {
     showSuccess('Agenda atualizada!');
     closeEditScheduleModal();
-    await loadAllSchedules(currentDevice.id);   // recarrega tudo
+    await loadAllSchedules(currentDevice.id);
   }
-
 }
+
 
 async function loadAllSchedules(deviceId) {
   if (!deviceId) return;
@@ -747,7 +760,7 @@ async function startCalibration() {
   const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
   const btn = event.target;
 
-  console.log('⚙️ Iniciando calibração:', pumpIndex);
+  console.log('⚙️ Iniciando calibração (60s):', pumpIndex);
 
   const result = await apiCall(
     `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/start`,
@@ -756,19 +769,76 @@ async function startCalibration() {
 
   if (result) {
     btn.disabled = true;
-    let countdown = 10;
 
-    const timer = setInterval(() => {
-      btn.textContent = `🔴 Go (${countdown}s)`;
-      countdown--;
-      if (countdown < 0) {
-        clearInterval(timer);
+    const overlay = document.getElementById('calibrationOverlay');
+    const textEl  = document.getElementById('calibrationCountdownText');
+    const barEl   = document.getElementById('calibrationProgressFill');
+
+    calibrationSecondsTotal = 60;
+    calibrationSecondsLeft  = 60;
+
+    if (overlay) overlay.style.display = 'flex';
+
+    if (barEl) barEl.style.width = '0%';
+    if (textEl) textEl.textContent = `Restam ${calibrationSecondsLeft} segundos...`;
+
+    if (calibrationTimer) clearInterval(calibrationTimer);
+    calibrationTimer = setInterval(() => {
+      calibrationSecondsLeft--;
+
+      const pct = ((calibrationSecondsTotal - calibrationSecondsLeft) /
+                   calibrationSecondsTotal) * 100;
+      if (barEl) barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+      if (textEl) {
+        const s = calibrationSecondsLeft <= 0 ? 0 : calibrationSecondsLeft;
+        textEl.textContent = `Restam ${s} segundos...`;
+      }
+
+      if (calibrationSecondsLeft <= 0) {
+        clearInterval(calibrationTimer);
+        calibrationTimer = null;
+        if (overlay) overlay.style.display = 'none';
         btn.disabled = false;
-        btn.textContent = '🔴 Go (10s)';
+        btn.textContent = '🔴 Iniciar Calibração';
       }
     }, 1000);
   }
 }
+
+async function abortCalibration() {
+  const overlay = document.getElementById('calibrationOverlay');
+  const btn = document.getElementById('goBtn');
+
+  if (calibrationTimer) {
+    clearInterval(calibrationTimer);
+    calibrationTimer = null;
+  }
+
+  if (overlay) overlay.style.display = 'none';
+
+  // opcional: avisar o device para parar a bomba, se houver endpoint
+  try {
+    const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value);
+    await apiCall(
+      `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/abort`,
+      'POST'
+    );
+  } catch (e) {
+    console.warn('Falha ao chamar abort no device (pode não existir endpoint específico)', e);
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = '🔴 Iniciar Calibração';
+  }
+
+  showError('Calibração abortada pelo usuário');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const abortBtn = document.getElementById('abortCalibrationBtn');
+  if (abortBtn) abortBtn.addEventListener('click', abortCalibration);
+});
 
 
 async function saveCalibration() {
@@ -780,16 +850,16 @@ async function saveCalibration() {
     return;
   }
 
-  console.log('⚙️ Salvando calibração:', pumpIndex, measuredVolume);
+  console.log('⚙️ Salvando calibração (60s):', pumpIndex, measuredVolume);
 
   const result = await apiCall(
     `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
     'POST',
-    { measured_volume: measuredVolume }
+    { measured_volume: measuredVolume }      // backend continua recebendo volume total
   );
 
   if (result) {
-    const rate = (measuredVolume / 10).toFixed(2);
+    const rate = (measuredVolume / 60).toFixed(2);  // mL/s com base em 60 s
     showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
     document.getElementById('measuredVolume').value = '';
   }
