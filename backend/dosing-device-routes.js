@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('./db-pool');
 
-// aqui só /commands
+console.log('[DOSER-ROUTES] dosing-device-routes carregado');
+
 router.get('/commands', async (req, res) => {
+  console.log('[DOSER] /iot/dosing/commands hit', req.query);
+
   let conn;
   try {
     const { esp_uid } = req.query;
@@ -21,21 +24,30 @@ router.get('/commands', async (req, res) => {
       [esp_uid]
     );
 
-    if (rows.length) {
-      const ids = rows.map(r => r.id);
-      await conn.query(
-        `UPDATE device_commands
-           SET status = 'processed', processed_at = NOW()
-         WHERE id IN (${ids.map(() => '?').join(',')})`,
-        ids
-      );
-    }
+    const commands = (rows || []).map(r => {
+      let payload = {};
 
-    const commands = rows.map(r => ({
-      id: r.id,
-      type: r.type,
-      payload: JSON.parse(r.payload || '{}'),
-    }));
+      if (r.payload == null) {
+        payload = {};
+      } else if (typeof r.payload === 'string') {
+        try {
+          payload = JSON.parse(r.payload || '{}');
+        } catch (e) {
+          console.error('[CMD] JSON.parse error payload=', r.payload, e.message);
+          payload = {};
+        }
+      } else if (typeof r.payload === 'object') {
+        payload = r.payload;
+      } else {
+        payload = {};
+      }
+
+      return {
+        id: r.id,
+        type: r.type,
+        payload,
+      };
+    });
 
     return res.json({ success: true, commands });
   } catch (err) {
@@ -47,4 +59,3 @@ router.get('/commands', async (req, res) => {
 });
 
 module.exports = router;
-
