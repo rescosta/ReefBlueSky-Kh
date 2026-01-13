@@ -341,17 +341,22 @@ function renderAllPumpsRateList() {
   }
 
   const lines = pumps.map((pump, idx) => {
-    const r = pump.calibration_rate_ml_s || 0;
-    if (r > 0) {
+    let r = pump.calibration_rate_ml_s;
+    // garante número
+    r = r != null ? Number(r) : 0;
+
+    const name = pump.name || 'Bomba ' + (idx + 1);
+
+    if (r > 0 && !Number.isNaN(r)) {
       const perMin = r * 60;
-      return `${idx + 1} - ${pump.name || 'Bomba ' + (idx + 1)}: `
-           + `${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
+      return `${idx + 1} - ${name}: ${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
     }
-    return `${idx + 1} - ${pump.name || 'Bomba ' + (idx + 1)}: taxa ainda não calibrada`;
+    return `${idx + 1} - ${name}: -- (ainda não calibrada)`;
   });
 
   container.innerHTML = lines.join('<br>');
 }
+
 
 
 // ===== EDIT MODAL =====
@@ -929,8 +934,9 @@ async function saveCalibration() {
     document.getElementById('measuredVolume').value = '';
 
     if (pumps[pumpIndex]) {
-      pumps[pumpIndex].calibration_rate_ml_s = rateNum;
+      pumps[pumpIndex].calibration_rate_ml_s = Number(rateNum);
     }
+
     updateCalibrationRateLabel();
     renderAllPumpsRateList();
 
