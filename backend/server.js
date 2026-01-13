@@ -842,10 +842,10 @@ app.use('/api/v1/user/dosing', authUserMiddleware, dosingUserRoutes);
 
 
 // 🔹 Rotas da dosadora (ESP), sem JWT de usuário
-app.use('/iot/dosing', dosingDeviceRoutes);
+app.use('/api/v1/iot/dosing', dosingDeviceRoutes);
 
 // (se tiver outras rotas IoT)
-app.use('/iot/dosing', dosingIotRoutes);
+app.use('/api/v1/iot/dosing', dosingIotRoutes);
 
 
 function buildTokenPayload(userRow) {
