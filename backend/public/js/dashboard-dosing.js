@@ -901,10 +901,10 @@ async function abortCalibration() {
     const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
     const pump = pumps[pumpIndex];
     if (pump && pump.id) {
-      await apiCall(
-        `/api/v1/user/dosing/pumps/${pump.id}/calibrate/abort`,
-        'POST'
-      );
+      // aborta calibração se estiver rolando
+      await apiCall(`/api/v1/user/dosing/pumps/${pump.id}/calibrate/abort`, 'POST');
+      // e aborta dose manual se houver
+      await apiCall(`/api/v1/user/dosing/pumps/${pump.id}/manual/abort`, 'POST');
     }
   } catch (e) {
     console.warn('Falha ao chamar abort no device', e);
@@ -915,9 +915,8 @@ async function abortCalibration() {
     btn.textContent = '🔴 Iniciar Calibração';
   }
 
-  showError('Calibração abortada pelo usuário');
+  showError('Operação abortada pelo usuário');
 }
-
 
 
 async function saveCalibration() {
