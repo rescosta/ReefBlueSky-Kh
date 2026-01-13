@@ -919,7 +919,7 @@ async function saveCalibration() {
     return;
   }
 
-  console.log('⚙️ Salvando calibração (10s):', pumpIndex, measuredVolume);
+  console.log('⚙️ Salvando calibração (60s):', pumpIndex, measuredVolume);
 
   const result = await apiCall(
     `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
@@ -929,7 +929,7 @@ async function saveCalibration() {
 
   if (result && result.data && typeof result.data.ml_per_second === 'number') {
     const rateNum = result.data.ml_per_second;
-    const rate = rateNum.toFixed(2);
+    const rate = rateNum.toFixed(3);
     showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
     document.getElementById('measuredVolume').value = '';
 
@@ -939,9 +939,9 @@ async function saveCalibration() {
 
     updateCalibrationRateLabel();
     renderAllPumpsRateList();
-
   }
 }
+
 
 
 async function toggleSchedule(scheduleId) {
