@@ -810,15 +810,26 @@ async function deleteSchedule(scheduleId) {
 
 // ===== MANUAL DOSE =====
 async function applyManualDose() {
-  const pumpIndex = parseInt(document.getElementById('pumpSelectManual').value);
-  const volume = parseInt(document.getElementById('manualVolume').value);
+  const pumpIndex = parseInt(document.getElementById('pumpSelectManual').value, 10);
+  const volume = parseFloat(document.getElementById('manualVolume').value);
 
   if (!volume || volume <= 0) {
     showError('Digite um volume válido');
     return;
   }
 
-  console.log('💧 Aplicando dose manual:', pumpIndex, volume);
+  const pump = pumps[pumpIndex];
+  const rate = pump && pump.calibration_rate_ml_s != null ? Number(pump.calibration_rate_ml_s) : 0;
+  if (!rate || Number.isNaN(rate) || rate <= 0) {
+    showError('Bomba sem taxa calibrada; calibre antes de usar dose manual.');
+    return;
+  }
+
+  const doseSeconds = volume / rate;
+  startManualProgress(doseSeconds);
+
+
+  console.log('💧 Aplicando dose manual:', pumpIndex, volume, '=>', doseSeconds, 's');
 
   const result = await apiCall(
     `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
@@ -831,7 +842,6 @@ async function applyManualDose() {
     document.getElementById('manualVolume').value = '0';
   }
 }
-
 
 // ===== CALIBRATION =====
 async function startCalibration() {
@@ -849,6 +859,7 @@ async function startCalibration() {
 
   calibrationSecondsTotal = 60;
   calibrationSecondsLeft  = 60;
+
 
   if (overlay) overlay.style.display = 'flex';
   if (barEl) barEl.style.width = '0%';
@@ -946,6 +957,33 @@ async function saveCalibration() {
   }
 }
 
+
+function startManualProgress(totalSeconds) {
+  const overlay = document.getElementById('calibrationOverlay');
+  const textEl  = document.getElementById('calibrationCountdownText');
+  const barEl   = document.getElementById('calibrationProgressFill');
+  if (!overlay || !textEl || !barEl) return;
+
+  let left = Math.max(1, Math.round(totalSeconds));
+  let total = left;
+
+  overlay.style.display = 'flex';
+  barEl.style.width = '0%';
+  textEl.textContent = `Dose em andamento (${left}s restantes)...`;
+
+  const timer = setInterval(() => {
+    left--;
+    const used = total - left;
+    const pct = (used / total) * 100;
+    barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    textEl.textContent = `Dose em andamento (${Math.max(0,left)}s restantes)...`;
+
+    if (left <= 0) {
+      clearInterval(timer);
+      overlay.style.display = 'none';
+    }
+  }, 1000);
+}
 
 
 async function toggleSchedule(scheduleId) {
