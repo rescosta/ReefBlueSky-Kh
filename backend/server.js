@@ -480,23 +480,132 @@ async function checkDevicesOnlineStatus() {
     }
 
 
-    // --- NOVO: Atualizar dosing_status por usuário com base em dosing_devices ---
-    const dosingRows = await conn.query(
-      `SELECT id, user_id, last_seen, online
-         FROM dosing_devices`
-    );
+  // --- MONITOR ESPECÍFICO PARA DOSADORA (tabela dosing_devices) ---
+  const dosingRows = await conn.query(
+    `SELECT dd.id,
+            dd.user_id,
+            dd.esp_uid,
+            dd.name,
+            dd.last_seen,
+            dd.online,
+            dd.offline_alert_sent,
+            u.email
+       FROM dosing_devices dd
+       JOIN users u ON u.id = dd.user_id
+      WHERE dd.last_seen IS NOT NULL`
+  );
 
-    for (const drow of dosingRows) {
-      const lastMs = drow.last_seen ? new Date(drow.last_seen).getTime() : 0;
-      const isRecent = lastMs && (now - lastMs <= OFFLINE_THRESHOLD_MS);
-      const isOnline = drow.online === 1 && isRecent;
-      const newStatus = isOnline ? 'online' : 'offline';
+  for (const drow of dosingRows) {
+    const lastMs = drow.last_seen ? new Date(drow.last_seen).getTime() : 0;
+    const isOffline = !lastMs || (now - lastMs > OFFLINE_THRESHOLD_MS);
 
-      await conn.query(
-        'UPDATE devices SET dosing_status = ? WHERE userId = ?',
-        [newStatus, drow.user_id]
-      );
+    const deviceLabel = drow.name || drow.esp_uid;
+    const lastSeenBr = lastMs
+      ? new Date(lastMs).toLocaleString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      : 'desconhecido';
+
+    // 2.1 – OFFLINE (dosadora)
+    if (isOffline && !drow.offline_alert_sent) {
+      try {
+        const text =
+          `⚠️Seu dosador ${deviceLabel} parece estar offline há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+          `Último sinal recebido em: ${lastSeenBr} (horário de Brasília).\n\n` +
+          `Verifique alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
+
+        const result = await conn.query(
+          `UPDATE dosing_devices
+              SET offline_alert_sent = 1
+            WHERE id = ? AND offline_alert_sent = 0`,
+          [drow.id]
+        );
+
+        if (result.affectedRows > 0) {
+          // Email OFFLINE
+          await mailTransporter.sendMail({
+            from: ALERT_FROM,
+            to: drow.email,
+            subject: `ReefBlueSky Dosadora - ${deviceLabel} offline`,
+            text,
+          });
+
+          // Telegram OFFLINE
+          await sendTelegramForUser(
+            drow.user_id,
+            `⚠️ *${deviceLabel}* (dosadora) parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
+            `Último sinal em: ${lastSeenBr} (Brasília).`
+          );
+        }
+      } catch (err) {
+        console.error('[ALERT] Erro ao enviar alerta OFFLINE da dosadora', drow.esp_uid, err.message);
+      }
     }
+
+    // 2.2 – VOLTOU ONLINE (dosadora)
+    if (!isOffline && drow.offline_alert_sent) {
+      try {
+        const result = await conn.query(
+          `UPDATE dosing_devices
+              SET offline_alert_sent = 0
+            WHERE id = ? AND offline_alert_sent = 1`,
+          [drow.id]
+        );
+
+        if (result.affectedRows > 0) {
+          const nowBr = new Date().toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
+
+          const text =
+            `Seu dosador ${deviceLabel} voltou a se comunicar com o servidor.\n` +
+            `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
+
+          // Email ONLINE
+          await mailTransporter.sendMail({
+            from: ALERT_FROM,
+            to: drow.email,
+            subject: `ReefBlueSky Dosadora - ${deviceLabel} voltou ONLINE`,
+            text,
+          });
+
+          // Telegram ONLINE
+          await sendTelegramForUser(
+            drow.user_id,
+            `✅ *${deviceLabel}* (dosadora) voltou *ONLINE*.\n` +
+            `Último sinal em: ${nowBr} (Brasília).`
+          );
+        }
+      } catch (err) {
+        console.error('[ALERT] Erro ao enviar alerta ONLINE da dosadora', drow.esp_uid, err.message);
+      }
+    }
+
+    // 2.3 – SINCRONIZAR dosing_status NA TABELA devices (opcional, para dashboard)
+    const isRecent = lastMs && (now - lastMs <= OFFLINE_THRESHOLD_MS);
+    const isOnline = drow.online === 1 && isRecent;
+    const newStatus = isOnline ? 'online' : 'offline';
+
+    await conn.query(
+      `UPDATE devices
+          SET dosing_status = ?
+        WHERE userId = ?`,
+      [newStatus, drow.user_id]
+    );
+  }
+
 
 
     // alerta de LCD offline ---
