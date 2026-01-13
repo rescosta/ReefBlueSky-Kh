@@ -677,7 +677,8 @@ function authUserMiddleware(req, res, next) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
 
   console.log('[AUTH] authUserMiddleware chamado em', req.method, req.originalUrl);
-  console.log('[AUTH] Authorization header =', authHeader || '<nenhum>');
+  console.log('[AUTH] Authorization header presente?', !!authHeader);
+
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.warn('[AUTH] Sem Bearer header');

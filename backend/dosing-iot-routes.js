@@ -224,6 +224,9 @@ router.post('/v1/iot/dosing/status', async (req, res) => {
     const signal_dbm = body.signal_dbm;
     const pumps      = body.pumps;
 
+  console.log('[DOSING IOT] /status recebido de', espUid, 'uptime=', uptime_s, 'signal=', signal_dbm);
+
+
     if (!espUid) {
       console.warn('[DOSING IOT] status sem esp_uid. Body=', body);
       return res
@@ -239,6 +242,7 @@ router.post('/v1/iot/dosing/status', async (req, res) => {
     }
 
     await updateDosingDeviceStatus(device.id, true, req.ip);
+    console.log('[DOSING IOT] device', device.id, 'marcado ONLINE em', new Date().toISOString());    
 
     // Atualizar volume atual de cada bomba
     if (pumps && Array.isArray(pumps)) {
