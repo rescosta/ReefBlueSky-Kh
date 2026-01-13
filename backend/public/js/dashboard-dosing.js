@@ -209,60 +209,66 @@ function updateNavbarDeviceInfo() {
 
 // ===== PUMPS =====
 async function loadPumps(deviceId) {
-    if (!deviceId) {
-        console.error('❌ deviceId não fornecido');
-        return;
+  if (!deviceId) {
+    console.error('❌ deviceId não fornecido');
+    return;
+  }
+
+  console.log('💧 Carregando bombas para device:', deviceId);
+
+  const token = getToken();
+  try {
+    const res = await fetch(`/api/v1/user/dosing/devices/${deviceId}/pumps`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || !json || !json.data) {
+      console.error('❌ Erro ao carregar bombas:', json);
+      showError(json && json.error ? json.error : 'Erro ao carregar bombas');
+      return;
     }
 
-    console.log('💧 Carregando bombas para device:', deviceId);
+    pumps = json.data;
+    console.log('✅ Bombas carregadas:', pumps.length);
 
-    const token = getToken(); // reaproveita sua função existente
-    try {
-        const res = await fetch(`/api/v1/user/dosing/devices/${deviceId}/pumps`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+    renderPumpSelectors();
+    renderConfigTable();
+    updateCalibrationRateLabel(); 
+    renderAllPumpsRateList();
 
-        const json = await res.json();
-
-        if (!res.ok || !json || !json.data) {
-            console.error('❌ Erro ao carregar bombas:', json);
-            showError(json && json.error ? json.error : 'Erro ao carregar bombas');
-            return;
-        }
-
-        pumps = json.data;
-        console.log('✅ Bombas carregadas:', pumps.length);
-
-        renderPumpSelectors();
-        renderConfigTable();
-    } catch (err) {
-        console.error('❌ Erro ao carregar bombas:', err);
-        showError('Erro de comunicação ao carregar bombas');
-    }
+  } catch (err) {
+    console.error('❌ Erro ao carregar bombas:', err);
+    showError('Erro de comunicação ao carregar bombas');
+  }
 }
 
-
 function renderPumpSelectors() {
-    const selectors = ['pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
+  const selectors = ['pumpSelectManual', 'pumpSelectCalibration', 'pumpSelectAgenda'];
 
-    selectors.forEach(selectorId => {
-        const select = document.getElementById(selectorId);
-        if (!select) return;
+  selectors.forEach(selectorId => {
+    const select = document.getElementById(selectorId);
+    if (!select) return;
 
-        select.innerHTML = '';
+    select.innerHTML = '';
 
-        pumps.forEach((pump, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = `${index + 1} - ${pump.name || `Bomba ${index + 1}`}`;
-            select.appendChild(option);
-        });
-
-        select.value = '0';
+    pumps.forEach((pump, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.textContent = `${index + 1} - ${pump.name || `Bomba ${index + 1}`}`;
+      select.appendChild(option);
     });
+
+    select.value = '0';
+
+    if (selectorId === 'pumpSelectCalibration') {
+      select.addEventListener('change', updateCalibrationRateLabel);
+    }
+  });
 }
 
 // ===== CONFIG TABLE =====
@@ -304,6 +310,49 @@ function renderConfigTable() {
         tbody.appendChild(row);
     });
 }
+
+function updateCalibrationRateLabel() {
+  const label = document.getElementById('calibrationRateLabel'); // <div> novo
+  if (!label) return;
+
+  const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10) || 0;
+  const pump = pumps[pumpIndex];
+  if (!pump) {
+    label.textContent = 'Taxa: -- mL/s';
+    return;
+  }
+
+  const r = pump.calibration_rate_ml_s || 0;
+  if (r > 0) {
+    const perMin = r * 60;
+    label.textContent = `Taxa atual desta bomba: ${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
+  } else {
+    label.textContent = 'Taxa ainda não calibrada para esta bomba.';
+  }
+}
+
+function renderAllPumpsRateList() {
+  const container = document.getElementById('allPumpsRateList');
+  if (!container) return;
+
+  if (!pumps || pumps.length === 0) {
+    container.textContent = 'Nenhuma bomba encontrada.';
+    return;
+  }
+
+  const lines = pumps.map((pump, idx) => {
+    const r = pump.calibration_rate_ml_s || 0;
+    if (r > 0) {
+      const perMin = r * 60;
+      return `${idx + 1} - ${pump.name || 'Bomba ' + (idx + 1)}: `
+           + `${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
+    }
+    return `${idx + 1} - ${pump.name || 'Bomba ' + (idx + 1)}: taxa ainda não calibrada`;
+  });
+
+  container.innerHTML = lines.join('<br>');
+}
+
 
 // ===== EDIT MODAL =====
 function openEditModal(index) {
@@ -874,13 +923,19 @@ async function saveCalibration() {
   );
 
   if (result && result.data && typeof result.data.ml_per_second === 'number') {
-    const rate = result.data.ml_per_second.toFixed(2);
+    const rateNum = result.data.ml_per_second;
+    const rate = rateNum.toFixed(2);
     showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
     document.getElementById('measuredVolume').value = '';
+
+    if (pumps[pumpIndex]) {
+      pumps[pumpIndex].calibration_rate_ml_s = rateNum;
+    }
+    updateCalibrationRateLabel();
+    renderAllPumpsRateList();
+
   }
 }
-
-
 
 
 async function toggleSchedule(scheduleId) {
