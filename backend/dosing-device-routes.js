@@ -38,8 +38,6 @@ router.get('/commands', async (req, res) => {
         }
       } else if (typeof r.payload === 'object') {
         payload = r.payload;
-      } else {
-        payload = {};
       }
 
       return {
@@ -49,6 +47,16 @@ router.get('/commands', async (req, res) => {
       };
     });
 
+    // marcar todos como processed de uma vez
+  if (commands.length) {
+    await conn.query(
+      `UPDATE device_commands
+         SET status = 'processed'
+       WHERE deviceId = ? AND status = 'pending'`,
+      [esp_uid]
+    );
+  }
+
     return res.json({ success: true, commands });
   } catch (err) {
     console.error('Error fetching device commands:', err);
@@ -57,5 +65,6 @@ router.get('/commands', async (req, res) => {
     if (conn) conn.release();
   }
 });
+
 
 module.exports = router;
