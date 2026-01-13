@@ -815,14 +815,16 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/calibrate/save', async (req, re
             return res.status(404).json({ error: 'Pump not found' });
         }
 
-        // Calcular taxa: 10 segundos de dosagem = measured_volume mL
-        const mlPerSecond = (measured_volume / 10).toFixed(2);
+        // Calcular taxa: 60 segundos de dosagem = measured_volume mL
+        const rawRate = measured_volume / 60;      
+        const mlPerSecond = rawRate.toFixed(3);
 
         // Atualizar pump com nova taxa
         await conn.query(
-            `UPDATE dosing_pumps SET calibration_rate_ml_s = ? WHERE id = ?`,
-            [mlPerSecond, pump[0].id]
+          `UPDATE dosing_pumps SET calibration_rate_ml_s = ? WHERE id = ?`,
+          [mlPerSecond, pump[0].id]
         );
+
 
         res.json({ data: { ml_per_second: parseFloat(mlPerSecond) } });
     } catch (err) {
