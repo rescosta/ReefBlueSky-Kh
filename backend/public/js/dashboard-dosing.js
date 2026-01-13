@@ -312,7 +312,7 @@ function renderConfigTable() {
 }
 
 function updateCalibrationRateLabel() {
-  const label = document.getElementById('calibrationRateLabel'); // <div> novo
+  const label = document.getElementById('calibrationRateLabel');
   if (!label) return;
 
   const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10) || 0;
@@ -322,14 +322,18 @@ function updateCalibrationRateLabel() {
     return;
   }
 
-  const r = pump.calibration_rate_ml_s || 0;
-  if (r > 0) {
+  let r = pump.calibration_rate_ml_s;
+  r = r != null ? Number(r) : 0;   // força número
+
+  if (r > 0 && !Number.isNaN(r)) {
     const perMin = r * 60;
-    label.textContent = `Taxa atual desta bomba: ${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
+    label.textContent =
+      `Taxa atual desta bomba: ${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
   } else {
     label.textContent = 'Taxa ainda não calibrada para esta bomba.';
   }
 }
+
 
 function renderAllPumpsRateList() {
   const container = document.getElementById('allPumpsRateList');
