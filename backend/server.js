@@ -24,6 +24,7 @@ const nodemailer = require('nodemailer');
 const displayRoutes    = require('./display-endpoints');
 const dosingUserRoutes = require('./dosing-user-routes');
 const dosingIotRoutes  = require('./dosing-iot-routes'); 
+const dosingDeviceRoutes = require('./dosing-device-routes');
 
 const axios = require('axios');
 
@@ -840,6 +841,13 @@ function requireDev(req, res, next) {
 app.use('/api/v1/user/dosing', authUserMiddleware, dosingUserRoutes);
 
 
+// 🔹 Rotas da dosadora (ESP), sem JWT de usuário
+app.use('/iot/dosing', dosingDeviceRoutes);
+
+// (se tiver outras rotas IoT)
+app.use('/iot/dosing', dosingIotRoutes);
+
+
 function buildTokenPayload(userRow) {
   return {
     userId: userRow.id,
@@ -864,6 +872,8 @@ app.get('/login', (req, res) => {
 app.get('/dashboard', (req, res) => {
   res.sendFile(__dirname + '/public/dashboard-main.html');
 });
+
+
 
 // ============================================================================
 // [SEGURANÇA] Middlewares de Proteção
