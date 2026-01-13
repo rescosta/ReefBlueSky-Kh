@@ -349,6 +349,7 @@ async function checkDevicesOnlineStatus() {
               d.deviceId,
               d.userId,
               d.name,
+              d.type,
               d.last_seen,
               d.offline_alert_sent,
               u.email
@@ -358,6 +359,10 @@ async function checkDevicesOnlineStatus() {
     );
 
     for (const row of rows) {
+      if (row.type === 'DOSER') {
+        continue; 
+      }
+
       const lastSeenMs = new Date(row.last_seen).getTime();
       const isOffline = (now - lastSeenMs) > OFFLINE_THRESHOLD_MS;
 
