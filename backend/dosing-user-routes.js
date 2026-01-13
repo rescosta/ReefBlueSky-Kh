@@ -887,6 +887,59 @@ router.post('/pumps/:id/calibrate/abort', async (req, res) => {
   }
 });
 
+// POST /api/v1/user/dosing/pumps/:id/manual/abort
+// Abortar dose manual em andamento (manda comando STOP_MANUAL para o ESP)
+router.post('/pumps/:id/manual/abort', async (req, res) => {
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const userId = req.user.userId;
+    const { id } = req.params;
+
+    conn = await pool.getConnection();
+
+    // Garantir que a bomba pertence ao usuário e pegar device
+    const rows = await conn.query(
+      `SELECT p.id, p.device_id, d.esp_uid, d.online
+       FROM dosing_pumps p
+       JOIN dosing_devices d ON p.device_id = d.id
+       WHERE p.id = ? AND d.user_id = ? LIMIT 1`,
+      [id, userId]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Pump not found' });
+    }
+
+    const pump = rows[0];
+
+    if (!pump.online) {
+      // ainda assim responde OK, só não enfileira comando
+      return res.json({ success: true, info: 'Device offline, abort only local' });
+    }
+
+    // Enfileira comando para o firmware parar dose manual
+    await conn.query(
+      `INSERT INTO device_commands (deviceId, type, payload, status)
+       VALUES (?, ?, ?, 'pending')`,
+      [
+        pump.esp_uid,
+        'STOP_MANUAL',
+        JSON.stringify({ pump_id: pump.id })
+      ]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error aborting manual dose:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
 
 // ============================================
 // HELPERS
