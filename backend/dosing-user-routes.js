@@ -17,36 +17,53 @@ const pool = require('./db-pool');
 // GET /api/v1/user/dosing/devices
 // Lista todos os devices dosadora do usuário
 router.get('/devices', async (req, res) => {
-    let conn;
-    try {
-        if (!req.user || !req.user.userId) {
-            console.error('[Dosing] GET /devices sem req.user');
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.user.userId;
-        conn = await pool.getConnection();
-
-        const devices = await conn.query(
-            `SELECT
-                d.id, d.name, d.hw_type, d.esp_uid, d.firmware_version,
-                d.online, d.last_seen, d.last_ip, d.timezone,
-                (SELECT COUNT(*) FROM dosing_pumps WHERE device_id = d.id) as pump_count,
-                (SELECT COUNT(*) FROM dosing_alerts WHERE device_id = d.id AND resolved_at IS NULL) as alert_count
-            FROM dosing_devices d
-            WHERE d.user_id = ?
-            ORDER BY d.created_at DESC`,
-            [userId]
-        );
-
-        res.json({ data: devices || [] });
-    } catch (err) {
-        console.error('Error fetching dosing devices:', err);
-        res.status(500).json({ error: 'Database error' });
-    } finally {
-        if (conn) conn.release();
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      console.error('[Dosing] GET /devices sem req.user');
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    const userId = req.user.userId;
+    conn = await pool.getConnection();
+
+    const devices = await conn.query(
+      `SELECT
+         d.id, d.name, d.hw_type, d.esp_uid, d.firmware_version,
+         d.online, d.last_seen, d.last_ip, d.timezone,
+         (SELECT COUNT(*) FROM dosing_pumps WHERE device_id = d.id) as pump_count,
+         (SELECT COUNT(*) FROM dosing_alerts WHERE device_id = d.id AND resolved_at IS NULL) as alert_count
+       FROM dosing_devices d
+       WHERE d.user_id = ?
+       ORDER BY d.created_at DESC`,
+      [userId]
+    );
+
+    const now = Date.now();
+    const OFFLINE_THRESHOLD_MINUTES = 5;
+    const OFFLINE_THRESHOLD_MS = OFFLINE_THRESHOLD_MINUTES * 60 * 1000;
+
+    const mapped = (devices || []).map(d => {
+      const lastMs = d.last_seen ? new Date(d.last_seen).getTime() : 0;
+      const isRecent = lastMs && (now - lastMs <= OFFLINE_THRESHOLD_MS);
+      const isOnline = d.online === 1 && isRecent;
+
+      return {
+        ...d,
+        online: isOnline,
+        last_seen: d.last_seen ? new Date(d.last_seen).toISOString() : null,
+      };
+    });
+
+    return res.json({ data: mapped });
+  } catch (err) {
+    console.error('Error fetching dosing devices:', err);
+    return res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
 
 // POST /api/v1/user/dosing/devices
 // Criar novo device dosadora
