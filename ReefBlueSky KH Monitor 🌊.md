@@ -1,342 +1,292 @@
-# ReefBlueSky KH Monitor 🌊
+***
+
+```md
+# ReefBlueSky KH Monitor & Dosadora Balling 🌊
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Arduino](https://img.shields.io/badge/Platform-Arduino%20ESP32-blue)](https://www.espressif.com/en/products/socs/esp32)
-[![Status: Active](https://img.shields.io/badge/Status-Active%20Development-brightgreen)]()
-[![Version: 1.0](https://img.shields.io/badge/Version-1.0-blue)]()
+[![Arduino](https://img.shields.io/badge/Platform-ESP32%2FESP8266-blue)](https://www.espressif.com/en/products/socs/esp32)
+[![Backend](https://img.shields.io/badge/Backend-Node.js%20Express-green)]()
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)]()
 
-**Um monitor de alcalinidade (KH) de código aberto, baixo custo e totalmente automatizado para aquários marinhos.**
+**Ecossistema completo de monitoramento e automação para aquários marinhos: medição automática de KH, display LCD remoto e dosagem Balling inteligente, com backend único em Node.js/Express e acesso seguro via Cloudflare Tunnel.**
 
-## 📋 Visão Geral
+---
 
-O **ReefBlueSky KH Monitor** é um projeto inovador que oferece uma alternativa acessível aos analisadores comerciais caros (que custam R$ 8.000+). Utilizando o método científico de **saturação de CO₂ atmosférico**, o sistema automatiza completamente a medição de KH (alcalinidade) em aquários marinhos.
+## 📋 Visão geral
 
-### ✨ Características Principais
+O **ReefBlueSky** hoje é mais do que um monitor de KH isolado: é um sistema integrado formado por três dispositivos físicos e um backend central.
 
-- ✅ **Automação Completa**: Ciclo de medição de 5 fases totalmente automatizado
-- ✅ **Calibração Inteligente**: Calibração com água de KH conhecido (reservatório C)
-- ✅ **Compensação de Temperatura**: Ajuste automático dos cálculos
-- ✅ **Frequência Configurável**: Testes de 1h a 24h (intervalo do usuário)
-- ✅ **Detecção de Erros**: Identificação automática de falhas de sensores/bombas
-- ✅ **Histórico de Dados**: Até 1000 medições armazenadas localmente
-- ✅ **Interface Web**: Dashboard em tempo real com gráficos e exportação de dados
-- ✅ **Código Aberto**: MIT License - Livre para modificar e distribuir
-- ✅ **Custo Baixo**: ~R$ 900 em componentes (9x mais barato que comercial)
+- **KH Monitor (ESP32)**  
+  Faz o ciclo completo de medição de KH, pH e temperatura, com compensação de temperatura, histórico em SPIFFS e envio de dados para a nuvem. [file:170]
+- **Display LCD remoto**  
+  Módulo leve que consome um endpoint resumido do backend e exibe, no aquário, KH/pH/temperatura/estado da última medição, além de enviar pings de presença. [file:108]
+- **Dosadora Balling (ESP8266/ESP32)**  
+  Controla até 6 bombas peristálticas, com agendador avançado, calibração, execução manual e detecção de reservatório baixo, sempre sincronizada com o backend. [file:108]
 
-## 🎯 Especificações Técnicas
+Toda a lógica de autenticação, dashboards, APIs, alertas e monitoramento de status roda em um **único backend Node.js/Express**, exposto com segurança por **Cloudflare Tunnel**. [file:108][file:189]
 
-| Aspecto | Especificação |
-|--------|---------------|
-| **Microcontrolador** | ESP32 (WiFi integrado) |
-| **Sensores** | pH (PH-4502C), Temperatura (DS18B20), Nível (capacitivos) |
-| **Bombas** | 4x Kamoer peristálticas (12V) |
-| **Câmaras** | 3 câmaras (50ml, 50ml, 200ml) com sistema hidráulico |
-| **Método** | Saturação de CO₂ atmosférico |
-| **Precisão** | ±0.1 dKH (após calibração) |
-| **Intervalo KH** | 1.0 - 20.0 dKH |
-| **Consumo** | 0.5W (standby) a 50W (pico) |
-| **Fonte** | 12V DC 10A 120W (CFTV) |
-| **Tamanho** | Compacto (cabe em gabinete pequeno) |
-| **Conectividade** | WiFi 802.11b/g/n, MQTT, HTTP |
+---
 
-## 🔬 Como Funciona
+## ✨ Funcionalidades principais
 
-### Ciclo de Medição em 5 Fases
+### KH Monitor (ESP32)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  CICLO DE MEDIÇÃO DE KH - 5 FASES                      │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  FASE 1: DESCARTE (5 min)                             │
-│  └─ Bombas descartam água residual                    │
-│                                                         │
-│  FASE 2: CALIBRAÇÃO (10 min)                          │
-│  └─ Câmara B preenchida com solução de referência     │
-│  └─ Saturação com CO₂ atmosférico                     │
-│  └─ Medição de pH da referência                       │
-│                                                         │
-│  FASE 3: COLETA (5 min)                               │
-│  └─ Câmara A preenchida com água do aquário           │
-│  └─ Transferência para câmara de análise              │
-│                                                         │
-│  FASE 4: SATURAÇÃO E MEDIÇÃO (15 min)                 │
-│  └─ Injeção de ar (compressor 5V)                     │
-│  └─ Saturação com CO₂ atmosférico                     │
-│  └─ Medição de pH da amostra                          │
-│  └─ Cálculo de KH baseado em diferença de pH          │
-│                                                         │
-│  FASE 5: MANUTENÇÃO (5 min)                           │
-│  └─ Limpeza das câmaras                               │
-│  └─ Preparação para próximo ciclo                     │
-│                                                         │
-│  TEMPO TOTAL: ~40 minutos                             │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+- Ciclo de medição em 5 fases totalmente automatizado (descarte, calibração, coleta, saturação, manutenção). [file:191][file:170]
+- Método científico de saturação de CO₂ atmosférico com precisão típica de ±0.1 dKH após calibração. [file:191][file:194]
+- Compensação de temperatura automática com coeficiente \( \alpha = 0.002 \) em relação a 25 °C. [file:194]
+- Histórico de até ~1000 medições em SPIFFS, com envio periódico ao backend. [file:189][file:170]
+- Modo AP para onboarding (configuração inicial de WiFi e credenciais de nuvem via portal web). [file:171][file:172]
+- Telemetria completa: KH, pH referência, pH amostra, temperatura, erros de ciclo, uso de memória, RSSI, uptime. [file:170]
 
-### Fórmula de Cálculo
+### Display LCD remoto
 
-```
-KH = (10^(pH_referência - pH_amostra) - 1) × 50 × Fator_Temperatura
+- Endpoint dedicado de resumo (`/api/v1/devices/:id/display/kh-summary`, nome sugerido) com KH/pH/temperatura/última medição/estado para reduzir tráfego. [file:108]
+- Ping periódico para `/api/display/ping`, atualizando `lcd_last_seen` no registro do device e permitindo cálculo de `lcd_status` (online/offline). [file:108]
+- Integração com sistema de alertas: se o LCD ficar sem ping por mais que o limiar configurado (ex.: 5 minutos), o backend aciona alerta por email/Telegram. [file:108]
 
-Onde:
-- pH_referência: pH da solução de referência (saturada com CO₂)
-- pH_amostra: pH da amostra de água do aquário (saturada com CO₂)
-- Fator_Temperatura: 1 + 0.002 × (Temperatura - 25°C)
-```
+### Dosadora Balling
 
-## 📦 O Que Você Recebe
+- Arquitetura baseada em três tabelas principais:  
+  `dosing_devices`, `dosing_pumps`, `dosing_schedules` + `dosing_executions` para histórico de doses. [file:108]
+- Até **6 bombas** por dosadora, com:
+  - Nome, volume total, volume atual estimado
+  - Percentual de alarme (ex.: alerta quando <20%)  
+  - Limite de dose diária (`max_daily_ml`) para proteção. [file:108]
+- **Agendador inteligente**:
+  - Dias da semana por agenda (bitmask -> lista `days_of_week`)  
+  - Janela de horário (início/fim do dia)  
+  - Volume diário total e número de doses por dia  
+  - Cálculo automático dos horários das doses e validação de conflitos com `min_gap_minutes` entre doses de bombas diferentes. [file:108]
+- **Execuções e calibração**:
+  - Execuções registradas em `dosing_executions` com origem `MANUAL`, `AGENDA` ou `CALIBRATION`. [file:108]
+  - Fluxo guiado de calibração com dose contínua por 60 s e cálculo de `calibration_rate_ml_s`. [file:108]
+  - Comando de abortar calibração enfileirado em `device_commands` quando o usuário clica em “Abortar”. [file:108]
+- Integração futura/atual com IA preditiva do KH Monitor para ajuste automático de dosagem (documentada no arquivo de IA). [file:192]
 
-### Código-Fonte ESP32
-- ✅ Arquivo principal (.ino)
-- ✅ 6 módulos de código (PumpControl, SensorManager, KH_Analyzer, WiFi_MQTT, MeasurementHistory)
-- ✅ Código comentado e bem estruturado
-- ✅ Suporte para MQTT e HTTP
+### Backend, dashboard e alertas
 
-### Documentação Completa
-- ✅ Manual de Montagem (passo-a-passo com diagramas)
-- ✅ Manual de Operação (como usar o sistema)
-- ✅ Guia de Calibração (procedimento detalhado)
-- ✅ Guia de Troubleshooting (solução de problemas)
-- ✅ Artigo Científico (metodologia e validação)
-- ✅ Lista de Materiais (BOM com links de fornecedores)
-- ✅ Esquemas Elétricos (diagramas coloridos e ilustrados)
-- ✅ Análise Crítica (limitações e melhorias futuras)
+- **Backend único** em Node.js + Express, usando `server.js` como entrypoint e `db-pool.js` para pool MariaDB/MySQL. [file:108]
+- Dashboards e páginas em **HTML/JS estático** dentro de `backend/public`, incluindo:
+  - `login.html`
+  - `dashboard-main.html` (KH)
+  - `dashboard-dosing.html` (dosadora) [file:108]
+- Autenticação via JWT e middleware `authUserMiddleware` para proteger rotas de usuário (`/api/v1/user/...`). [file:108]
+- Monitor de **status online/offline**:
+  - KH: baseado em `devices.last_seen`  
+  - Dosadora: `dosing_devices.last_seen` + `offline_alert_sent`  
+  - LCD: `devices.lcd_last_seen` e campo derivado `lcd_status` [file:108]
+- Sistema de alertas:
+  - Email via SMTP configurável no `.env`  
+  - Telegram por usuário com `telegram_bot_token` e `telegram_chat_id` gravados na tabela `users` [file:108]
 
-### Website e Dashboard
-- ✅ Frontend React com 8 páginas
-- ✅ Backend Express com tRPC
-- ✅ Banco de dados MySQL
-- ✅ Dashboard em tempo real
-- ✅ Histórico de medições
-- ✅ Exportação de dados (CSV/JSON)
-- ✅ Autenticação de usuários
+---
 
-## 🚀 Quick Start
+## 🧱 Arquitetura e estrutura de pastas
 
-### 1. Preparação do Hardware
+Estrutura sugerida do repositório monolítico:
 
 ```bash
-# Clone o repositório
-git clone https://github.com/seu-usuario/ReefBlueSky-KH-Monitor.git
-cd ReefBlueSky-KH-Monitor
-
-# Veja a lista de materiais
-cat docs/BOM.md
-
-# Consulte o manual de montagem
-cat docs/MANUAL_MONTAGEM.md
-```
-
-### 2. Instalação do Firmware ESP32
-
-```bash
-# Requisitos
-- Arduino IDE 1.8.0+
-- ESP32 Board Package
-
-# Passos
-1. Abra Arduino IDE
-2. Arquivo → Preferências → URL de Gerenciador de Placas
-3. Adicione: https://dl.espressif.com/dl/package_esp32_index.json
-4. Ferramentas → Placa → Gerenciador de Placas → Instale ESP32
-5. Abra ReefBlueSky_KH_Monitor.ino
-6. Configure WiFi no código (linhas 15-16)
-7. Selecione: Ferramentas → Placa → ESP32 Dev Module
-8. Clique em Upload
-```
-
-### 3. Configuração Inicial
-
-```bash
-# Após o upload bem-sucedido:
-1. Abra Monitor Serial (115200 baud)
-2. Reinicie o ESP32
-3. Veja as mensagens de inicialização
-4. Acesse o website em: http://seu-ip:3000
-5. Faça login com suas credenciais
-6. Calibre o sistema (veja Manual de Calibração)
-```
-
-## 📚 Documentação Detalhada
-
-| Documento | Descrição | Link |
-|-----------|-----------|------|
-| **Manual de Montagem** | Passo-a-passo completo com diagramas | [docs/MANUAL_MONTAGEM.md](docs/MANUAL_MONTAGEM.md) |
-| **Manual de Operação** | Como usar o sistema | [docs/MANUAL_OPERACAO.md](docs/MANUAL_OPERACAO.md) |
-| **Guia de Calibração** | Procedimento de calibração | [docs/GUIA_CALIBRACAO.md](docs/GUIA_CALIBRACAO.md) |
-| **Guia de Troubleshooting** | Solução de problemas | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
-| **Esquemas Elétricos** | Diagramas coloridos | [docs/ESQUEMAS_ELETRICOS.md](docs/ESQUEMAS_ELETRICOS.md) |
-| **Lista de Materiais** | BOM com links | [docs/BOM.md](docs/BOM.md) |
-| **API Reference** | Documentação de API | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
-| **Artigo Científico** | Metodologia e validação | [docs/ARTIGO_CIENTIFICO.pdf](docs/ARTIGO_CIENTIFICO.pdf) |
-
-## 🔧 Estrutura do Projeto
-
-```
-ReefBlueSky-KH-Monitor/
-├── firmware/
-│   ├── ReefBlueSky_KH_Monitor.ino          # Arquivo principal
-│   └── src/
-│       ├── PumpControl.h/cpp               # Controle de bombas
-│       ├── SensorManager.h/cpp             # Leitura de sensores
-│       ├── KH_Analyzer.h/cpp               # Análise de KH
-│       ├── WiFi_MQTT.h/cpp                 # Comunicação
-│       └── MeasurementHistory.h/cpp        # Histórico
-├── website/
-│   ├── client/                             # Frontend React
-│   ├── server/                             # Backend Express
-│   ├── drizzle/                            # Schema BD
-│   └── package.json
-├── docs/
-│   ├── MANUAL_MONTAGEM.md
-│   ├── MANUAL_OPERACAO.md
-│   ├── GUIA_CALIBRACAO.md
-│   ├── TROUBLESHOOTING.md
-│   ├── ESQUEMAS_ELETRICOS.md
-│   ├── BOM.md
-│   ├── API_REFERENCE.md
-│   └── ARTIGO_CIENTIFICO.pdf
-├── images/
-│   ├── galeria-1-overview.jpg
-│   ├── galeria-2-chambers.jpg
-│   ├── cycle-phase-1-discard.jpg
-│   └── ... (10 imagens profissionais)
-├── LICENSE                                 # MIT License
-├── README.md                               # Este arquivo
-└── CONTRIBUTING.md                         # Guia de contribuição
-```
-
-## 💻 Requisitos do Sistema
-
-### Hardware
-- ESP32 (WROOM-32 ou similar)
-- 4 Bombas peristálticas Kamoer
-- Sensor de pH PH-4502C
-- Sensor de temperatura DS18B20
-- Drivers de motor (TB6612FNG, ULN2003)
-- 3 Câmaras de medição (50ml, 50ml, 200ml)
-- Fonte CFTV 12V 10A 120W
-- Stepdown LM2596 12V→5V 3A
-- Stepdown LM2596 5V→3.3V 3A
-- Fotoacoplador PC817
-- Compressor 5V (injeção de ar)
-
-### Software
-- Arduino IDE 1.8.0+
-- Python 3.8+ (para website)
-- Node.js 16+ (para website)
-- MySQL 5.7+ (para website)
-
-## 🔌 Pinagem ESP32
-
-| GPIO | Função | Tipo | Descrição |
-|------|--------|------|-----------|
-| 12 | Bomba 1 PWM | Output | Controle velocidade |
-| 13 | Bomba 1 Dir | Output | Controle direção |
-| 14 | Bomba 2 PWM | Output | Controle velocidade |
-| 15 | Bomba 2 Dir | Output | Controle direção |
-| 16 | Bomba 3 IN1 | Output | ULN2003 |
-| 17 | Bomba 3 IN2 | Output | ULN2003 |
-| 18 | Bomba 4 IN3 | Output | ULN2003 |
-| 19 | Bomba 4 IN4 | Output | ULN2003 |
-| 20 | Compressor | Output | Fotoacoplador |
-| 32 | Sensor pH | Input | ADC |
-| 33 | Sensor Temp | Input | OneWire |
-| 34 | Nível A | Input | ADC |
-| 35 | Nível B | Input | ADC |
-
-## 📊 Consumo de Energia
-
-| Cenário | Corrente | Potência | Duração |
-|---------|----------|----------|---------|
-| Standby | 0.35A | 4.2W | Contínuo |
-| Operação Normal | 2.5A | 30W | ~40 min/ciclo |
-| Pico (4 bombas + compressor) | 5.5A | 66W | ~15 min |
-| **Margem de Segurança** | **4.5A** | **54W** | **45% disponível** |
-
-## 🔐 Segurança
-
-- ✅ Proteção contra curto-circuito (fusível 5A)
-- ✅ Proteção contra inversão de polaridade (diodo)
-- ✅ Proteção térmica em reguladores
-- ✅ Isolamento elétrico (fotoacoplador para compressor)
-- ✅ Validação de dados (sensores)
-- ✅ Detecção de erros automática
-
-## 🤝 Como Contribuir
-
-Contribuições são bem-vindas! Por favor:
-
-1. Faça um Fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para mais detalhes.
-
-## 📝 Licença
-
-Este projeto está licenciado sob a MIT License - veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-## 🙏 Agradecimentos
-
-- Comunidade de aquarismo marinho
-- Projeto Arduino e ESP32
-- Contribuidores do projeto
-
-## 📞 Suporte
-
-- **Issues**: [GitHub Issues](https://github.com/seu-usuario/ReefBlueSky-KH-Monitor/issues)
-- **Discussões**: [GitHub Discussions](https://github.com/seu-usuario/ReefBlueSky-KH-Monitor/discussions)
-- **Email**: seu-email@example.com
-
-## 🎯 Roadmap
-
-- [ ] Integração com Home Assistant
-- [ ] App móvel (iOS/Android)
-- [ ] Gráficos avançados com previsões
-- [ ] Alertas por email/SMS
-- [ ] Integração com sistemas de dosagem automática
-- [ ] Suporte para múltiplos tanques
-- [ ] Calibração automática contínua
-
-## 📈 Estatísticas do Projeto
-
-- **Linhas de Código**: ~2000
-- **Módulos**: 6
-- **Documentação**: 8 guias completos
-- **Imagens**: 10 profissionais
-- **Tempo de Desenvolvimento**: 200+ horas
-- **Custo Total**: ~R$ 900 (vs R$ 8000+ comercial)
-
-## 🌟 Destaques
-
-> "O ReefBlueSky KH Monitor democratiza a medição de alcalinidade para aquaristas marinhos. Com código aberto e custo acessível, qualquer um pode construir um sistema profissional." - Comunidade de Aquarismo
-
-## 📜 Citação
-
-Se você usar este projeto em pesquisa ou publicação, por favor cite:
-
-```bibtex
-@software{reefbluesky2025,
-  title={ReefBlueSky KH Monitor: Open-Source Alkalinity Monitoring for Marine Aquariums},
-  author={Seu Nome},
-  year={2025},
-  url={https://github.com/seu-usuario/ReefBlueSky-KH-Monitor}
-}
+ReefBlueSky/
+├── esp32-kh/                         # Firmware KH Monitor (ESP32)
+│   ├── ReefBlueSky_KH_Monitor_v3.ino
+│   ├── WiFiSetup.h / WiFiSetup.cpp   # Onboarding WiFi + portal AP
+│   ├── CloudAuth.*                   # Autenticação com backend
+│   ├── SensorManager.*               # pH, temperatura, nível
+│   ├── PumpControl.*                 # Bombas do sistema de medição
+│   ├── KHAnalyzer.*                  # Cálculo de KH
+│   ├── KHPredictor.*                 # IA preditiva (tendência de KH)
+│   └── MeasurementHistory.*          # Histórico em SPIFFS
+├── esp8266-doser/                    # Firmware dosadora Balling
+│   ├── main.ino
+│   └── ...                           # Lógica de fila, execução, heartbeat
+├── lcd-display/                      # Firmware do display LCD remoto
+│   ├── lcd_main.ino
+│   └── ...                           # Consumo do endpoint resumo + ping
+├── backend/                          # Backend Node.js / Express
+│   ├── server.js                     # Servidor principal + cron de monitor
+│   ├── db-pool.js                    # Pool MariaDB/MySQL
+│   ├── dosing-user-routes.js         # Rotas web (dashboard dosadora)
+│   ├── dosing-iot-routes.js          # Rotas IoT da dosadora
+│   ├── display-endpoints.js          # Rotas LCD + resumos KH
+│   ├── public/                       # Frontend estático
+│   │   ├── login.html
+│   │   ├── dashboard-main.html
+│   │   ├── dashboard-dosing.html
+│   │   ├── js/
+│   │   │   ├── dashboard-main.js
+│   │   │   └── dashboard-dosing.js
+│   │   └── css/
+│   ├── package.json
+│   └── .env.example
+└── docs/                             # Documentação em Markdown/PDF
+    ├── ReefBlueSky-KH-Monitor.md
+    ├── ReefBlueSky-KH-Monitor-Manual-de-Operacao.md
+    ├── ReefBlueSky-KH-Monitor-Manual-de-Montagem-Completo.md
+    ├── ReefBlueSky-KH-Monitor-Guia-Completo-de-Fiacao-e-Fonte-de-Alimentacao.md
+    ├── ReefBlueSky-KH-Monitor-Guia-Completo-de-Calibracao.md
+    ├── ReefBlueSky-KH-Monitor-Sistema-de-IA-Preditiva-para-Correcao-Automatica-de-KH.md
+    ├── ...
 ```
 
 ---
 
-**Desenvolvido com ❤️ para a comunidade de aquarismo marinho**
+## 🔐 Autenticação, rotas e segurança
 
-[![GitHub stars](https://img.shields.io/github/stars/seu-usuario/ReefBlueSky-KH-Monitor?style=social)](https://github.com/seu-usuario/ReefBlueSky-KH-Monitor)
-[![GitHub forks](https://img.shields.io/github/forks/seu-usuario/ReefBlueSky-KH-Monitor?style=social)](https://github.com/seu-usuario/ReefBlueSky-KH-Monitor)
-[![GitHub watchers](https://img.shields.io/github/watchers/seu-usuario/ReefBlueSky-KH-Monitor?style=social)](https://github.com/seu-usuario/ReefBlueSky-KH-Monitor)
+### Autenticação de usuário (dashboard)
 
-**Última atualização**: Novembro 2025
-**Versão**: 1.0
-**Status**: ✅ Pronto para Produção
+- Fluxo baseado em **JWT**:
+  - `accessToken` curto, assinado com `JWT_SECRET`
+  - `refreshToken` mais longo, assinado com `JWT_REFRESH_SECRET` [file:189][file:108]
+- Middleware `authUserMiddleware`:
+  - Lê `Authorization: Bearer <token>`
+  - Valida assinatura e expiração
+  - Injeta `req.user.userId` e `req.user.role` nas rotas [file:108]
+
+Principais rotas web (todas sob `/api/v1/user/...`):
+
+- Autenticação
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/refresh`
+  - `POST /api/v1/auth/logout` [file:189][file:108]
+- KH Monitor
+  - `GET /api/v1/user/devices` – lista dispositivos KH do usuário
+  - `GET /api/v1/user/devices/:id/measurements` – histórico paginado [file:108]
+- Dosadora Balling  
+  (em `dosing-user-routes.js`):
+  - `GET /api/v1/user/dosing/devices`
+  - `POST /api/v1/user/dosing/devices`
+  - `GET /api/v1/user/dosing/devices/:deviceId/pumps`
+  - `PUT /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex`
+  - `GET /api/v1/user/dosing/devices/:deviceId/schedules`
+  - `GET /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules`
+  - `POST /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules`
+  - `PUT /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId`
+  - `DELETE /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId`
+  - `POST /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/manual`
+  - `POST /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/calibrate/start`
+  - `POST /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/calibrate/save`
+  - `POST /api/v1/user/dosing/pumps/:id/calibrate/abort` [file:108]
+
+### Autenticação de dispositivos (IoT)
+
+- KH Monitor e dosadora usam um token de dispositivo / segredo configurado no onboarding via `CloudAuth` ou rota de handshake. [file:170][file:108]
+- Rotas IoT típicas (em `dosing-iot-routes.js` e rotas KH equivalentes):
+  - `POST /api/v1/iot/dosing/handshake`
+  - `POST /api/v1/iot/dosing/status`
+  - `POST /api/v1/iot/dosing/exec-result`
+  - `POST /api/v1/iot/kh/telemetry`
+  - `POST /api/v1/iot/kh/health` [file:108][file:170]
+
+### Rotas LCD
+
+- `GET /api/v1/devices/:deviceId/display/kh-summary` – resumo enxuto para o LCD. [file:108]
+- `POST /api/display/ping` – ping periódico do LCD (atualiza `lcd_last_seen`). [file:108]
+
+### Camadas de segurança
+
+- **Criptografia**:
+  - Tokens e segredos criptografados no NVS do ESP32 (AES) [file:189]
+  - Comunicação entre devices e backend sempre via HTTPS (Cloudflare Tunnel) [file:189]
+- **HTTPS obrigatório**:
+  - Redirecionamento HTTP → HTTPS no backend
+  - Cloudflare fornece TLS de ponta a ponta até o túnel [file:189]
+- **Rate limiting**:
+  - Login e rotas sensíveis com limite de requisições por IP/intervalo
+  - Cloudflare pode aplicar rate limiting adicional na borda [file:189]
+- **Proteções lógicas**:
+  - Command whitelist para comandos que o backend envia ao device
+  - Validação robusta de payloads das rotas de dosagem (volumes, horários, dias da semana etc.)
+  - Logs de auditoria sem dados sensíveis (sem tokens/senhas em log) [file:189][file:108]
+- **Monitor de integridade**:
+  - Tarefa em `server.js` rodando a cada X segundos:
+    - Atualiza status online/offline por `last_seen`
+    - Envia alertas na transição de estado
+    - Garante que o dash sempre reflita o estado real, mesmo se o frontend não estiver aberto [file:108]
+
+---
+
+## ☁️ Cloudflare Tunnel e deploy
+
+O deploy recomendado é manter o backend em uma máquina ou VPS atrás de firewall, expondo-o para a internet **apenas** através de um túnel Cloudflare.
+
+Fluxo simplificado:
+
+1. Instalar `cloudflared` no servidor que roda o backend. [file:189]
+2. Autenticar com sua conta Cloudflare (`cloudflared login`). [file:189]
+3. Criar um túnel apontando para `http://localhost:3000` (ou porta configurada do Express). [file:189]
+4. Vincular o túnel a um subdomínio (por exemplo, `iot.seu-dominio.com.br`). [file:189]
+5. Configurar como serviço `systemd` para iniciar com o sistema (túnel + backend). [file:189]
+
+No firmware (KH Monitor, dosadora, LCD), o endpoint passa a ser sempre algo como:
+
+```cpp
+#define CLOUD_SERVER   "iot.seu-dominio.com.br"
+#define CLOUD_PORT     443
+#define CLOUD_ENDPOINT "/api/v1/iot/kh/telemetry"   // ou rotas da dosadora
+```
+
+Dessa forma, todos os devices usam TLS válido, com proteção extra de WAF e rate limiting na borda da Cloudflare. [file:172][file:189]
+
+---
+
+## ⚙️ Configuração rápida
+
+### Backend (`backend/.env`)
+
+Exemplo de `.env` consolidando as variáveis usadas hoje:
+
+```env
+PORT=3000
+NODE_ENV=production
+
+# JWT
+JWT_SECRET=seu-secret-super-seguro
+JWT_REFRESH_SECRET=seu-refresh-secret
+
+# DB (MariaDB/MySQL)
+DB_HOST=127.0.0.1
+DB_USER=reef
+DB_PASSWORD=senha
+DB_NAME=reefbluesky
+
+# Email Alerts
+EMAIL_HOST=smtp.seu-dominio.com
+EMAIL_PORT=587
+EMAIL_USER=alerts@seu-dominio.com
+EMAIL_PASS=sua-senha
+EMAIL_FROM="ReefBlueSky Alerts <alerts@seu-dominio.com>"
+
+# Cloud / Frontend
+PUBLIC_BASE_URL=https://iot.seu-dominio.com.br
+ALLOWED_ORIGINS=https://reefbluesky.seu-dominio.com.br
+
+# (Opcional) Telegram global
+TELEGRAM_TOKEN=
+TELEGRAM_CHAT_ID=
+```
+
+Os detalhes extras de deploy e segurança fina estão nos documentos específicos em `docs/`. [file:189]
+
+### Firmware KH Monitor
+
+- Código principal em `esp32-kh/ReefBlueSky_KH_Monitor_v3.ino`. [file:170]
+- WiFi/AP/Cloud configurados em `WiFiSetup.h / WiFiSetup.cpp`. [file:171][file:172]
+- Ao iniciar pela primeira vez, o ESP32 abre um AP temporário com página de configuração para:
+  - SSID/senha WiFi
+  - URL/host do backend
+  - Token/segredo do dispositivo [file:171][file:172]
+
+---
+
+## 📚 Documentação complementar
+
+Os seguintes arquivos em `docs/` detalham cada parte do sistema:
+
+- `ReefBlueSky-KH-Monitor-Manual-de-Operacao.md` – uso diário, dashboards, interpretação dos dados. [file:195]
+- `ReefBlueSky-KH-Monitor-Manual-de-Montagem-Completo.md` – montagem mecânica/eletrônica/hidráulica completa. [file:196]
+- `ReefBlueSky-KH-Monitor-Guia-Completo-de-Fiacao-e-Fonte-de-Alimentacao.md` – dimensionamento de fontes, fiação, pinagem e consumo. [file:197]
+- `ReefBlueSky-KH-Monitor-Guia-Completo-de-Calibracao.md` – calibração de KH, pH, temperatura e sensores de nível. [file:198]
+- `ReefBlueSky-KH-Monitor-Sistema-de-IA-Preditiva-para-Correcao-Automatica-de-KH.md` – arquitetura da IA, métricas e roadmap. [file:192]
+- Artigo técnico: `ReefBlueSky-KH-Monitor_-Um-Sistema-Automatizado-de-Codigo-Aberto-para-Monitoramento-Continuo-de-Alcalinidade-em-Aquarios-Marinhos.md`. [file:194]
+
+---
