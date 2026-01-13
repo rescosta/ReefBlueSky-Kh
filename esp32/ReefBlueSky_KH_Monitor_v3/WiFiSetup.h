@@ -34,7 +34,17 @@ private:
     WebServer server;
     DNSServer dnsServer;
     static constexpr byte DNS_PORT = 53;
-    
+
+    // Multi‑SSID + reconexão em background
+    struct WiFiCred { String ssid; String password; };
+    WiFiCred* networks = nullptr;
+    int numNetworks = 0;
+    int currentNetworkIndex = 0;
+    bool portalActive = false;
+    unsigned long lastReconnectTry = 0;
+    static constexpr unsigned long RECONNECT_INTERVAL = 30000; // 30s
+    static constexpr int CONNECT_TIMEOUT = 15000;              // 15s
+
     String ssid;
     String password;
     static constexpr const char* FIXED_SERVER_URL = "https://iot.reefbluesky.com.br/api/v1"; 
@@ -369,6 +379,7 @@ private:
     bool loadConfigFromSPIFFS();
     void handleConfigSubmit();
     void handleStatus();
+    void tryReconnect();
     
 public:
     WiFiSetup() : server(80) {}
@@ -384,6 +395,7 @@ public:
     
     // [ONBOARDING] Processar requisições HTTP do servidor web
     void handleClient();
+    void loopReconnect();  
     
     // [ONBOARDING] Verificar se dispositivo já foi configurado
     bool isConfigured() const { return configured; }
@@ -393,6 +405,17 @@ public:
     String getPassword() const { return password; }
     String getServerUsername() const { return serverUsername; }
     String getServerPassword() const { return serverPassword; }
+
+    bool isPortalActive() const { return portalActive; }
+    void closePortalIfActive() {
+    if (!portalActive) return;
+    dnsServer.stop();
+    WiFi.softAPdisconnect(true);
+    portalActive = false;
+    Serial.println("[WiFiSetup] Portal fechado (auto, detectado pelo main).");
+    }
+
+
 };
 
 #endif // WIFISETUP_H

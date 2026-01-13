@@ -1,6 +1,8 @@
 #include "WiFiSetup.h" 
 #include <WiFi.h> 
 
+
+
 // Declaração da função implementada em MultiDeviceAuth.h
 bool saveCredentialsToNVS(String email, String password);
 
@@ -10,24 +12,32 @@ bool saveCredentialsToNVS(String email, String password);
 // ============================================================================
 
 bool WiFiSetup::begin() {
-    Serial.println("[WiFiSetup] Iniciando sistema de configuração...");
-    
-    // Inicializar SPIFFS
-    if (!SPIFFS.begin(true)) {
-        Serial.println("[WiFiSetup] ERRO: Falha ao inicializar SPIFFS");
-        return false;
+  Serial.println("[WiFiSetup] Iniciando sistema de configuração...");
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("[WiFiSetup] ERRO: Falha ao inicializar SPIFFS");
+    return false;
+  }
+
+  // 1) Tenta carregar config
+  if (loadConfigFromSPIFFS()) {
+    Serial.println("[WiFiSetup] Configuração carregada do SPIFFS");
+    configured = true;
+
+    if (connectToWiFi()) {
+      return true;
+    } else {
+      Serial.println("[WiFiSetup] Falha ao conectar em todas as redes salvas.");
+      // NÃO zera configured aqui
+      // configured = false;  // <- remove isso
+      return createAccessPoint();
     }
-    
-    // Tentar carregar configuração salva
-    if (loadConfigFromSPIFFS()) {
-        Serial.println("[WiFiSetup] Configuração carregada do SPIFFS");
-        configured = true;
-        return connectToWiFi();
-    }
-    
-    // Se não houver configuração, criar AP para onboarding
-    Serial.println("[WiFiSetup] Nenhuma configuração encontrada, criando AP...");
-    return createAccessPoint();
+  }
+
+
+  // 4) Nenhuma config válida → AP direto
+  Serial.println("[WiFiSetup] Nenhuma configuração encontrada, criando AP...");
+  return createAccessPoint();
 }
 
 bool WiFiSetup::createAccessPoint() {
@@ -64,7 +74,10 @@ bool WiFiSetup::createAccessPoint() {
     });
 
     server.on("/api/scan", HTTP_GET, [this]() {
-        int n = WiFi.scanNetworks();
+    
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.disconnect();      
+        int n = WiFi.scanNetworks(false);
         DynamicJsonDocument doc(1024);
         JsonArray arr = doc.createNestedArray("networks");
         for (int i = 0; i < n; i++) {
@@ -75,80 +88,162 @@ bool WiFiSetup::createAccessPoint() {
         server.send(200, "application/json", out);
       });
         
+    server.onNotFound([this]() {
+    server.send(200, "text/html; charset=utf-8", getConfigHTML());
+    });
+
     // Iniciar servidor web
     server.begin();
     Serial.println("[WiFiSetup] Servidor web iniciado na porta 80");
-    
+    portalActive = true;
+    Serial.println("[WiFiSetup] Portal ativo + reconexão em background");
     return true;
 }
 
 bool WiFiSetup::connectToWiFi() {
-    Serial.printf("[WiFiSetup] Conectando ao WiFi: %s\n", ssid.c_str());
-    
-    // Modo station
-    WiFi.mode(WIFI_STA);
-    
-    // Conectar
+  Serial.println("[WiFiSetup] Conectando usando lista de redes...");
+
+  WiFi.mode(WIFI_STA);
+
+  File file = SPIFFS.open(CONFIG_FILE, "r");
+  if (!file) {
+    Serial.println("[WiFiSetup] ERRO abrindo config para multi-WiFi");
+    return false;
+  }
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError err = deserializeJson(doc, file);
+  file.close();
+  if (err) {
+    Serial.printf("[WiFiSetup] ERRO ao desserializar (multi-WiFi): %s\n", err.c_str());
+    return false;
+  }
+
+  // Debug: imprime JSON completo
+  Serial.println("[WiFiSetup] Conteúdo de wifi_config.json:");
+  String raw;
+  serializeJsonPretty(doc, raw);
+  Serial.println(raw);
+
+  JsonArray nets = doc["networks"].as<JsonArray>();
+
+  // Fallback: formato antigo
+  if (nets.isNull() || nets.size() == 0) {
+    Serial.printf("[WiFiSetup] Nenhuma lista de redes, usando ssid único: %s\n", ssid.c_str());
     WiFi.begin(ssid.c_str(), password.c_str());
-    
-    // Aguardar conexão (máximo 20 segundos)
+
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 40) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
+      delay(500);
+      Serial.print(".");
+      attempts++;
     }
-    
+    Serial.println();
+
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("\n[WiFiSetup] Conectado ao WiFi!\n");
-        Serial.printf("[WiFiSetup] IP: %s\n", WiFi.localIP().toString().c_str());
-        Serial.printf("[WiFiSetup] RSSI: %d dBm\n", WiFi.RSSI());
-        return true;
-    } else {
-        Serial.println("\n[WiFiSetup] ERRO: Falha ao conectar ao WiFi");
-        return false;
+      Serial.printf("[WiFiSetup] Conectado ao WiFi! IP: %s\n",
+                    WiFi.localIP().toString().c_str());
+      Serial.printf("[WiFiSetup] RSSI: %d dBm\n", WiFi.RSSI());
+      return true;
     }
+
+    Serial.println("[WiFiSetup] ERRO: Falha ao conectar ao WiFi");
+    return false;
+  }
+
+  // Multi‑WiFi: tentar cada rede salva
+  for (JsonObject net : nets) {
+    String s = net["ssid"].as<String>();
+    String p = net["password"].as<String>();
+    if (s.isEmpty()) continue;
+
+    Serial.printf("[WiFiSetup] Rede salva: %s\n", s.c_str());
+    Serial.printf("[WiFiSetup] Tentando SSID: %s\n", s.c_str());
+
+    WiFi.begin(s.c_str(), p.c_str());
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 40) {
+      delay(500);
+      Serial.print(".");
+      attempts++;
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("[WiFiSetup] Conectado ao WiFi: %s\n", s.c_str());
+      ssid     = s;
+      password = p;
+      Serial.printf("[WiFiSetup] IP: %s\n", WiFi.localIP().toString().c_str());
+      Serial.printf("[WiFiSetup] RSSI: %d dBm\n", WiFi.RSSI());
+      return true;
+    }
+  }
+
+  Serial.println("[WiFiSetup] ERRO: Nenhuma das redes conectou");
+  return false;
 }
 
-bool WiFiSetup::loadConfigFromSPIFFS() {
-    Serial.printf("[WiFiSetup] Carregando configuração de %s\n", CONFIG_FILE);
-    
-    if (!SPIFFS.exists(CONFIG_FILE)) {
-        Serial.println("[WiFiSetup] Arquivo de configuração não encontrado");
-        return false;
-    }
-    
-    File file = SPIFFS.open(CONFIG_FILE, "r");
-    if (!file) {
-        Serial.println("[WiFiSetup] ERRO: Não foi possível abrir arquivo de configuração");
-        return false;
-    }
-    
-    DynamicJsonDocument doc(1024);
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-    
-    if (error) {
-        Serial.printf("[WiFiSetup] ERRO ao desserializar JSON: %s\n", error.c_str());
-        return false;
-    }
-    
-    // Extrair configurações
-    ssid = doc["ssid"].as<String>();
-    password = doc["password"].as<String>();
-    serverUsername = doc["serverUsername"].as<String>();
-    serverPassword = doc["serverPassword"].as<String>();
-  
-    saveCredentialsToNVS(serverUsername, serverPassword);
 
-    
-    if (ssid.isEmpty()) {
-        Serial.println("[WiFiSetup] Configuração incompleta");
-        return false;
+bool WiFiSetup::loadConfigFromSPIFFS() {
+  Serial.printf("[WiFiSetup] Carregando configuração de %s\n", CONFIG_FILE);
+
+  if (!SPIFFS.exists(CONFIG_FILE)) {
+    Serial.println("[WiFiSetup] Arquivo de configuração não encontrado");
+    return false;
+  }
+
+  File file = SPIFFS.open(CONFIG_FILE, "r");
+  if (!file) {
+    Serial.println("[WiFiSetup] ERRO: Não foi possível abrir arquivo de configuração");
+    return false;
+  }
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError error = deserializeJson(doc, file);
+  file.close();
+
+  if (error) {
+    Serial.printf("[WiFiSetup] ERRO ao desserializar JSON: %s\n", error.c_str());
+    return false;
+  }
+
+  // Formato novo
+  // Formato novo
+  if (doc.containsKey("networks")) {
+    JsonArray nets = doc["networks"].as<JsonArray>();
+    if (!nets.isNull() && nets.size() > 0) {
+      numNetworks = nets.size();
+      networks = new WiFiCred[numNetworks];
+      for (int i = 0; i < numNetworks; i++) {
+        JsonObject n = nets[i];
+        networks[i].ssid     = n["ssid"].as<String>();
+        networks[i].password = n["password"].as<String>();
+      }
+      Serial.printf("[WiFiSetup] %d redes carregadas para reconexão BG\n", numNetworks);
+
+      // usa a primeira rede como atual
+      ssid     = networks[0].ssid;
+      password = networks[0].password;
     }
-    
-    Serial.println("[WiFiSetup] Configuração carregada com sucesso");
-    return true;
+  } else {
+    // Formato antigo
+    ssid     = doc["ssid"].as<String>();
+    password = doc["password"].as<String>();
+  }
+
+  serverUsername = doc["serverUsername"].as<String>();
+  serverPassword = doc["serverPassword"].as<String>();
+
+  saveCredentialsToNVS(serverUsername, serverPassword);
+
+  if (ssid.isEmpty()) {
+    Serial.println("[WiFiSetup] Configuração incompleta");
+    return false;
+  }
+
+  Serial.println("[WiFiSetup] Configuração carregada com sucesso");
+  return true;
 }
 
 bool WiFiSetup::saveConfigToSPIFFS(const DynamicJsonDocument& config) {
@@ -173,51 +268,85 @@ bool WiFiSetup::saveConfigToSPIFFS(const DynamicJsonDocument& config) {
 }
 
 void WiFiSetup::handleConfigSubmit() {
-    Serial.println("[WiFiSetup] Recebendo configuração do cliente...");
-    
-    // Verificar se há dados POST
-    if (!server.hasArg("plain")) {
-        server.send(400, "application/json", "{\"success\":false,\"message\":\"Nenhum dado recebido\"}");
-        return;
+  Serial.println("[WiFiSetup] Recebendo configuração do cliente...");
+
+  if (!server.hasArg("plain")) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Nenhum dado recebido\"}");
+    return;
+  }
+
+  DynamicJsonDocument doc(1024);
+  DeserializationError error = deserializeJson(doc, server.arg("plain"));
+
+  if (error) {
+    Serial.printf("[WiFiSetup] ERRO ao desserializar: %s\n", error.c_str());
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"JSON inválido\"}");
+    return;
+  }
+
+  // Validar campos obrigatórios
+  if (!doc.containsKey("ssid") || !doc.containsKey("password") ||
+      !doc.containsKey("serverUsername") || !doc.containsKey("serverPassword")) {
+    server.send(400, "application/json", "{\"success\":false,\"message\":\"Campos obrigatórios faltando\"}");
+    return;
+  }
+
+  // Extrair do POST
+  String newSsid = doc["ssid"].as<String>();
+  String newPass = doc["password"].as<String>();
+  String newUser = doc["serverUsername"].as<String>();
+  String newPwd  = doc["serverPassword"].as<String>();
+
+  ssid           = newSsid;
+  password       = newPass;
+  serverUsername = newUser;
+  serverPassword = newPwd;
+
+  // Também já grava em NVS (como você fazia em load)
+  saveCredentialsToNVS(serverUsername, serverPassword);
+
+  // ----- montar documento completo com lista de redes -----
+  DynamicJsonDocument full(4096);
+
+  if (SPIFFS.exists(CONFIG_FILE)) {
+    File f = SPIFFS.open(CONFIG_FILE, "r");
+    if (f) {
+      DeserializationError e2 = deserializeJson(full, f);
+      if (e2) {
+        Serial.printf("[WiFiSetup] Aviso: config antiga inválida (%s), recriando\n", e2.c_str());
+      }
+      f.close();
     }
-    
-    // Desserializar JSON
-    DynamicJsonDocument doc(1024);
-    DeserializationError error = deserializeJson(doc, server.arg("plain"));
-    
-    if (error) {
-        Serial.printf("[WiFiSetup] ERRO ao desserializar: %s\n", error.c_str());
-        server.send(400, "application/json", "{\"success\":false,\"message\":\"JSON inválido\"}");
-        return;
+  }
+
+  full["serverUsername"] = newUser;
+  full["serverPassword"] = newPwd;
+
+  JsonArray nets = full["networks"].to<JsonArray>();
+
+  bool exists = false;
+  for (JsonObject n : nets) {
+    if (n["ssid"].as<String>() == newSsid) {
+      n["password"] = newPass;
+      exists = true;
+      break;
     }
-    
-    // Validar campos obrigatórios
-    if (!doc.containsKey("ssid") || !doc.containsKey("password") || 
-        !doc.containsKey("serverUsername") || !doc.containsKey("serverPassword"))
-        {
-        server.send(400, "application/json", "{\"success\":false,\"message\":\"Campos obrigatórios faltando\"}");
-        return;
-    }
-    
-    // Extrair e salvar configuração
-    ssid = doc["ssid"].as<String>();
-    password = doc["password"].as<String>();
-    serverUsername = doc["serverUsername"].as<String>();
-    serverPassword = doc["serverPassword"].as<String>();
-    
-    // Salvar em SPIFFS
-    if (!saveConfigToSPIFFS(doc)) {
-        server.send(500, "application/json", "{\"success\":false,\"message\":\"Erro ao salvar configuração\"}");
-        return;
-    }
-    
-    // Responder sucesso
-    server.send(200, "application/json", "{\"success\":true,\"message\":\"Configuração salva com sucesso\"}");
-    
-    // Aguardar 2 segundos e reiniciar
-    Serial.println("[WiFiSetup] Reiniciando em 2 segundos...");
-    delay(2000);
-    ESP.restart();
+  }
+  if (!exists) {
+    JsonObject n = nets.createNestedObject();
+    n["ssid"]     = newSsid;
+    n["password"] = newPass;
+  }
+
+  if (!saveConfigToSPIFFS(full)) {
+    server.send(500, "application/json", "{\"success\":false,\"message\":\"Erro ao salvar configuração\"}");
+    return;
+  }
+
+  server.send(200, "application/json", "{\"success\":true,\"message\":\"Configuração salva com sucesso\"}");
+  Serial.println("[WiFiSetup] Reiniciando em 2 segundos...");
+  delay(2000);
+  ESP.restart();
 }
 
 void WiFiSetup::handleStatus() {
@@ -236,4 +365,84 @@ void WiFiSetup::handleStatus() {
 void WiFiSetup::handleClient() {
     dnsServer.processNextRequest();
     server.handleClient();
+}
+
+
+const char* statusName(wl_status_t st) {
+  switch (st) {
+    case WL_IDLE_STATUS:     return "IDLE";
+    case WL_NO_SSID_AVAIL:   return "NO_SSID";
+    case WL_SCAN_COMPLETED:  return "SCAN_DONE";
+    case WL_CONNECTED:       return "CONNECTED";
+    case WL_CONNECT_FAILED:  return "CONNECT_FAILED";
+    case WL_CONNECTION_LOST: return "CONNECTION_LOST";
+    case WL_DISCONNECTED:    return "DISCONNECTED";
+    default:                 return "UNKNOWN";
+  }
+}
+
+void WiFiSetup::tryReconnect() {
+  wl_status_t st = WiFi.status();
+  Serial.printf("[WiFiSetup] tryReconnect: configured=%d numNetworks=%d status=%d (%s)\n",
+                configured, numNetworks, st, statusName(st));
+  if (!configured || numNetworks == 0) return;
+  if (WiFi.status() == WL_CONNECTED) return;
+  if (millis() - lastReconnectTry < RECONNECT_INTERVAL) return;
+
+  // Se ainda está com portal aberto, mantém AP+STA.
+  // Se já está só em STA, não precisa religar AP.
+  if (portalActive) {
+    WiFi.mode(WIFI_AP_STA);
+  } else {
+    WiFi.mode(WIFI_STA);
+  }
+
+  String ssidTry = networks[currentNetworkIndex].ssid;
+  String passTry = networks[currentNetworkIndex].password;
+
+  Serial.printf("[WiFiSetup] BG: Tentando %s (%d/%d)\n",
+                ssidTry.c_str(), currentNetworkIndex + 1, numNetworks);
+
+  WiFi.begin(ssidTry.c_str(), passTry.c_str());
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < CONNECT_TIMEOUT) {
+    delay(100);
+    if (portalActive) {
+      dnsServer.processNextRequest();
+      server.handleClient();
+    }
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("[WiFiSetup] BG RECONECTADO! IP: %s RSSI: %d\n",
+                  WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    ssid     = ssidTry;
+    password = passTry;
+
+    if (portalActive) {
+      dnsServer.stop();
+      WiFi.softAPdisconnect(true);
+      portalActive = false;
+      Serial.println("[WiFiSetup] Portal fechado apos reconectar");
+    }
+    currentNetworkIndex = 0;
+
+    Serial.println("[WiFiSetup] WiFi recuperado em BG, reiniciando device para fluxo limpo...");
+    delay(1000);
+    esp_restart();   // ESP32
+  } else {
+    currentNetworkIndex = (currentNetworkIndex + 1) % numNetworks;
+    Serial.println("[WiFiSetup] BG: falhou, próxima rede na fila");
+  }
+
+  lastReconnectTry = millis();
+}
+
+void WiFiSetup::loopReconnect() {
+  // Mantém portal/DNS se estiver ativo
+  handleClient();
+
+  // Sempre verifica se precisa reconectar
+  tryReconnect();
 }

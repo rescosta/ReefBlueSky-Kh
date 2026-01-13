@@ -33,12 +33,16 @@ void wifiFactoryReset();
 
 extern CloudAuth cloudAuth;
 
+extern const char* CLOUD_BASE_URL;
+
 // =================================================================================
 // Configurações de Comunicação
 // =================================================================================
 
 //const char* ssid = "";
 //const char* password = "";
+
+
 
 
 // Vazão calibrada da bomba 1 (mL/s). Ajuste após teste real.
@@ -81,6 +85,9 @@ float getSpiffsUsagePercent() {
   return ((float)used / (float)total) * 100.0f;
 }
 
+
+unsigned long firstNoTokenTime = 0;
+const unsigned long MAX_NO_TOKEN_MS = 10UL * 60UL * 1000UL; // ex: 10 minutos
 
 // =================================================================================
 // Objetos Globais
@@ -129,7 +136,7 @@ void debugForceSyncWithKH(float kh) {
     Serial.println("[DEBUG] NTP ainda não ok, usando millis() para timestamp");
     ts = millis() / 1000ULL;
   }
-  m.timestamp    = ts;              // ← idem aqui
+  m.timestamp    = ts;           
   m.kh           = kh;
   m.ph_reference = 8.2;
   m.ph_sample    = 8.0;
@@ -277,10 +284,6 @@ void handleCloudReconnect(unsigned long now) {
     return;
   }
 
-
-
-
-
   // Respeita intervalo mínimo entre tentativas
   if (now - lastReconnectAttemptMs < RECONNECT_INTERVAL_MS) {
     return;
@@ -297,6 +300,26 @@ void handleCloudReconnect(unsigned long now) {
     Serial.println("[Cloud] Ainda sem token válido (aguardando registro ou erro).");
     cloudConnected = false;
   }
+
+  // Watchdog para estado "sem token" por muito tempo
+  if (cloudConnected) {
+    // reset do timer se conectou à nuvem
+    firstNoTokenTime = 0;
+  } else {
+    // só conta se WiFi estiver conectado
+    if (WiFi.isConnected()) {
+      if (firstNoTokenTime == 0) {
+        firstNoTokenTime = now;
+      } else if (now - firstNoTokenTime > MAX_NO_TOKEN_MS) {
+        Serial.println("[Cloud] Sem token válido há muito tempo. Reiniciando device...");
+        delay(2000);
+        ESP.restart();
+      }
+    } else {
+      // se WiFi caiu, reseta o timer; reconexão já é tratada pelo WiFiSetup
+      firstNoTokenTime = 0;
+    }
+  }
 }
 void setup() {
   Serial.begin(115200); delay(1000);
@@ -311,39 +334,25 @@ void setup() {
   //pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
 
   // 2️⃣ WIFI PRIMEIRO (CRÍTICO!)
-  Serial.println("[Main] Iniciando WiFiSetup...");
+    Serial.println("[Main] Iniciando WiFiSetup...");
   bool wifiOk = wifiSetup.begin();
 
-  if (wifiOk) {
-    Serial.println("[Main] WiFi conectado!");
-
-    // 3️⃣ MultiDeviceAuth DEPOIS WiFi
-    initMultiDeviceAuth();                    // ← login + deviceToken
-        Serial.println("✓ Auth OK");
-    cloudAuth.setDeviceId(deviceId);          // ← deviceId agora existe!
-    cloudAuth.init();                         // ← token OK!
-    Serial.printf("[DEBUG] deviceToken tamanho = %d\n", deviceToken.length());
+  if (wifiOk && WiFi.isConnected()) {  // ← + WiFi.isConnected()!
+    Serial.println("[Main] WiFi STA conectado!");
     
-    /*configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);  // NTP
-    Serial.println("[NTP] configTime chamado, servidor=pool.ntp.org");
-    struct tm timeinfo;
-      int retries = 0;
-      while (!getLocalTime(&timeinfo) && retries++ < 10) {
-        Serial.println("[NTP] Aguardando sincronizar...");
-        delay(1000);
-      }
-      if (retries >= 10) {
-        Serial.println("[NTP] Falha ao sincronizar dentro do timeout.");
-      } else {
-        Serial.println("[NTP] NTP sincronizado com sucesso.");
-      }*/
-
-    WiFi.softAPdisconnect(true);  // derruba AP
-    WiFi.mode(WIFI_STA);   
-
+    // Auth só com STA
+    initMultiDeviceAuth();
+    Serial.println("✓ Auth OK");
+    cloudAuth.setDeviceId(deviceId);
+    cloudAuth.init();
+    
+    //WiFi.softAPdisconnect(true);  // Desliga AP do setup
+    //WiFi.mode(WIFI_STA);
+    
+    setupWebServer();  
   } else {
-    Serial.println("[Main] WiFiSetup falhou. MODO LOCAL/AP.");
-  } 
+    Serial.println("[Main] AP mode ativo. Configure WiFi em 192.168.4.1");
+  }
 
   // 4️⃣ HARDWARE DEPOIS auth (1x SÓ!)
   pumpControl.begin();
@@ -380,13 +389,33 @@ void setup() {
   initAiPumpControl();
 }
 
+
 // =================================================================================
 // Loop Principal
 // =================================================================================
+static bool lastWifiConnected = false;
 
 void loop() {
   unsigned long now = millis();
   tryNtpOnceNonBlocking();
+
+  bool nowConnected = (WiFi.status() == WL_CONNECTED);
+  if (nowConnected && !lastWifiConnected) {
+    Serial.println("[Main] WiFi reconectado (auto). Fechando portal se ainda ativo.");
+    wifiSetup.closePortalIfActive();
+  }
+  lastWifiConnected = nowConnected;
+
+  if (!wifiSetup.isConfigured()) {
+    wifiSetup.loopReconnect();  
+    delay(100);
+    return;
+  }
+
+  Serial.printf("[LEVEL] A=%d(%.0f) B=%d(%.0f) C=%d(%.0f)\n",
+    sensorManager.getLevelA(), analogRead(LEVEL_A_PIN)*3.3/4095,
+    sensorManager.getLevelB(), analogRead(LEVEL_B_PIN)*3.3/4095,
+    sensorManager.getLevelC(), analogRead(LEVEL_C_PIN)*3.3/4095);
 
 
   // 🔥 1. SERIAL DEBUG (ÚNICO BLOCO!)
@@ -438,10 +467,7 @@ void loop() {
 
   // 🔥 3. WEB SERVER
   webServer.handleClient();
-  if (isAiActive()) {
-  int aiAction = getFuzzyDecision();  // ← ADICIONAR
-}
-  wifiSetup.handleClient();
+  wifiSetup.loopReconnect();
 
   // 🔥 4. AI PUMP CONTROL
   int aiAction = getFuzzyDecision();
@@ -823,11 +849,9 @@ void sendHealthToCloud() {
   }
 }
 
-
 // =================================================================================
 // Logs para o backend
 // =================================================================================
-
 void sendLogsToCloud(const String &message, const char *level = "INFO") {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[Logs] WiFi não conectado, pulando envio.");
@@ -843,23 +867,20 @@ void sendLogsToCloud(const String &message, const char *level = "INFO") {
     ts = millis();  // ainda assim garante ordenação
   }
 
-  String url = String(cloudAuth.getBaseUrl()) + "/api/v1/device/logs";  // se tiver baseUrl
-  // Se não tiver getBaseUrl(), usa constante tipo:
-  // const char* CLOUD_BASE = "https://seu-backend.com";
-  // String url = String(CLOUD_BASE) + "/api/v1/device/logs";
+  // aqui só usa
+  String url = String(CLOUD_BASE_URL) + "/device/logs";
 
   HTTPClient http;
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", String("Bearer ") + deviceToken);
 
-  // Monta JSON simples com 1 linha
   StaticJsonDocument<256> doc;
   JsonArray arr = doc.createNestedArray("lines");
   JsonObject line = arr.createNestedObject();
-  line["ts"]     = ts;
-  line["level"]  = level;
-  line["message"]= message;
+  line["ts"]      = ts;
+  line["level"]   = level;
+  line["message"] = message;
 
   String body;
   serializeJson(doc, body);
@@ -897,8 +918,6 @@ void performPrediction() {
     Serial.println("[Main] Última medição inválida, pulando predição");
   }
 }
-
-
 
 void processCloudCommand() {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -1217,6 +1236,8 @@ void performMeasurement() {
         cloudAuth.queueMeasurement(mc);
         cloudAuth.syncOfflineMeasurements();
         //sendHealthToCloud(); 
+        sendLogsToCloud("log de teste do ESP", "INFO");
+        
       }
 
     } else {

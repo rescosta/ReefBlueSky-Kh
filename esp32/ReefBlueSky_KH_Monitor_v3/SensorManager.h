@@ -1,6 +1,8 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
+#define LEVEL_THRESHOLD  2500  // Central 1.8V seco/cheio
+
 #include <Arduino.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>

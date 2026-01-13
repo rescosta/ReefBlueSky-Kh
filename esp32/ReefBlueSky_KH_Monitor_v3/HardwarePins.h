@@ -6,6 +6,8 @@
 #define LEVEL_A_PIN       16
 #define LEVEL_B_PIN       17
 #define LEVEL_C_PIN        5
+#define LEVEL_THRESHOLD  2500  // Use nos 3 sensores
+
 
 // IA PUMP CONTROL (NOVOS!)
 #define LEVEL_R01_PIN     LEVEL_A_PIN  // Reservatório 01
@@ -48,4 +50,4 @@
 #define COMPRESSOR_ON    16
 
 // Botão BOOT
-static const gpio_num_t WIFI_RESET_BTN_GPIO = GPIO_NUM_32;
+static const gpio_num_t WIFI_RESET_BTN_GPIO = GPIO_NUM_0;

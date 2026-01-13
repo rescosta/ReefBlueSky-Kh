@@ -3,7 +3,7 @@
 
 
 SensorManager::SensorManager(int ph_pin, int temp_pin)
-    : _ph_pin(ph_pin), _temp_pin(temp_pin), _last_ph(7.0), _last_temperature(25.0) {
+    : _ph_pin(ph_pin), _temp_pin(temp_pin), _last_ph(7.0), _last_temperature(-127.0f) {
     _oneWire = new OneWire(_temp_pin);
     _sensors = new DallasTemperature(_oneWire);
     
@@ -18,13 +18,12 @@ void SensorManager::begin() {
     pinMode(_ph_pin, INPUT);
 
     // Sensores ópticos de nível (saída digital)
-    pinMode(LEVEL_A_PIN, INPUT_PULLUP);
-    pinMode(LEVEL_B_PIN, INPUT_PULLUP);
-    pinMode(LEVEL_C_PIN, INPUT_PULLUP);
+    pinMode(LEVEL_A_PIN, INPUT);
+    pinMode(LEVEL_B_PIN, INPUT);
+    pinMode(LEVEL_C_PIN, INPUT);
 
     _sensors->begin();
 
-    readTemperatureRaw();
     readPHRaw();
 
     Serial.println("[SensorManager] Sensores inicializados com sucesso");
@@ -41,33 +40,35 @@ float SensorManager::getPH() {
 }
 
 float SensorManager::getTemperature() {
+    _sensors->requestTemperatures();   // usa o objeto certo
+    delay(200);                        // tempo para conversão
     _last_temperature = readTemperatureRaw();
     return _last_temperature;
 }
 
 int SensorManager::getLevelA() {
-    if (!_levelAEnabled) {
-        Serial.println("[SensorManager] Level A DESATIVADO (forçado)");
-        return 0;  // 0 = não cheio
-    }
-    // LOW = sensor óptico detecta líquido = nível máximo
-    return digitalRead(LEVEL_A_PIN) == LOW ? 1 : 0;
+    if (!_levelAEnabled) { Serial.println("[SensorManager] Level A DESATIVADO"); return 0; }
+    int adc = analogRead(LEVEL_A_PIN);
+    int status = (adc < LEVEL_THRESHOLD) ? 1 : 0;
+    Serial.printf("[LEVEL A] ADC=%d V=%.2fV -> %d\n", adc, adc*3.3/4095, status);
+    return status;  // ← ÚNICO return
 }
 
+// Igual para B e C:
 int SensorManager::getLevelB() {
-    if (!_levelBEnabled) {
-        Serial.println("[SensorManager] Level B DESATIVADO (forçado)");
-        return 0;
-    }
-    return digitalRead(LEVEL_B_PIN) == LOW ? 1 : 0;
+    if (!_levelBEnabled) { Serial.println("[SensorManager] Level B DESATIVADO"); return 0; }
+    int adc = analogRead(LEVEL_B_PIN);
+    int status = (adc < LEVEL_THRESHOLD) ? 1 : 0;
+    Serial.printf("[LEVEL B] ADC=%d V=%.2fV -> %d\n", adc, adc*3.3/4095, status);
+    return status;
 }
 
 int SensorManager::getLevelC() {
-    if (!_levelCEnabled) {
-        Serial.println("[SensorManager] Level C DESATIVADO (forçado)");
-        return 0;
-    }
-    return digitalRead(LEVEL_C_PIN) == LOW ? 1 : 0;
+    if (!_levelCEnabled) { Serial.println("[SensorManager] Level C DESATIVADO"); return 0; }
+    int adc = analogRead(LEVEL_C_PIN);
+    int status = (adc < LEVEL_THRESHOLD) ? 1 : 0;
+    Serial.printf("[LEVEL C] ADC=%d V=%.2fV -> %d\n", adc, adc*3.3/4095, status);
+    return status;
 }
 
 void SensorManager::calibratePH(float ph_neutral, float ph_acidic) {
@@ -122,7 +123,6 @@ float SensorManager::readPHRaw() {
 }
 
 float SensorManager::readTemperatureRaw() {
-    _sensors->requestTemperatures();
     float temp = _sensors->getTempCByIndex(0);
 
     // DS18B20 erro típico = -127.0
