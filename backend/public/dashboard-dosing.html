@@ -769,6 +769,24 @@
                 <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10.5">
             </div>
             <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
+
+            <div class="form-group" style="margin-top: 8px;">
+              <label style="display:block; font-size:13px; color:#9ca3af;">
+                Taxa de dosagem da bomba:
+              </label>
+              <div id="calibrationRateLabel" style="font-size:13px; color:#e5e7eb; margin-top:4px;">
+                Taxa atual desta bomba: -- mL/s
+              </div>
+              <div style="margin-top:24px;">
+                <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
+                <div id="allPumpsRateList" style="font-size:13px; color:#e5e7eb;">
+                  Carregando taxas...
+                </div>
+              </div>
+              <small style="font-size:11px; color:#9ca3af;">
+                Usada nas doses manuais e nas agendas automáticas.
+              </small>
+            </div>
         </div>
     </div>
 
