@@ -44,6 +44,17 @@ struct DoseJob {
   uint8_t  retries;
 };
 
+struct ManualRun {
+  bool     active;
+  uint32_t pumpId;
+  uint8_t  pumpIndex;
+  uint32_t startMs;
+  uint32_t durationMs;
+  uint32_t scheduleId;  
+  uint16_t volumeMl;
+};
+
+
 class DoserControl {
 private:
   PumpConfig pumps[MAX_PUMPS];
@@ -54,6 +65,8 @@ private:
 
   DoseJob doseJobs[MAX_DOSE_JOBS];
   uint8_t doseJobCount = 0;
+
+  ManualRun manualRun;  
 
   int pumpPins[MAX_PUMPS];
 
@@ -75,6 +88,9 @@ public:
 
   void rebuildJobs(time_t now);
   void loop(time_t now);
+
+  void startManualDose(uint8_t pumpIndex, uint16_t volumeMl, uint32_t scheduleId = 0);
+  void stopManualDose(uint32_t pumpId);
 
   uint8_t getPumpCount() const { return pumpCount; }
   const PumpConfig& getPump(uint8_t idx) const { return pumps[idx]; }

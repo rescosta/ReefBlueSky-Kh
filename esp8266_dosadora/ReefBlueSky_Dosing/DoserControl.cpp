@@ -1,5 +1,14 @@
 #include "DoserControl.h"
 
+DoserControl::DoserControl() {
+  manualRun.active   = false;
+  pumpCount          = 0;
+  scheduleCount      = 0;
+  doseJobCount       = 0;
+  lastJobsRebuild    = 0;
+  lastDailyExecuted  = 0;
+}
+
 void DoserControl::initPins(const int* pins) {
   for (uint8_t i = 0; i < MAX_PUMPS; i++) {
     pumpPins[i] = pins[i];
@@ -126,6 +135,25 @@ void DoserControl::loop(time_t now) {
     rebuildJobs(now);
   }
 
+    // ✅ Dose manual em andamento
+  if (manualRun.active) {
+    uint32_t elapsed = millis() - manualRun.startMs;
+    if (elapsed >= manualRun.durationMs) {
+      digitalWrite(pumpPins[manualRun.pumpIndex], LOW);
+      manualRun.active = false;
+
+      if (onExecutionCallback) {
+        onExecutionCallback(
+          manualRun.pumpId,
+          manualRun.volumeMl,
+          manualRun.scheduleId,
+          (uint32_t)now,
+          "OK"
+        );
+      }
+    }
+  }
+
   // Verificar e executar jobs
   for (uint8_t i = 0; i < doseJobCount; i++) {
     DoseJob& job = doseJobs[i];
@@ -179,6 +207,44 @@ void DoserControl::loop(time_t now) {
         }
       }
     }
+  }
+}
+
+void DoserControl::startManualDose(uint8_t pumpIdx, uint16_t volumeMl, uint32_t scheduleId) {
+  if (pumpIdx >= pumpCount) return;
+  PumpConfig& pump = pumps[pumpIdx];
+
+  uint32_t durationMs = (uint32_t)((volumeMl / pump.calibMlPerSec) * 1000);
+
+  digitalWrite(pumpPins[pumpIdx], HIGH);
+
+  manualRun.active     = true;
+  manualRun.pumpId     = pump.id;
+  manualRun.pumpIndex  = pumpIdx;
+  manualRun.startMs    = millis();
+  manualRun.durationMs = durationMs;
+  manualRun.scheduleId = scheduleId;
+  manualRun.volumeMl   = volumeMl;
+
+  pump.currentVolumeMl -= volumeMl;
+}
+
+void DoserControl::stopManualDose(uint32_t pumpId) {
+  if (!manualRun.active) return;
+  if (manualRun.pumpId != pumpId) return;
+
+  digitalWrite(pumpPins[manualRun.pumpIndex], LOW);
+  manualRun.active = false;
+
+  if (onExecutionCallback) {
+    time_t nowSec = time(nullptr);
+    onExecutionCallback(
+      manualRun.pumpId,
+      manualRun.volumeMl,
+      manualRun.scheduleId,
+      (uint32_t)nowSec,
+      "ABORTED"
+    );
   }
 }
 

@@ -1,5 +1,6 @@
 #ifndef CLOUDAUTH_DOSER_H
 #define CLOUDAUTH_DOSER_H
+#include "DoserControl.h"
 
 #include <Arduino.h>
 #ifdef ESP8266
@@ -27,6 +28,9 @@ private:
 
   static constexpr uint32_t TOKENREFRESHBEFORES = 300;
 
+  bool fetchCommands(JsonDocument& outDoc);
+  void handleCommand(JsonObject cmd, DoserControl* doser);
+
   bool performRegistration();
   bool performLogin();
   bool refreshAccessToken();
@@ -36,6 +40,7 @@ private:
 public:
   bool init(const String& sUrl, const String& uname, const String& upass);
   bool isAuthenticated() const { return accessToken.length() > 0; }
+  void processCommands(DoserControl* doser);
 
   bool ensureTokenFresh();
   bool fetchDoserConfig(JsonDocument& outConfig);

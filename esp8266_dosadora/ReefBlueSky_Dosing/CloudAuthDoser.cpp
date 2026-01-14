@@ -15,16 +15,6 @@
   #define DOSER_FW_VERSION "0.0.0"
 #endif
 
-#include "DoserControl.h"
-
-DoserControl::DoserControl() {
-  pumpCount = 0;
-  scheduleCount = 0;
-  doseJobCount = 0;
-  lastJobsRebuild = 0;
-  lastDailyExecuted = 0;
-}
-
 bool CloudAuthDoser::init(const String& sUrl, const String& uname, const String& upass) {
   serverUrl = sUrl;
   username = uname;
@@ -284,6 +274,69 @@ bool CloudAuthDoser::reportDosingExecution(uint32_t pumpId, uint16_t volumeMl, u
 
   return (httpCode == 200 || httpCode == 201);
 }
+
+bool CloudAuthDoser::fetchCommands(JsonDocument& outDoc) {
+  if (!isAuthenticated()) return false;
+
+  HTTPClient http;
+  String url = serverUrl + "/iot/dosing/commands?esp_uid=" + espUid;
+  //Serial.print("[CloudAuth] fetchCommands URL: ");
+  //Serial.println(url);
+
+  WiFiClient client;
+  http.begin(client, url);
+  http.addHeader("Authorization", getAuthHeader());
+
+  int httpCode = http.GET();
+  String response = http.getString();
+  http.end();
+
+  if (httpCode != 200) {
+    Serial.printf("[CloudAuth] fetchCommands httpCode=%d\n", httpCode);
+    Serial.println(response);
+    return false;
+  }
+
+  DeserializationError err = deserializeJson(outDoc, response);
+  if (err) {
+    Serial.printf("[CloudAuth] JSON error in commands: %s\n", err.c_str());
+    return false;
+  }
+
+  // loga só quando vier algo
+  JsonArray cmds = outDoc["commands"].as<JsonArray>();
+  if (!cmds.isNull() && cmds.size() > 0) {
+    Serial.printf("[CloudAuth] %d command(s) received\n", cmds.size());
+  }
+
+  return true;
+}
+
+void CloudAuthDoser::handleCommand(JsonObject cmd, DoserControl* doser) {
+  String type = cmd["type"].as<String>();
+  JsonObject payload = cmd["payload"].as<JsonObject>();
+
+  if (type == "STOP_MANUAL") {
+    uint32_t pumpId = payload["pump_id"] | 0;
+    Serial.printf("[CMD] STOP_MANUAL pump %lu\n", pumpId);
+    if (doser) {
+      doser->stopManualDose(pumpId);
+    }
+  }
+}
+
+void CloudAuthDoser::processCommands(DoserControl* doser) {
+  DynamicJsonDocument doc(2048);
+  if (!fetchCommands(doc)) return;
+
+  if (!doc.containsKey("commands")) return;
+  JsonArray cmds = doc["commands"].as<JsonArray>();
+
+  for (JsonObject cmd : cmds) {
+    handleCommand(cmd, doser);
+  }
+}
+
 
 String CloudAuthDoser::getAuthHeader() const {
   return "Bearer " + accessToken;

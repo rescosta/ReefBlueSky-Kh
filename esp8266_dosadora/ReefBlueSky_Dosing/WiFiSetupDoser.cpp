@@ -13,6 +13,7 @@ const char* statusName(wl_status_t st) {
   }
 }
 
+const int MAX_NETS = 10;
 
 // ============================================================================
 // ONBOARDING: Inicializar sistema WiFi
@@ -457,86 +458,106 @@ void WiFiSetupDoser::handleConfigSubmit() {
   Serial.println("[WiFiSetupDoser] Recebendo configuração do cliente...");
 
   if (!server.hasArg("plain")) {
-    server.send(400, "application/json", "{\"success\":false,\"message\":\"Nenhum dado recebido\"}");
+    server.send(400, "application/json",
+                "{\"success\":false,\"message\":\"Nenhum dado recebido\"}");
     return;
   }
 
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, server.arg("plain"));
-
   if (error) {
-    Serial.printf("[WiFiSetupDoser] ERRO ao desserializar JSON: %s\n", error.c_str());
-    server.send(400, "application/json", "{\"success\":false,\"message\":\"JSON inválido\"}");
+    Serial.printf("[WiFiSetupDoser] ERRO ao desserializar JSON: %s\n",
+                  error.c_str());
+    server.send(400, "application/json",
+                "{\"success\":false,\"message\":\"JSON inválido\"}");
     return;
   }
 
   // Validar campos obrigatórios
   if (!doc.containsKey("ssid") || !doc.containsKey("password") ||
-      !doc.containsKey("serverUsername") || !doc.containsKey("serverPassword")) {
-    server.send(400, "application/json", "{\"success\":false,\"message\":\"Campos obrigatórios faltando\"}");
+      !doc.containsKey("serverUsername") ||
+      !doc.containsKey("serverPassword")) {
+    server.send(400, "application/json",
+                "{\"success\":false,\"message\":\"Campos obrigatórios faltando\"}");
     return;
   }
 
   // Extrair campos do POST
-  String newSsid  = doc["ssid"].as<String>();
-  String newPass  = doc["password"].as<String>();
-  String newUser  = doc["serverUsername"].as<String>();
-  String newPwd   = doc["serverPassword"].as<String>();
+  String newSsid = doc["ssid"].as<String>();
+  String newPass = doc["password"].as<String>();
+  String newUser = doc["serverUsername"].as<String>();
+  String newPwd  = doc["serverPassword"].as<String>();
 
   ssid           = newSsid;
   password       = newPass;
   serverUsername = newUser;
   serverPassword = newPwd;
+  // ======== ATUALIZA VETOR EM RAM (networks[]) ========
 
-  // ----- montar documento "full" com lista de redes -----
-  DynamicJsonDocument full(2048);
-
-  // Se já existe config, carrega para preservar redes antigas
-  if (SPIFFS.exists(CONFIG_FILE)) {
-    File f = SPIFFS.open(CONFIG_FILE, "r");
-    if (f) {
-      DeserializationError e2 = deserializeJson(full, f);
-      if (e2) {
-        Serial.printf("[WiFiSetupDoser] Aviso: config antiga inválida (%s), recriando\n", e2.c_str());
-      }
-      f.close();
-    }
+  if (!networks) {
+    networks = new WiFiCred[MAX_NETS];
+    numNetworks = 0;
   }
 
-  // Atualiza credenciais do servidor (únicas)
-  full["serverUsername"] = newUser;
-  full["serverPassword"] = newPwd;
-
-  // Garante que existe array "networks"
-  JsonArray nets = full["networks"].to<JsonArray>();
-
-  // Atualiza ou adiciona SSID
-  bool exists = false;
-  for (JsonObject n : nets) {
-    if (n["ssid"].as<String>() == newSsid) {
-      n["password"] = newPass;
-      exists = true;
+  // procura SSID igual
+  int idx = -1;
+  for (int i = 0; i < numNetworks; i++) {
+    if (networks[i].ssid == newSsid) {
+      idx = i;
       break;
     }
   }
-  if (!exists) {
-    JsonObject n = nets.createNestedObject();
-    n["ssid"]     = newSsid;
-    n["password"] = newPass;
+
+  if (idx >= 0) {
+    // Atualiza senha da rede existente
+    networks[idx].password = newPass;
+  } else {
+    // Insere novo SSID
+    if (numNetworks < MAX_NETS) {
+      networks[numNetworks].ssid     = newSsid;
+      networks[numNetworks].password = newPass;
+      numNetworks++;
+    } else {
+      // política simples: sobrescreve a posição 0
+      networks[0].ssid     = newSsid;
+      networks[0].password = newPass;
+    }
   }
+
+
+  // ======== RECONSTRÓI JSON INTEIRO A PARTIR DO VETOR ========
+
+  DynamicJsonDocument full(2048);
+  full["serverUsername"] = newUser;
+  full["serverPassword"] = newPwd;
+
+  JsonArray nets = full.createNestedArray("networks");
+  for (int i = 0; i < numNetworks; i++) {
+    if (networks[i].ssid.length() == 0) continue;
+    JsonObject n = nets.createNestedObject();
+    n["ssid"]     = networks[i].ssid;
+    n["password"] = networks[i].password;
+  }
+
+  // DEBUG: ver JSON antes de gravar
+  String dbg;
+  serializeJsonPretty(full, dbg);
+  Serial.println("[WiFiSetupDoser] FULL antes de salvar:");
+  Serial.println(dbg);
 
   // Salvar em SPIFFS
   if (!saveConfigToSPIFFS(full)) {
-    server.send(500, "application/json", "{\"success\":false,\"message\":\"Erro ao salvar configuração\"}");
+    server.send(500, "application/json",
+                "{\"success\":false,\"message\":\"Erro ao salvar configuração\"}");
     return;
   }
 
-  server.send(200, "application/json", "{\"success\":true,\"message\":\"Configuração salva com sucesso\"}");
+  server.send(200, "application/json",
+              "{\"success\":true,\"message\":\"Configuração salva com sucesso\"}");
   Serial.println("[WiFiSetupDoser] Configuração salva, reiniciando...");
   delay(2000);
   ESP.restart();
 }
-
 
 void WiFiSetupDoser::handleStatus() {
   DynamicJsonDocument doc(256);
@@ -596,16 +617,22 @@ bool WiFiSetupDoser::loadConfigFromSPIFFS() {
   if (doc.containsKey("networks")) {
     JsonArray nets = doc["networks"].as<JsonArray>();
     if (!nets.isNull() && nets.size() > 0) {
-      numNetworks = nets.size();
-      networks = new WiFiCred[numNetworks];
-      for (int i = 0; i < numNetworks; i++) {
-        JsonObject n = nets[i];
-        networks[i].ssid = n["ssid"].as<String>();
-        networks[i].password = n["password"].as<String>();
+
+      if (!networks) {
+        networks = new WiFiCred[MAX_NETS];
       }
-      Serial.printf("[WiFiSetupDoser] %d redes carregadas para reconexão BG\n", numNetworks);
-    }
-    if (!nets.isNull() && nets.size() > 0) {
+      numNetworks = 0;
+
+      for (int i = 0; i < (int)nets.size() && i < MAX_NETS; i++) {
+        JsonObject n = nets[i];
+        networks[numNetworks].ssid     = n["ssid"].as<String>();
+        networks[numNetworks].password = n["password"].as<String>();
+        numNetworks++;
+      }
+
+      Serial.printf("[WiFiSetupDoser] %d redes carregadas para reconexão BG\n",
+                    numNetworks);
+
       JsonObject first = nets[0];
       ssid     = first["ssid"].as<String>();
       password = first["password"].as<String>();
@@ -627,6 +654,7 @@ bool WiFiSetupDoser::loadConfigFromSPIFFS() {
   Serial.println("[WiFiSetupDoser] Configuração carregada com sucesso");
   return true;
 }
+
 
 bool WiFiSetupDoser::saveConfigToSPIFFS(const DynamicJsonDocument& config) {
   Serial.printf("[WiFiSetupDoser] Salvando configuração em %s\n", CONFIG_FILE);

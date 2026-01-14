@@ -51,6 +51,20 @@ void setup() {
   Serial.begin(115200);
   delay(1500);
 
+  #ifdef ESP8266
+    if (!SPIFFS.begin()) {
+      Serial.println("SPIFFS init failed");
+    }
+  #else
+    if (!SPIFFS.begin(true)) {
+      Serial.println("SPIFFS init failed");
+    }
+  #endif
+
+  // APENAS PARA LIMPAR UMA VEZ
+  //SPIFFS.remove("/doser_wifi_config.json");
+  //Serial.println("CONFIG WiFi apagada!");
+
   Serial.println();
   Serial.println();
   Serial.println("ReefBlueSky Balling Dosing v1.0.0");
@@ -100,7 +114,6 @@ void setup() {
 void generateEspUid() {
   espUid = generateDoserId();
 }
-
 // ============================================================================
 // MAIN LOOP
 // ============================================================================
@@ -126,39 +139,45 @@ void loop() {
     delay(100);
     return;
   }
-  
+
   // 4) Botão de configuração
   handleConfigButton();
 
   // 5) Cloud
-  if (cloudAuth) {
-    if (cloudAuth->isAuthenticated()) {
-      cloudAuth->ensureTokenFresh();
+  static uint32_t lastCmdCheck = 0;
 
-      // Status periódico (30s)
-      if (now - lastStatus > 30000) {
-        DynamicJsonDocument statusDoc(512);
-        doser->buildPumpsStatusJson(statusDoc);
-        cloudAuth->sendDoserStatus(now / 1000, WiFi.RSSI(), statusDoc);
-        lastStatus = now;
-      }
+  if (cloudAuth && cloudAuth->isAuthenticated()) {
+    cloudAuth->ensureTokenFresh();
 
-      // Handshake periódico (5min)
-      if (now - lastHandshake > 300000) {
-        DynamicJsonDocument configDoc(8192);
-        if (cloudAuth->fetchDoserConfig(configDoc)) {
-          doser->loadFromServer(configDoc);
-        }
-        lastHandshake = now;
+    // comandos a cada 1s
+    if (doser && (now - lastCmdCheck > 1000)) {
+      cloudAuth->processCommands(doser);
+      lastCmdCheck = now;
+    }
+
+    // Status periódico (30s)
+    if (now - lastStatus > 30000) {
+      DynamicJsonDocument statusDoc(512);
+      doser->buildPumpsStatusJson(statusDoc);
+      cloudAuth->sendDoserStatus(now / 1000, WiFi.RSSI(), statusDoc);
+      lastStatus = now;
+    }
+
+    // Handshake periódico (5min)
+    if (now - lastHandshake > 300000) {
+      DynamicJsonDocument configDoc(8192);
+      if (cloudAuth->fetchDoserConfig(configDoc)) {
+        doser->loadFromServer(configDoc);
       }
-    } else {
-      // Tentar autenticar se ainda não estiver
-      if (WiFi.status() == WL_CONNECTED) {
-        cloudAuth->init(
-          wifiSetup->getServerUrl(),
-          wifiSetup->getServerUsername(),
-          wifiSetup->getServerPassword());
-      }
+      lastHandshake = now;
+    }
+  } else {
+    // Tentar autenticar se ainda não estiver
+    if (WiFi.status() == WL_CONNECTED) {
+      cloudAuth->init(
+        wifiSetup->getServerUrl(),
+        wifiSetup->getServerUsername(),
+        wifiSetup->getServerPassword());
     }
   }
 
@@ -183,6 +202,7 @@ void loop() {
   yield();
   delay(50);
 }
+
 
 
 // ============================================================================
