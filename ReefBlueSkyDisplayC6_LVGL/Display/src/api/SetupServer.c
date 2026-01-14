@@ -211,8 +211,11 @@ static esp_err_t api_setup_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+  
     nvs_storage_save_wifi_credentials(j_ssid->valuestring, j_pass->valuestring);
+    nvs_storage_add_wifi_network(j_ssid->valuestring, j_pass->valuestring);
     nvs_storage_save_auth_credentials(j_user->valuestring, j_pwd->valuestring);
+
 
     cJSON_Delete(root);
 
@@ -275,6 +278,16 @@ static esp_err_t api_status_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+
+static esp_err_t captive_redirect_handler(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
+
 esp_err_t setup_server_start(void)
 {
     if (s_server) {
@@ -323,6 +336,30 @@ esp_err_t setup_server_start(void)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(s_server, &api_status);
+
+        httpd_uri_t gen204 = {
+        .uri      = "/generate_204",
+        .method   = HTTP_GET,
+        .handler  = captive_redirect_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(s_server, &gen204);
+
+    httpd_uri_t apple = {
+        .uri      = "/hotspot-detect.html",
+        .method   = HTTP_GET,
+        .handler  = captive_redirect_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(s_server, &apple);
+
+    httpd_uri_t win_ncsi = {
+        .uri      = "/ncsi.txt",
+        .method   = HTTP_GET,
+        .handler  = captive_redirect_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(s_server, &win_ncsi);
 
     return ESP_OK;
 }

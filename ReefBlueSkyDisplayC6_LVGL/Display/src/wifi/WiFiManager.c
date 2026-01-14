@@ -4,6 +4,8 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+#include "NVSStorage.h"
+
 static const char *TAG = "WiFiMgr";
 
 static wifi_state_t s_state = WIFI_STATE_IDLE;
@@ -21,6 +23,58 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "WiFi got IP");
         s_state = WIFI_STATE_CONNECTED;
     }
+}
+
+esp_err_t wifi_manager_connect_auto(void)
+{
+    wifi_network_t nets[WIFI_MAX_NETWORKS];
+    uint32_t count = 0;
+
+
+    if (!nvs_storage_load_wifi_networks(nets, WIFI_MAX_NETWORKS, &count) || count == 0) {
+        ESP_LOGW(TAG, "No WiFi networks stored in NVS");
+        return ESP_FAIL;
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+        ESP_LOGI(TAG, "Trying WiFi %u/%u (SSID=%s)", i + 1, count, nets[i].ssid);
+
+        wifi_config_t wifi_cfg = { 0 };
+        strncpy((char *)wifi_cfg.sta.ssid, nets[i].ssid, sizeof(wifi_cfg.sta.ssid) - 1);
+        wifi_cfg.sta.ssid[sizeof(wifi_cfg.sta.ssid) - 1] = '\0';
+
+        strncpy((char *)wifi_cfg.sta.password, nets[i].password, sizeof(wifi_cfg.sta.password) - 1);
+        wifi_cfg.sta.password[sizeof(wifi_cfg.sta.password) - 1] = '\0';
+
+        wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
+        s_state = WIFI_STATE_CONNECTING;
+
+        esp_err_t err = esp_wifi_connect();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_wifi_connect failed: %d", err);
+            s_state = WIFI_STATE_FAILED;
+            continue;
+        }
+
+        // Espera um pouco pela conexão
+        int retries = 0;
+        while (s_state == WIFI_STATE_CONNECTING && retries < 40) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            retries++;
+        }
+
+        if (s_state == WIFI_STATE_CONNECTED) {
+            ESP_LOGI(TAG, "Connected to WiFi (SSID=%s)", nets[i].ssid);
+            return ESP_OK;
+        }
+
+        ESP_LOGW(TAG, "Failed to connect to %s, trying next...", nets[i].ssid);
+    }
+
+    ESP_LOGE(TAG, "All stored WiFi networks failed");
+    return ESP_FAIL;
 }
 
 esp_err_t wifi_manager_init(void)
@@ -57,10 +111,17 @@ esp_err_t wifi_manager_init(void)
 
 esp_err_t wifi_manager_connect_sta(const char *ssid, const char *password)
 {
+    nvs_storage_add_wifi_network(ssid, password);
+
     wifi_config_t wifi_cfg = { 0 };
-    snprintf((char *)wifi_cfg.sta.ssid,     sizeof(wifi_cfg.sta.ssid),     "%s", ssid);
-    snprintf((char *)wifi_cfg.sta.password, sizeof(wifi_cfg.sta.password), "%s", password);
+    strncpy((char *)wifi_cfg.sta.ssid, ssid, sizeof(wifi_cfg.sta.ssid) - 1);
+    wifi_cfg.sta.ssid[sizeof(wifi_cfg.sta.ssid) - 1] = '\0';
+
+    strncpy((char *)wifi_cfg.sta.password, password, sizeof(wifi_cfg.sta.password) - 1);
+    wifi_cfg.sta.password[sizeof(wifi_cfg.sta.password) - 1] = '\0';
+
     wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
 
@@ -73,6 +134,8 @@ esp_err_t wifi_manager_connect_sta(const char *ssid, const char *password)
     return err;
 }
 
+esp_err_t wifi_manager_connect_auto(void);
+
 wifi_state_t wifi_manager_get_state(void)
 {
     return s_state;
@@ -81,4 +144,15 @@ wifi_state_t wifi_manager_get_state(void)
 bool wifi_manager_is_connected(void)
 {
     return s_state == WIFI_STATE_CONNECTED;
+}
+
+void wifi_manager_stop_ap(void)
+{
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+
+    if (mode == WIFI_MODE_APSTA) {
+        ESP_LOGI(TAG, "Switching WiFi mode to STA only (stopping AP)");
+        esp_wifi_set_mode(WIFI_MODE_STA);  // desliga AP, mantém STA
+    }
 }

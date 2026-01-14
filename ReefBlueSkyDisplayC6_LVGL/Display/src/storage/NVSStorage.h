@@ -5,6 +5,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define WIFI_MAX_NETWORKS 10
+
+typedef struct {
+    char ssid[33];
+    char password[65];
+} wifi_network_t;
+
+bool nvs_storage_add_wifi_network(const char *ssid, const char *password);
+bool nvs_storage_load_wifi_networks(wifi_network_t *out, uint32_t max, uint32_t *out_count);
+
 
 esp_err_t nvs_storage_init(void);
 

@@ -3,7 +3,7 @@
 #include "esp_log.h"
 #include <string.h>
 
-#define AP_SSID     "ReefBlueSky-Setup"
+#define AP_SSID     "ReefBlueSkyLCD-Setup"
 #define AP_PASSWORD "12345678"
 
 static const char *TAG = "AP";

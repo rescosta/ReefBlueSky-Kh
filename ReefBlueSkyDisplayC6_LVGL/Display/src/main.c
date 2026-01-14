@@ -23,13 +23,10 @@
 
 #define NVS_NAMESPACE "reefbluesky"
 bool g_wifi_status = false;
-static lv_obj_t *status_label;
-
-
 
 typedef struct {
     float kh;
-    float health;
+    float health; 
     bool  has_data;
 } cached_summary_t;
 
@@ -39,6 +36,7 @@ static cached_summary_t g_cached_summary;
 static const char *TAG = "MAIN";
 
 static void start_setup_mode(void);
+
 void save_cached_summary_to_nvs(const cached_summary_t *c);
 void load_cached_summary_from_nvs(cached_summary_t *c);
 
@@ -52,62 +50,45 @@ static void time_sync_notification_cb(struct timeval *tv)
 
 void time_init(void)
 {
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
-    sntp_set_time_sync_notification_cb(time_sync_notification_cb);
-    sntp_init();
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "time.google.com");
+    esp_sntp_set_time_sync_notification_cb(time_sync_notification_cb);
+    esp_sntp_init();
 
-    // Brasília sem horário de verão
     setenv("TZ", "BRT3", 1);
     tzset();
 }
+
 
 // futuro: #include "api/AuthClient.h"
 
 static void login_task(void *arg)
 {
-    char ssid[33] = {0};
-    char pass[65] = {0};
-
     while (1) {
-        if (!nvs_storage_load_wifi_credentials(ssid, sizeof(ssid),
-                                               pass, sizeof(pass))) {
-            ESP_LOGW(TAG, "No WiFi credentials in NVS, starting setup AP");
-            start_setup_mode();
-            vTaskDelay(pdMS_TO_TICKS(10000));
+        // Tenta conectar em qualquer rede salva (multi‑WiFi)
+        if (wifi_manager_connect_auto() != ESP_OK) {
+            ESP_LOGW(TAG, "Nenhuma rede conectou, entrando em modo setup");
+            start_setup_mode();                 // AP + DNS + HTTP (captive)
+            vTaskDelay(pdMS_TO_TICKS(30000));   // espera 30s e tenta de novo
             continue;
         }
 
-        ESP_LOGI(TAG, "Connecting to WiFi SSID=%s", ssid);
-        wifi_manager_connect_sta(ssid, pass);
+        ESP_LOGI(TAG, "WiFi conectado, seguindo fluxo normal");
+        wifi_manager_stop_ap();   // desliga AP de setup, se estiver ligado
 
-        int tries = 0;
-        while (!wifi_manager_is_connected() && tries < 40) { // ~20s
-            vTaskDelay(pdMS_TO_TICKS(500));
-            tries++;
-        }
-
-        if (!wifi_manager_is_connected()) {
-            ESP_LOGW(TAG, "WiFi connect failed, retrying in 10s");
-            g_wifi_status = false;
-            vTaskDelay(pdMS_TO_TICKS(10000));
-            continue;
-        }
-
-        ESP_LOGI(TAG, "WiFi connected");
-
-        // Sincroniza hora via NTP
+        // NTP
         time_init();
 
-        // Login + registro do display no servidor
+        // Login + registro do display
         if (display_client_login_and_register() == ESP_OK) {
             ESP_LOGI(TAG, "Display login/register OK");
             display_client_load_kh_devices();
             g_wifi_status = true;
         } else {
-            ESP_LOGW(TAG, "Display login/register FAILED, retrying in 10s");
+            ESP_LOGW(TAG, "Login falhou, voltando para setup");
             g_wifi_status = false;
-            vTaskDelay(pdMS_TO_TICKS(10000));
+            start_setup_mode();                 // volta para captive
+            vTaskDelay(pdMS_TO_TICKS(30000));
             continue;
         }
 
@@ -116,9 +97,16 @@ static void login_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(10000));
         }
 
-        // Perdeu WiFi → marca offline e volta pro loop
         g_wifi_status = false;
+        // Saiu do while -> perdeu Wi‑Fi, volta para o loop e tenta de novo
     }
+}
+
+static void start_setup_mode(void)
+{
+    ap_start(NULL, NULL);      // sobe o soft-AP 192.168.4.1
+    // captdnsInit();          // deixa comentado por enquanto
+    setup_server_start();      // HTTP server com SETUP_HTML e /api/*
 }
 
 
@@ -156,13 +144,6 @@ static void reset_button_task(void *arg)
 
         vTaskDelay(check_interval);
     }
-}
-
-static void start_setup_mode(void)
-{
-    ap_start(NULL, NULL);     // sobe o soft-AP 192.168.4.1
-    captdnsInit();            // DNS que responde tudo para 192.168.4.1
-    setup_server_start();     // HTTP server com SETUP_HTML e /api/*
 }
 
 static void summary_task(void *arg)

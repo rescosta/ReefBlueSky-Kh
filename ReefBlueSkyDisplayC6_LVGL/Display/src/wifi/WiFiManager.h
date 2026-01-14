@@ -17,8 +17,12 @@ typedef enum {
 
 esp_err_t   wifi_manager_init(void);
 esp_err_t   wifi_manager_connect_sta(const char *ssid, const char *password);
+esp_err_t   wifi_manager_connect_auto(void);
 wifi_state_t wifi_manager_get_state(void);
 bool        wifi_manager_is_connected(void);
+
+
+void         wifi_manager_stop_ap(void);
 
 #ifdef __cplusplus
 }
