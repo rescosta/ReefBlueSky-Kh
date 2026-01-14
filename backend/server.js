@@ -873,6 +873,10 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(__dirname + '/public/dashboard-main.html');
 });
 
+app.get('/dashboard-account.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard-account.html'));
+});
+
 
 
 // ============================================================================
