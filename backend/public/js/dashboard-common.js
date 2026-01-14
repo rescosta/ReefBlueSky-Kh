@@ -135,6 +135,7 @@ function getTopbarHtml() {
             <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
             <a href="dashboard-dosing.html" id="nav-dosing">Dosadora</a>
             <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
+            <a href="/dashboard/account" id="menu-account">Minha conta</a>
           </nav>
       </div>
       <div class="topbar-right">
