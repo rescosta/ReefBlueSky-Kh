@@ -254,6 +254,9 @@ async function loadPumps(deviceId) {
     renderConfigTable();
     updateCalibrationRateLabel(); 
     renderAllPumpsRateList();
+    renderDashboardSummary();
+    renderDashboardCharts();
+
 
   } catch (err) {
     console.error('❌ Erro ao carregar bombas:', err);
@@ -348,7 +351,6 @@ function updateCalibrationRateLabel() {
   }
 }
 
-
 function renderAllPumpsRateList() {
   const container = document.getElementById('allPumpsRateList');
   if (!container) return;
@@ -375,6 +377,76 @@ function renderAllPumpsRateList() {
   container.innerHTML = lines.join('<br>');
 }
 
+
+function renderDashboardSummary() {
+  const container = document.getElementById('dashboardPumpsSummary');
+  if (!container) return;
+
+  if (!pumps || pumps.length === 0) {
+    container.innerHTML = '<div class="small-text">Nenhuma bomba encontrada.</div>';
+    return;
+  }
+
+  const rows = pumps.map((pump, idx) => {
+    const daily = pump.max_daily_ml || pump.daily_max || 0;
+    const name = pump.name || `Bomba ${idx + 1}`;
+    const on = pump.enabled;
+    const statusClass = on ? 'btn-on' : 'btn-off';
+    const statusText = on ? 'ON' : 'OFF';
+
+    return `
+      <div class="dash-row">
+        <div class="dash-col dash-pump-num">${idx + 1}</div>
+        <div class="dash-col dash-pump-name">${name}</div>
+        <div class="dash-col dash-pump-daily">${formatMl(daily)} mL/dia</div>
+        <div class="dash-col dash-pump-status">
+          <span class="btn-status ${statusClass}">${statusText}</span>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="dash-header">
+      <div class="dash-col dash-pump-num">Bomba</div>
+      <div class="dash-col dash-pump-name">Nome</div>
+      <div class="dash-col dash-pump-daily">Dosagem diária</div>
+      <div class="dash-col dash-pump-status">Status</div>
+    </div>
+    ${rows.join('')}
+  `;
+}
+
+function renderDashboardCharts() {
+  const container = document.getElementById('dashboardPumpsCharts');
+  if (!container) return;
+
+  if (!pumps || pumps.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const blocks = pumps.map((pump, idx) => {
+    const name = pump.name || `Bomba ${idx + 1}`;
+    const total = pump.container_volume_ml || pump.container_size || 0;
+    const current = pump.current_volume_ml || pump.current_volume || 0;
+    const pct = total > 0 ? Math.max(0, Math.min(100, (current * 100) / total)) : 0;
+
+    return `
+      <div class="reservoir-card">
+        <div class="reservoir-header">
+          <span>${idx + 1} - ${name}</span>
+          <span>${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)</span>
+        </div>
+        <div class="reservoir-bar">
+          <div class="reservoir-fill" style="width:${pct}%;"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = blocks.join('');
+}
 
 
 // ===== EDIT MODAL =====
