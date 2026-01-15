@@ -26,6 +26,7 @@ FILES_HTML=(
   "dashboard-main.html"
   "dashboard-sistema.html"
   "dashboard-dosing.html"
+  "dashboard-account.html"
 
 )
 
@@ -38,6 +39,7 @@ FILES_JS=(
   "dashboard-sistema.js"
   "dashboard-common.js"
   "dashboard-dosing.js"
+  "dashboard-account.js"
 )
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
