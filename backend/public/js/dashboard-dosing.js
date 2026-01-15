@@ -15,6 +15,20 @@ let calibrationSecondsTotal = 60;
 let calibrationSecondsLeft = 0;
 
 
+function parseMl(valueStr) {
+  if (!valueStr) return NaN;
+  return parseFloat(String(valueStr).trim().replace(',', '.'));
+}
+
+function formatMl(valueNum) {
+  if (valueNum == null || Number.isNaN(valueNum)) return '';
+  return Number(valueNum).toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+}
+
+
 // ===== AUTH =====
 function getToken() {
   // se o login grava em 'authToken', usa esse
@@ -304,7 +318,7 @@ function renderConfigTable() {
             <td>${containerSize}</td>
             <td>${currentVolume}</td>
             <td>${alarmPercent}%</td>
-            <td>${maxDaily}</td>
+            <td>${formatMl(maxDaily)}</td>
             <td><button class="btn-edit" onclick="openEditModal(${index})">Editar</button></td>
         `;
         tbody.appendChild(row);
@@ -373,7 +387,8 @@ function openEditModal(index) {
     document.getElementById('editContainerSize').value = pump.container_volume_ml || pump.container_size || 0;
     document.getElementById('editCurrentVolume').value = pump.current_volume_ml || pump.current_volume || 0;
     document.getElementById('editAlarmPercent').value = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-    document.getElementById('editDailyMax').value = pump.max_daily_ml || pump.daily_max || 0;
+    document.getElementById('editDailyMax').value = formatMl(pump.max_daily_ml || pump.daily_max || 0);
+
 
     document.getElementById('editModal').style.display = 'flex';
 }
@@ -391,7 +406,7 @@ async function saveEditModal() {
     container_size: parseInt(document.getElementById('editContainerSize').value) || 0,
     current_volume: parseInt(document.getElementById('editCurrentVolume').value) || 0,
     alarm_percent: parseInt(document.getElementById('editAlarmPercent').value) || 0,
-    daily_max: parseInt(document.getElementById('editDailyMax').value) || 0
+    daily_max: parseMl(document.getElementById('editDailyMax').value) || 0
   };
 
   console.log('💾 Salvando bomba:', index, data);
@@ -458,7 +473,7 @@ function openEditScheduleModal(scheduleId) {
   document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
   document.getElementById('editStartTime').value   = schedule.start_time || '';
   document.getElementById('editEndTime').value     = schedule.end_time || '';
-  document.getElementById('editVolumePerDay').value = schedule.volume_per_day_ml || 0;
+  document.getElementById('editVolumePerDay').value = formatMl(schedule.volume_per_day_ml || 0);
 
   // abre modal
   document.getElementById('editScheduleModal').style.display = 'flex';
@@ -489,7 +504,7 @@ async function saveEditScheduleModal() {
       doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
       start_time: document.getElementById('editStartTime').value,
       end_time: document.getElementById('editEndTime').value,
-      volume_per_day_ml: parseFloat(document.getElementById('editVolumePerDay').value) || 0,
+      volume_per_day_ml: parseMl(document.getElementById('editVolumePerDay').value) || 0,
       min_gap_minutes: parseInt(document.getElementById('editMinGapMinutes').value) || 30
     };
 
@@ -607,7 +622,7 @@ function renderScheduleTableAll() {
       <td>${daysText || '---'}</td>
       <td>${schedule.doses_per_day || 0}</td>
       <td>${startTime} - ${endTime}</td>
-      <td>${schedule.volume_per_day_ml || 0}</td>
+      <td>${formatMl(schedule.volume_per_day_ml || 0)}</td>
       <td>
         <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
       </td>
@@ -718,7 +733,7 @@ function renderScheduleTable() {
           <td>${daysText || '---'}</td>
           <td>${schedule.doses_per_day || 0}</td>
           <td>${startTime} - ${endTime}</td>
-          <td>${schedule.volume_per_day_ml || 0}</td>
+          <td>${formatMl(schedule.volume_per_day_ml || 0)}</td>
           <td>
             <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
           </td>
@@ -755,7 +770,7 @@ async function createSchedule() {
     doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10),
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day: parseInt(document.getElementById('volumePerDay').value, 10)
+    volume_per_day: parseMl(document.getElementById('volumePerDay').value) || 0
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
@@ -811,7 +826,9 @@ async function deleteSchedule(scheduleId) {
 // ===== MANUAL DOSE =====
 async function applyManualDose() {
   const pumpIndex = parseInt(document.getElementById('pumpSelectManual').value, 10);
-  const volume = parseFloat(document.getElementById('manualVolume').value);
+  const volume = parseMl(document.getElementById('manualVolume').value);
+
+
 
   if (!volume || volume <= 0) {
     showError('Digite um volume válido');
@@ -921,7 +938,8 @@ async function abortCalibration() {
 
 async function saveCalibration() {
   const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
-  const measuredVolume = parseFloat(document.getElementById('measuredVolume').value);
+  const measuredVolume = parseMl(document.getElementById('measuredVolume').value);
+
 
   if (!measuredVolume || measuredVolume <= 0) {
     showError('Digite um volume válido');
