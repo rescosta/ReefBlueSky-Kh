@@ -616,6 +616,50 @@
           min-width: 120px;
         }
 
+        .dash-header, .dash-row {
+          display: grid;
+          grid-template-columns: 70px 1fr 160px 120px;
+          gap: 8px;
+          align-items: center;
+          padding: 6px 8px;
+        }
+
+        .dash-header {
+          font-size: 13px;
+          color: #9ca3af;
+          border-bottom: 1px solid #1f2937;
+        }
+
+        .dash-row {
+          font-size: 14px;
+        }
+
+        .reservoir-card {
+          margin-top: 12px;
+        }
+
+        .reservoir-header {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          margin-bottom: 4px;
+        }
+
+        .reservoir-bar {
+          width: 100%;
+          height: 10px;
+          background: #020617;
+          border-radius: 999px;
+          border: 1px solid #1f2937;
+          overflow: hidden;
+        }
+
+        .reservoir-fill {
+          height: 100%;
+          background: #10b981;
+        }
+
+
 
         @media (max-width: 768px) {
             .controls {
@@ -673,32 +717,18 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('configTab', this)">Configurações</button>
+            <button class="tab-btn active" onclick="switchTab('tab-dashboard', this)">Dashboard</button>
             <button class="tab-btn" onclick="switchTab('agendaTab', this)">Agenda</button>
             <button class="tab-btn" onclick="switchTab('manualTab', this)">Manual</button>
+            <button class="tab-btn" onclick="switchTab('configTab', this)">Configurações</button>
             <button class="tab-btn" onclick="switchTab('calibrationTab', this)">Calibração</button>
         </div>
 
-        <!-- Config Tab -->
-        <div id="configTab" class="tab-content active">
-            <h2>Configurar Bombas</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>BOMBA</th>
-                        <th>NOME</th>
-                        <th>STATUS</th>
-                        <th>VOL. RECIPIENTE (ML)</th>
-                        <th>VOL. ATUAL (ML)</th>
-                        <th>ALARME %</th>
-                       <!-- <th>MÁX. DIÁRIO (ML)</th> -->
-                        <th>AÇÃO</th>
-                    </tr>
-                </thead>
-                <tbody id="configTableBody">
-                    <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
-                </tbody>
-            </table>
+
+       <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content">
+          <div id="dashboardPumpsSummary"></div>
+          <div id="dashboardPumpsCharts"></div>
         </div>
 
         <!-- Agenda Tab -->
@@ -744,6 +774,28 @@
                 <input type="number" id="manualVolume" min="0" value="0">
             </div>
             <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
+        </div>
+
+        <!-- Config Tab -->
+        <div id="configTab" class="tab-content active">
+            <h2>Configurar Bombas</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>BOMBA</th>
+                        <th>NOME</th>
+                        <th>STATUS</th>
+                        <th>VOL. RECIPIENTE (ML)</th>
+                        <th>VOL. ATUAL (ML)</th>
+                        <th>ALARME %</th>
+                       <!-- <th>MÁX. DIÁRIO (ML)</th> -->
+                        <th>AÇÃO</th>
+                    </tr>
+                </thead>
+                <tbody id="configTableBody">
+                    <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+                </tbody>
+            </table>
         </div>
 
         <!-- Calibration Tab -->
@@ -989,8 +1041,6 @@
       </button>
       </div>
     </div>
-
-
 
      <div class="footer">
         <div id="userInfo">Usuário --</div>
