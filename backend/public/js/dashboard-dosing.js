@@ -446,7 +446,6 @@ function openEditModal(index) {
     document.getElementById('editContainerSize').value = pump.container_volume_ml || pump.container_size || 0;
     document.getElementById('editCurrentVolume').value = pump.current_volume_ml || pump.current_volume || 0;
     document.getElementById('editAlarmPercent').value = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-    document.getElementById('editDailyMax').value = formatMl(pump.max_daily_ml || pump.daily_max || 0);
 
 
     document.getElementById('editModal').style.display = 'flex';
