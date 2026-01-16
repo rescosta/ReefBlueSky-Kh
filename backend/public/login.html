@@ -231,10 +231,33 @@
                 </div>
             </div>
 
+            <div class="buttons-row">
+                <button type="button" id="loginBtn">
+                    Entrar no Painel
+                </button>
+                <button type="button" id="registerBtn" class="btn-secondary">
+                    Registrar e entrar
+                </button>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+        </form>
+
+        <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
+
+
+       
+        <!-- Step 2: verificação de conta (apenas código) -->
+        <div id="step-2" style="display:none; margin-top: 20px;">
+          <div class="form-group">
+            <label for="verificationCodeStep2">Código de verificação (6 dígitos):</label>
+            <input id="verificationCodeStep2" type="text" maxlength="6" />
+          </div>
+
             <div class="form-group">
-              <label for="timezone">🌍 Fuso horário:</label>
-              <select id="timezone" name="timezone">
-                <option value="">Detectar automaticamente</option>
+                <label for="timezoneStep2">🌍 Fuso horário:</label>
+                <select id="timezoneStep2" name="timezoneStep2">
 
                 <!-- Américas -->
                 <option value="America/Sao_Paulo">America/Sao_Paulo (Brasil)</option>
@@ -274,29 +297,6 @@
               </select>
             </div>
 
-            <div class="buttons-row">
-                <button type="button" id="loginBtn">
-                    Entrar no Painel
-                </button>
-                <button type="button" id="registerBtn" class="btn-secondary">
-                    Registrar e entrar
-                </button>
-            </div>
-
-            <div class="error-message" id="errorMessage"></div>
-            <div class="success-message" id="successMessage"></div>
-        </form>
-
-        <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
-
-
-       
-        <!-- Step 2: verificação de conta (apenas código) -->
-        <div id="step-2" style="display:none; margin-top: 20px;">
-          <div class="form-group">
-            <label for="verificationCodeStep2">Código de verificação (6 dígitos):</label>
-            <input id="verificationCodeStep2" type="text" maxlength="6" />
-          </div>
           <button type="button" onclick="confirmCode()">Confirmar código</button>
         </div>
 
@@ -442,8 +442,6 @@
       async function registerAndAskCode() {
         const email = emailInput.value.trim();
         const password = passwordInput.value;
-        const tzSelect = document.getElementById('timezone');
-        const timezone = tzSelect ? tzSelect.value.trim() : '';
 
         errorMessage.style.display = 'none';
         successMessage.style.display = 'none';
@@ -464,7 +462,7 @@
           const response = await fetch('/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, timezone })
+            body: JSON.stringify({ email, password })
           });
 
           const data = await response.json();
@@ -582,6 +580,8 @@
       async function confirmCode() {
         const code = document.getElementById('verificationCodeStep2').value.trim();
         const email = lastRegisteredEmail || emailInput.value.trim();
+        const tzSel2 = document.getElementById('timezoneStep2');
+        const timezone = tzSel2 ? tzSel2.value.trim() : '';
 
         if (!email || !code) {
           showError('Informe o código de verificação.');
@@ -601,6 +601,24 @@
             showError(result.message || 'Código inválido ou expirado.');
             return;
           }
+
+        if (timezone) {
+          try {
+            await fetch('/api/v1/account/profile', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + result.data.token,
+              },
+              body: JSON.stringify({
+                name: '',          // pode ajustar depois, quando tiver campo nome
+                timezone: timezone
+              })
+            });
+          } catch (e) {
+            console.warn('Falha ao salvar timezone após verify-code', e);
+          }
+        }
 
           saveTokensAndRedirect(result.data);
         } catch (err) {
@@ -628,7 +646,7 @@
         console.log('Dica: pagins de teste');
         showStep(1);
 
-        const tzSelect = document.getElementById('timezone');
+        const tzSelect = document.getElementById('timezoneStep2');
         if (tzSelect) {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
