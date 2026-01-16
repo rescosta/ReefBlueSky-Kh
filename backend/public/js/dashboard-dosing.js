@@ -1,6 +1,6 @@
 // Dashboard Dosadora
 // ================================================
-//06
+
 
 let currentDevice = null;
 let currentPumpIndex = 0;
@@ -444,8 +444,12 @@ function renderDashboardCharts() {
             <div class="reservoir-fill" style="width:${pct}%;"></div>
           </div>
           <div class="reservoir-info">
-            ${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)<br>
-            ${formatMl(daily)} mL/dia
+            <div class="reservoir-info-top">
+              ${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)
+            </div>
+            <div class="reservoir-info-top">
+              ${formatMl(daily)} mL/dia
+            </div>
             <span class="reservoir-status">
               <span class="btn-status ${statusClass}">${statusText}</span>
             </span>
