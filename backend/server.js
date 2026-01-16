@@ -26,8 +26,6 @@ const dosingUserRoutes = require('./dosing-user-routes');
 const dosingIotRoutes  = require('./dosing-iot-routes'); 
 const dosingDeviceRoutes = require('./dosing-device-routes');
 
-const path = require('path');
-
 const axios = require('axios');
 
 dotenv.config();
@@ -875,10 +873,6 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(__dirname + '/public/dashboard-main.html');
 });
 
-app.get('/dashboard-account.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard-account.html'));
-});
-
 
 
 // ============================================================================
@@ -1724,7 +1718,7 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
     conn = await pool.getConnection();
 
     const rows = await conn.query(
-      'SELECT id, email, createdAt, updatedAt, role FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, email, name, timezone, createdAt, updatedAt, role FROM users WHERE id = ? LIMIT 1',
       [userId]
     );
 
@@ -1742,6 +1736,8 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
       data: {
         id: user.id,
         email: user.email,
+        name: user.name,
+        timezone: user.timezone,
         role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
@@ -1764,6 +1760,64 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
     }
   }
 });
+
+// Atualizar dados básicos da conta (nome, timezone)
+app.put('/api/v1/account/profile', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { name, timezone } = req.body || {};
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ success: false, message: 'Nome não pode ser vazio.' });
+  }
+
+  // timezone pode ser opcional; se quiser obrigar, valide aqui
+  const safeName = name.trim();
+
+  let safeTimezone = timezone || null;
+  if (typeof safeTimezone === 'string') {
+    safeTimezone = safeTimezone.trim() || null;
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query(
+      'UPDATE users SET name = ?, timezone = ?, updatedAt = NOW() WHERE id = ?',
+      [safeName, safeTimezone, userId]
+    );
+
+    // reconsulta para devolver os dados atualizados
+    const rows = await conn.query(
+      'SELECT id, email, name, timezone, createdAt, updatedAt, role FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Usuário não encontrado.' });
+    }
+    const user = rows[0];
+
+    return res.json({
+      success: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        timezone: user.timezone,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    });
+  } catch (err) {
+    console.error('API account/profile error:', err.message);
+    return res.status(500).json({ success: false, message: 'Erro ao atualizar perfil.' });
+  } finally {
+    if (conn) {
+      try { conn.release(); } catch (e) {}
+    }
+  }
+});
+
 
 app.get('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => {
   const userId = req.user.userId;
