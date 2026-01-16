@@ -224,9 +224,17 @@ async function deleteAccount() {
   }
 }
 
-// Bind de eventos
+function initAccountTopbar() {
+  if (window.DashboardCommon && typeof DashboardCommon.initTopbar === 'function') {
+    DashboardCommon.initTopbar(); // monta o mesmo topo de todas as telas
+  }
+
+  const accountLink = document.getElementById('menu-account');
+  if (accountLink) accountLink.classList.add('active');
+}
+
 function initAccountPage() {
-  initTopbar();
+  initAccountTopbar();   // aqui chama o topo comum
 
   document.getElementById('btnSaveProfile')?.addEventListener('click', (e) => {
     e.preventDefault();
@@ -251,6 +259,7 @@ function initAccountPage() {
   loadAccountProfile();
   loadDevices();
 }
+
 
 // Entrada
 document.addEventListener('DOMContentLoaded', initAccountPage);
