@@ -28,6 +28,13 @@ function formatMl(valueNum) {
   });
 }
 
+function formatNumberBr(valueNum, decimals = 1) {
+  if (valueNum == null || Number.isNaN(valueNum)) return '--';
+  return Number(valueNum)
+    .toFixed(decimals)
+    .replace('.', ',');
+}
+
 
 // ===== AUTH =====
 function getToken() {
@@ -319,7 +326,6 @@ function renderConfigTable() {
             <td>${containerSize}</td>
             <td>${currentVolume}</td>
             <td>${alarmPercent}%</td>
-            <td>${formatMl(maxDaily)}</td>
             <td><button class="btn-edit" onclick="openEditModal(${index})">Editar</button></td>
         `;
         tbody.appendChild(row);
@@ -343,7 +349,7 @@ function updateCalibrationRateLabel() {
   if (r > 0 && !Number.isNaN(r)) {
     const perMin = r * 60;
     label.textContent =
-      `Taxa atual desta bomba: ${r.toFixed(3)} ml/s (${perMin.toFixed(1)} ml/min)`;
+      `Taxa atual desta bomba: ${formatNumberBr(r, 3)} ml/s (${formatNumberBr(perMin, 1)} ml/min)`;
   } else {
     label.textContent = 'Taxa ainda não calibrada para esta bomba.';
   }
@@ -365,10 +371,10 @@ function renderAllPumpsRateList() {
 
     const name = pump.name || 'Bomba ' + (idx + 1);
 
-    if (r > 0 && !Number.isNaN(r)) {
-      const perMin = r * 60;
-      return `${idx + 1} - ${name}: ${r.toFixed(3)} ml/s (${perMin.toFixed(1)} ml/min)`;
-    }
+  if (r > 0 && !Number.isNaN(r)) {
+    const perMin = r * 60;
+    return `${idx + 1} - ${name}: ${formatNumberBr(r, 3)} ml/s (${formatNumberBr(perMin, 1)} ml/min)`;
+  }
     return `${idx + 1} - ${name}: -- (ainda não calibrada)`;
   });
 
@@ -1014,8 +1020,7 @@ async function saveCalibration() {
 
   if (result && result.data && typeof result.data.ml_per_second === 'number') {
     const rateNum = result.data.ml_per_second;
-    const rate = rateNum.toFixed(3);
-    showSuccess(`Calibração salva! Taxa: ${rate} ml/s`);
+    showSuccess(`Calibração salva! Taxa: ${formatNumberBr(rateNum, 3)} ml/s`);
     document.getElementById('measuredVolume').value = '';
 
     if (pumps[pumpIndex]) {
