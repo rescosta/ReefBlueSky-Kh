@@ -619,12 +619,14 @@
         .dashboard-header,
         .dashboard-row {
           display: grid;
-          grid-template-columns: 70px 1fr 130px 240px 140px; /* Bomba | Nome | Status | % Reservatório | Vol. Agendado */
+          /* Bomba | Nome | Status | % Reservatório | Vol. agendado */
+          grid-template-columns: 60px 1.2fr 110px 2.2fr 1fr;
           align-items: center;
           gap: 8px;
           padding: 6px 8px;
           font-size: 13px;
         }
+
 
         .dashboard-header {
           color: #9ca3af;
