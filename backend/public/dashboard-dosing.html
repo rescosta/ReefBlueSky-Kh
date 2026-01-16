@@ -616,48 +616,33 @@
           min-width: 120px;
         }
 
-        .dash-header, .dash-row {
+        .dashboard-header,
+        .dashboard-row {
           display: grid;
-          grid-template-columns: 70px 1fr 160px 120px;
-          gap: 8px;
+          grid-template-columns: 70px 1fr 130px 240px 140px; /* Bomba | Nome | Status | % Reservatório | Vol. Agendado */
           align-items: center;
+          gap: 8px;
           padding: 6px 8px;
+          font-size: 13px;
         }
 
-        .dash-header {
-          font-size: 13px;
+        .dashboard-header {
           color: #9ca3af;
           border-bottom: 1px solid #1f2937;
+          font-weight: 500;
         }
 
-        .dash-row {
-          font-size: 14px;
-        }
-
-        .reservoir-card {
-          margin-top: 8px;
-        }
-
-        .reservoir-row {
-          display: grid;
-          grid-template-columns: 0.8fr 2.2fr 1.5fr; /* nome | barra | info+status */
-          align-items: center;
-          gap: 16px;
+        .dashboard-row {
           font-size: 13px;
         }
 
-        .reservoir-label {
-          text-align: left;
-        }
-
-        .reservoir-header {
+        .dashboard-reservoir {
           display: flex;
-          justify-content: space-between;
-          font-size: 13px;
-          margin-bottom: 4px;
+          flex-direction: column;
+          gap: 4px;
         }
 
-        .reservoir-bar {
+        .dashboard-reservoir-bar {
           width: 100%;
           height: 8px;
           background: #020617;
@@ -666,26 +651,16 @@
           overflow: hidden;
         }
 
-        .reservoir-fill {
+        .dashboard-reservoir-fill {
           height: 100%;
           background: #10b981;
         }
 
-        .reservoir-info {
-          text-align: right;
-          font-size: 12px;
+        .dashboard-reservoir-text {
+          font-size: 11px;
           color: #9ca3af;
-          line-height: 1.3;
         }
 
-        .reservoir-info-top {
-          margin-bottom: 2px;
-        }
-
-        .reservoir-status {
-          display: inline-block;
-          margin-top: 2px;
-        }
 
         @media (max-width: 768px) {
             .controls {
@@ -753,7 +728,6 @@
 
        <!-- Dashboard Tab -->
         <div id="tab-dashboard" class="tab-content active">
-          <div id="dashboardPumpsSummary"></div>
           <div id="dashboardPumpsCharts"></div>
         </div>
 
