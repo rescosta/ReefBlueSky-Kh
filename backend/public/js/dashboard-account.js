@@ -233,8 +233,90 @@ function initAccountTopbar() {
   if (accountLink) accountLink.classList.add('active');
 }
 
+
+const TIMEZONES = [
+  // Brasil / América do Sul
+  { name: 'America/Sao_Paulo',    offset: 'UTC-03:00' },
+  { name: 'America/Bahia',        offset: 'UTC-03:00' },
+  { name: 'America/Fortaleza',    offset: 'UTC-03:00' },
+  { name: 'America/Recife',       offset: 'UTC-03:00' },
+  { name: 'America/Manaus',       offset: 'UTC-04:00' },
+  { name: 'America/Cuiaba',       offset: 'UTC-04:00' },
+  { name: 'America/Porto_Velho',  offset: 'UTC-04:00' },
+  { name: 'America/Rio_Branco',   offset: 'UTC-05:00' },
+  { name: 'America/Noronha',      offset: 'UTC-02:00' },
+
+  { name: 'America/Argentina/Buenos_Aires', offset: 'UTC-03:00' },
+  { name: 'America/Montevideo',  offset: 'UTC-03:00' },
+  { name: 'America/Santiago',    offset: 'UTC-03:00' },
+  { name: 'America/Bogota',      offset: 'UTC-05:00' },
+  { name: 'America/Lima',        offset: 'UTC-05:00' },
+  { name: 'America/Mexico_City', offset: 'UTC-06:00' },
+
+  // América do Norte
+  { name: 'America/New_York',    offset: 'UTC-05:00' },
+  { name: 'America/Chicago',     offset: 'UTC-06:00' },
+  { name: 'America/Denver',      offset: 'UTC-07:00' },
+  { name: 'America/Los_Angeles', offset: 'UTC-08:00' },
+  { name: 'America/Toronto',     offset: 'UTC-05:00' },
+  { name: 'America/Vancouver',   offset: 'UTC-08:00' },
+
+  // Europa
+  { name: 'Europe/London',   offset: 'UTC+00:00' },
+  { name: 'Europe/Lisbon',   offset: 'UTC+00:00' },
+  { name: 'Europe/Madrid',   offset: 'UTC+01:00' },
+  { name: 'Europe/Paris',    offset: 'UTC+01:00' },
+  { name: 'Europe/Berlin',   offset: 'UTC+01:00' },
+  { name: 'Europe/Rome',     offset: 'UTC+01:00' },
+  { name: 'Europe/Amsterdam',offset: 'UTC+01:00' },
+  { name: 'Europe/Brussels', offset: 'UTC+01:00' },
+  { name: 'Europe/Zurich',   offset: 'UTC+01:00' },
+  { name: 'Europe/Athens',   offset: 'UTC+02:00' },
+  { name: 'Europe/Moscow',   offset: 'UTC+03:00' },
+
+  // África / Oriente Médio
+  { name: 'Africa/Johannesburg', offset: 'UTC+02:00' },
+  { name: 'Africa/Cairo',        offset: 'UTC+02:00' },
+  { name: 'Asia/Jerusalem',      offset: 'UTC+02:00' },
+  { name: 'Asia/Riyadh',         offset: 'UTC+03:00' },
+  { name: 'Asia/Dubai',          offset: 'UTC+04:00' },
+
+  // Ásia / Oceania
+  { name: 'Asia/Kolkata',   offset: 'UTC+05:30' },
+  { name: 'Asia/Bangkok',   offset: 'UTC+07:00' },
+  { name: 'Asia/Singapore', offset: 'UTC+08:00' },
+  { name: 'Asia/Hong_Kong', offset: 'UTC+08:00' },
+  { name: 'Asia/Shanghai',  offset: 'UTC+08:00' },
+  { name: 'Asia/Tokyo',     offset: 'UTC+09:00' },
+  { name: 'Australia/Sydney',   offset: 'UTC+11:00' },
+  { name: 'Australia/Brisbane', offset: 'UTC+10:00' },
+  { name: 'Pacific/Auckland',  offset: 'UTC+13:00' },
+
+  // Genéricos
+  { name: 'UTC', offset: 'UTC+00:00' },
+];
+
+
+function populateTimezoneSelect() {
+  const select = document.getElementById('accountTimezone');
+  if (!select) return;
+
+  const sorted = [...TIMEZONES].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+
+  sorted.forEach((tz) => {
+    const opt = document.createElement('option');
+    opt.value = tz.name;
+    opt.textContent = `${tz.name} (${tz.offset})`;
+    select.appendChild(opt);
+  });
+}
+
+
+
 function initAccountPage() {
-  initAccountTopbar();   // aqui chama o topo comum
+  initAccountTopbar();   
 
   document.getElementById('btnSaveProfile')?.addEventListener('click', (e) => {
     e.preventDefault();
@@ -256,6 +338,7 @@ function initAccountPage() {
     deleteAccount();
   });
 
+  populateTimezoneSelect(); 
   loadAccountProfile();
   loadDevices();
 }
