@@ -254,7 +254,6 @@ async function loadPumps(deviceId) {
     renderConfigTable();
     updateCalibrationRateLabel(); 
     renderAllPumpsRateList();
-    renderDashboardSummary();
     renderDashboardCharts();
 
 
@@ -432,14 +431,25 @@ function renderDashboardCharts() {
     const current = pump.current_volume_ml || pump.current_volume || 0;
     const pct = total > 0 ? Math.max(0, Math.min(100, (current * 100) / total)) : 0;
 
+    const daily = pump.max_daily_ml || pump.daily_max || 0;
+    const on = pump.enabled;
+    const statusClass = on ? 'btn-on' : 'btn-off';
+    const statusText = on ? 'ON' : 'OFF';
+
     return `
       <div class="reservoir-card">
-        <div class="reservoir-header">
-          <span>${idx + 1} - ${name}</span>
-          <span>${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)</span>
-        </div>
-        <div class="reservoir-bar">
-          <div class="reservoir-fill" style="width:${pct}%;"></div>
+        <div class="reservoir-row">
+          <div class="reservoir-label">${idx + 1} - ${name}</div>
+          <div class="reservoir-bar">
+            <div class="reservoir-fill" style="width:${pct}%;"></div>
+          </div>
+          <div class="reservoir-info">
+            ${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)<br>
+            ${formatMl(daily)} mL/dia
+            <span class="reservoir-status">
+              <span class="btn-status ${statusClass}">${statusText}</span>
+            </span>
+          </div>
         </div>
       </div>
     `;
@@ -447,6 +457,7 @@ function renderDashboardCharts() {
 
   container.innerHTML = blocks.join('');
 }
+
 
 
 // ===== EDIT MODAL =====
