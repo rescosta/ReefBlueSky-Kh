@@ -333,7 +333,7 @@ function updateCalibrationRateLabel() {
   const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10) || 0;
   const pump = pumps[pumpIndex];
   if (!pump) {
-    label.textContent = 'Taxa: -- mL/s';
+    label.textContent = 'Taxa: -- ml/s';
     return;
   }
 
@@ -343,7 +343,7 @@ function updateCalibrationRateLabel() {
   if (r > 0 && !Number.isNaN(r)) {
     const perMin = r * 60;
     label.textContent =
-      `Taxa atual desta bomba: ${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
+      `Taxa atual desta bomba: ${r.toFixed(3)} ml/s (${perMin.toFixed(1)} ml/min)`;
   } else {
     label.textContent = 'Taxa ainda não calibrada para esta bomba.';
   }
@@ -367,7 +367,7 @@ function renderAllPumpsRateList() {
 
     if (r > 0 && !Number.isNaN(r)) {
       const perMin = r * 60;
-      return `${idx + 1} - ${name}: ${r.toFixed(3)} mL/s (${perMin.toFixed(1)} mL/min)`;
+      return `${idx + 1} - ${name}: ${r.toFixed(3)} ml/s (${perMin.toFixed(1)} ml/min)`;
     }
     return `${idx + 1} - ${name}: -- (ainda não calibrada)`;
   });
@@ -408,10 +408,10 @@ function renderDashboard() {
             <div class="dashboard-reservoir-fill" style="width:${pct}%;"></div>
           </div>
           <div class="dashboard-reservoir-text">
-            ${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)
+            ${formatMl(current)} / ${formatMl(total)} ml (${pct.toFixed(0)}%)
           </div>
         </div>
-        <div>${formatMl(daily)} mL/dia</div>
+        <div>${formatMl(daily)} ml/dia</div>
       </div>
     `;
   });
@@ -908,7 +908,7 @@ async function applyManualDose() {
   );
 
   if (result) {
-    showSuccess(`Dose de ${volume}mL aplicada!`);
+    showSuccess(`Dose de ${volume}ml aplicada!`);
     document.getElementById('manualVolume').value = '0';
   }
 }
@@ -1015,7 +1015,7 @@ async function saveCalibration() {
   if (result && result.data && typeof result.data.ml_per_second === 'number') {
     const rateNum = result.data.ml_per_second;
     const rate = rateNum.toFixed(3);
-    showSuccess(`Calibração salva! Taxa: ${rate} mL/s`);
+    showSuccess(`Calibração salva! Taxa: ${rate} ml/s`);
     document.getElementById('measuredVolume').value = '';
 
     if (pumps[pumpIndex]) {
