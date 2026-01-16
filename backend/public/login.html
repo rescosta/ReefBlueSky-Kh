@@ -231,6 +231,48 @@
                 </div>
             </div>
 
+            <div class="form-group">
+              <label for="timezone">🌍 Fuso horário:</label>
+              <select id="timezone" name="timezone">
+                <option value="">Detectar automaticamente</option>
+
+                <!-- Américas -->
+                <option value="America/Sao_Paulo">America/Sao_Paulo (Brasil)</option>
+                <option value="America/Buenos_Aires">America/Buenos_Aires (Argentina)</option>
+                <option value="America/Santiago">America/Santiago (Chile)</option>
+                <option value="America/Mexico_City">America/Mexico_City (México)</option>
+                <option value="America/New_York">America/New_York (Costa Leste EUA)</option>
+                <option value="America/Chicago">America/Chicago (Centro EUA)</option>
+                <option value="America/Denver">America/Denver (Montanha EUA)</option>
+                <option value="America/Los_Angeles">America/Los_Angeles (Costa Oeste EUA)</option>
+                <option value="America/Toronto">America/Toronto (Canadá Leste)</option>
+                <option value="America/Vancouver">America/Vancouver (Canadá Oeste)</option>
+
+                <!-- Europa / África -->
+                <option value="Europe/London">Europe/London (Reino Unido)</option>
+                <option value="Europe/Lisbon">Europe/Lisbon (Portugal)</option>
+                <option value="Europe/Madrid">Europe/Madrid (Espanha)</option>
+                <option value="Europe/Paris">Europe/Paris (França)</option>
+                <option value="Europe/Berlin">Europe/Berlin (Alemanha)</option>
+                <option value="Europe/Rome">Europe/Rome (Itália)</option>
+                <option value="Europe/Amsterdam">Europe/Amsterdam (Holanda)</option>
+                <option value="Europe/Warsaw">Europe/Warsaw (Polônia)</option>
+                <option value="Africa/Johannesburg">Africa/Johannesburg (África do Sul)</option>
+
+                <!-- Ásia / Oceania -->
+                <option value="Asia/Dubai">Asia/Dubai (Emirados)</option>
+                <option value="Asia/Kolkata">Asia/Kolkata (Índia)</option>
+                <option value="Asia/Bangkok">Asia/Bangkok (Tailândia)</option>
+                <option value="Asia/Shanghai">Asia/Shanghai (China)</option>
+                <option value="Asia/Tokyo">Asia/Tokyo (Japão)</option>
+                <option value="Asia/Seoul">Asia/Seoul (Coreia do Sul)</option>
+                <option value="Australia/Sydney">Australia/Sydney (Austrália)</option>
+                <option value="Pacific/Auckland">Pacific/Auckland (Nova Zelândia)</option>
+
+                <!-- Fallback genérico -->
+                <option value="UTC">UTC (Tempo Universal)</option>
+              </select>
+            </div>
 
             <div class="buttons-row">
                 <button type="button" id="loginBtn">
@@ -400,6 +442,8 @@
       async function registerAndAskCode() {
         const email = emailInput.value.trim();
         const password = passwordInput.value;
+        const tzSelect = document.getElementById('timezone');
+        const timezone = tzSelect ? tzSelect.value.trim() : '';
 
         errorMessage.style.display = 'none';
         successMessage.style.display = 'none';
@@ -420,7 +464,7 @@
           const response = await fetch('/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password, timezone })
           });
 
           const data = await response.json();
@@ -581,9 +625,21 @@
       });
 
       document.addEventListener('DOMContentLoaded', () => {
-        console.log('Dica: use admin@test.com / teste123 para testar.');
+        console.log('Dica: pagins de teste');
         showStep(1);
+
+        const tzSelect = document.getElementById('timezone');
+        if (tzSelect) {
+          try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const opt = Array.from(tzSelect.options).find(o => o.value === tz);
+            if (opt) tzSelect.value = tz;
+          } catch (e) {
+            console.warn('Falha ao detectar timezone automaticamente', e);
+          }
+        }
       });
+
     </script>
   </body>
 </html>
