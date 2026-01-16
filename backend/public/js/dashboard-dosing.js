@@ -254,8 +254,7 @@ async function loadPumps(deviceId) {
     renderConfigTable();
     updateCalibrationRateLabel(); 
     renderAllPumpsRateList();
-    renderDashboardCharts();
-
+    renderDashboard();
 
   } catch (err) {
     console.error('❌ Erro ao carregar bombas:', err);
@@ -377,8 +376,8 @@ function renderAllPumpsRateList() {
 }
 
 
-function renderDashboardSummary() {
-  const container = document.getElementById('dashboardPumpsSummary');
+function renderDashboard() {
+  const container = document.getElementById('dashboardPumpsCharts');
   if (!container) return;
 
   if (!pumps || pumps.length === 0) {
@@ -387,45 +386,6 @@ function renderDashboardSummary() {
   }
 
   const rows = pumps.map((pump, idx) => {
-    const daily = pump.max_daily_ml || pump.daily_max || 0;
-    const name = pump.name || `Bomba ${idx + 1}`;
-    const on = pump.enabled;
-    const statusClass = on ? 'btn-on' : 'btn-off';
-    const statusText = on ? 'ON' : 'OFF';
-
-    return `
-      <div class="dash-row">
-        <div class="dash-col dash-pump-num">${idx + 1}</div>
-        <div class="dash-col dash-pump-name">${name}</div>
-        <div class="dash-col dash-pump-daily">${formatMl(daily)} mL/dia</div>
-        <div class="dash-col dash-pump-status">
-          <span class="btn-status ${statusClass}">${statusText}</span>
-        </div>
-      </div>
-    `;
-  });
-
-  container.innerHTML = `
-    <div class="dash-header">
-      <div class="dash-col dash-pump-num">Bomba</div>
-      <div class="dash-col dash-pump-name">Nome</div>
-      <div class="dash-col dash-pump-daily">Dosagem diária</div>
-      <div class="dash-col dash-pump-status">Status</div>
-    </div>
-    ${rows.join('')}
-  `;
-}
-
-function renderDashboardCharts() {
-  const container = document.getElementById('dashboardPumpsCharts');
-  if (!container) return;
-
-  if (!pumps || pumps.length === 0) {
-    container.innerHTML = '';
-    return;
-  }
-
-  const blocks = pumps.map((pump, idx) => {
     const name = pump.name || `Bomba ${idx + 1}`;
     const total = pump.container_volume_ml || pump.container_size || 0;
     const current = pump.current_volume_ml || pump.current_volume || 0;
@@ -437,29 +397,35 @@ function renderDashboardCharts() {
     const statusText = on ? 'ON' : 'OFF';
 
     return `
-      <div class="reservoir-card">
-        <div class="reservoir-row">
-          <div class="reservoir-label">${idx + 1} - ${name}</div>
-          <div class="reservoir-bar">
-            <div class="reservoir-fill" style="width:${pct}%;"></div>
+      <div class="dashboard-row">
+        <div>${idx + 1}</div>
+        <div>${name}</div>
+        <div>
+          <span class="btn-status ${statusClass}">${statusText}</span>
+        </div>
+        <div class="dashboard-reservoir">
+          <div class="dashboard-reservoir-bar">
+            <div class="dashboard-reservoir-fill" style="width:${pct}%;"></div>
           </div>
-          <div class="reservoir-info">
-            <div class="reservoir-info-top">
-              ${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)
-            </div>
-            <div class="reservoir-info-top">
-              ${formatMl(daily)} mL/dia
-            </div>
-            <span class="reservoir-status">
-              <span class="btn-status ${statusClass}">${statusText}</span>
-            </span>
+          <div class="dashboard-reservoir-text">
+            ${formatMl(current)} / ${formatMl(total)} mL (${pct.toFixed(0)}%)
           </div>
         </div>
+        <div>${formatMl(daily)} mL/dia</div>
       </div>
     `;
   });
 
-  container.innerHTML = blocks.join('');
+  container.innerHTML = `
+    <div class="dashboard-header">
+      <div>Bomba</div>
+      <div>Nome</div>
+      <div>Status</div>
+      <div>% Reservatório</div>
+      <div>Vol. agendado</div>
+    </div>
+    ${rows.join('')}
+  `;
 }
 
 
