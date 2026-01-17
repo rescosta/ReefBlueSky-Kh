@@ -146,6 +146,8 @@ async function loadDevices() {
     const data    = await res.json();
     const devices = data?.data || [];
 
+    console.log('devices DEBUG', devices); 
+
     if (!devices.length) {
       container.innerHTML = '<div class="small-text">Nenhum dispositivo vinculado ainda.</div>';
       return;
