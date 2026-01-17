@@ -155,11 +155,11 @@ async function loadDevices() {
       // Ícone igual ao da barra (usa as mesmas classes CSS)
       let iconHtml = '';
       if (type === 'KH') {
-        iconHtml = '<span class="icon-kh"></span>';
+        iconHtml = '<span class="icon-kh">KH</span>';
       } else if (type === 'DOSER') {
-        iconHtml = '<span class="icon-doser"></span>';
+        iconHtml = '<span class="icon-doser">DOS</span>';
       } else if (type === 'LCD') {
-        iconHtml = '<span class="icon-lcd"></span>';
+        iconHtml = '<span class="icon-lcd">LCD</span>';
       }
 
       const left = document.createElement('div');
