@@ -250,6 +250,34 @@ async function loadDevices() {
       return;
     }
 
+    const kh  = devices.find(d => d.type === 'KH');
+    const dos = devices.find(d => d.type === 'DOSER');
+    const lcd = devices.find(d => d.type === 'LCD');
+
+    const khOnline  = kh  ? computeOnlineFromLastSeen(kh.lastSeen  || kh.last_seen)   : false;
+    const dosOnline = dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false;
+    const lcdOnline = lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false;
+
+    // atualiza LCD/DOS dos spans “Devices” lá de cima
+    setLcdStatusInDevices(lcd ? (lcdOnline ? 'online' : 'offline') : 'never');
+    setDosingStatusInDevices(dos ? (dosOnline ? 'online' : 'offline') : 'never');
+
+    // badge global “Desconhecido / Online / Offline”
+    const badge = document.getElementById('deviceStatusBadgeDevices');
+    if (badge) {
+      if (!kh && !dos && !lcd) {
+        badge.className = 'badge badge-off';
+        badge.textContent = 'Desconhecido';
+      } else if (khOnline || dosOnline || lcdOnline) {
+        badge.className = 'badge badge-on';
+        badge.textContent = 'Online';
+      } else {
+        badge.className = 'badge badge-off';
+        badge.textContent = 'Offline';
+      }
+    }
+
+
     const frag = document.createDocumentFragment();
 
     devices.forEach((d) => {
