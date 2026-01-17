@@ -3658,6 +3658,66 @@ return res.json({
   }
 });
 
+
+// Rota IoT para o KH Monitor enviar health + níveis
+app.post('/device/health', async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const deviceId = body.device_id || body.deviceId; // ou do token JWT do device
+    const userId   = body.user_id   || body.userId;   // ajuste conforme seu auth
+    if (!deviceId || !userId) {
+      return res.status(400).json({ success: false, message: 'deviceId/userId ausentes' });
+    }
+
+    const intervalHours    = body.interval_hours || null;
+    const level_a          = body.level_a != null ? body.level_a : null;
+    const level_b          = body.level_b != null ? body.level_b : null;
+    const level_c          = body.level_c != null ? body.level_c : null;
+    const pump1_running    = body.pump1_running || 0;
+    const pump1_direction  = body.pump1_direction || 'forward';
+    const pump2_running    = body.pump2_running || 0;
+    const pump2_direction  = body.pump2_direction || 'forward';
+    const pump3_running    = body.pump3_running || 0;
+    const pump3_direction  = body.pump3_direction || 'forward';
+
+    await pool.query(
+      `INSERT INTO device_status (
+         deviceId, userId, interval_hours,
+         level_a, level_b, level_c,
+         pump1_running, pump1_direction,
+         pump2_running, pump2_direction,
+         pump3_running, pump3_direction,
+         updatedAt
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         interval_hours   = VALUES(interval_hours),
+         level_a          = VALUES(level_a),
+         level_b          = VALUES(level_b),
+         level_c          = VALUES(level_c),
+         pump1_running    = VALUES(pump1_running),
+         pump1_direction  = VALUES(pump1_direction),
+         pump2_running    = VALUES(pump2_running),
+         pump2_direction  = VALUES(pump2_direction),
+         pump3_running    = VALUES(pump3_running),
+         pump3_direction  = VALUES(pump3_direction),
+         updatedAt        = NOW()`,
+      [
+        deviceId, userId, intervalHours,
+        level_a, level_b, level_c,
+        pump1_running, pump1_direction,
+        pump2_running, pump2_direction,
+        pump3_running, pump3_direction,
+      ]
+    );
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Error in /device/health', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 // Dashboard de Gráficos
 
 app.get('/dashboard-graficos', (req, res) => {
