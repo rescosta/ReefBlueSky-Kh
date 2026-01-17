@@ -72,6 +72,14 @@ console.log('ifaces =', os.networkInterfaces());
 console.log('netType =', detectNetType());
 
 
+function computeOnlineFromLastSeen(lastSeen, minutes = 5) {
+  if (!lastSeen) return false;
+  const lastMs = new Date(lastSeen).getTime();
+  if (!Number.isFinite(lastMs)) return false;
+  const delta = Date.now() - lastMs;
+  return delta >= 0 && delta <= minutes * 60 * 1000;
+}
+
 
 function readWifiRssi(cb) {
   exec(
@@ -1926,9 +1934,10 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
         r.dosing_status === 'online' ? 'online' : 'offline';
 
       const lastSeenMs = r.lastSeen ? new Date(r.lastSeen).getTime() : null;
+      const online = computeOnlineFromLastSeen(r.lastSeen, 5); 
 
-      const FIVE_MIN = 5 * 60 * 1000;
-      const online = !!(lastSeenMs && (Date.now() - lastSeenMs) < FIVE_MIN);
+      //const FIVE_MIN = 5 * 60 * 1000;
+      //const online = !!(lastSeenMs && (Date.now() - lastSeenMs) < FIVE_MIN);
 
       return {
         id:        r.id,
