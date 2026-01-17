@@ -129,6 +129,42 @@ function computeOnlineFromLastSeen(lastSeen) {
   return diffMin <= 5;
 }
 
+// Gera os mesmos botões de status da barra superior
+function buildTopbarStatusButtons(devices) {
+  const kh  = devices.find(d => d.type === 'KH');
+  const dos = devices.find(d => d.type === 'DOSER');
+  const lcd = devices.find(d => d.type === 'LCD');
+
+  const khOnline  = kh  ? computeOnlineFromLastSeen(kh.lastSeen || kh.last_seen)   : false;
+  const dosOnline = dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false;
+  const lcdOnline = lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false;
+
+  const anyOnline = khOnline || dosOnline || lcdOnline;
+
+  const globalHtml =
+    `<button class="top-pill ${anyOnline ? 'on' : 'off'}">
+       ${anyOnline ? 'Online' : 'Offline'}
+     </button>`;
+
+  const dosHtml =
+    `<button class="top-pill ${dosOnline ? 'on' : 'off'}">
+       DOS ${dosOnline ? 'ON' : 'OFF'}
+     </button>`;
+
+  const lcdHtml =
+    `<button class="top-pill ${lcdOnline ? 'on' : 'off'}">
+       LCD ${lcdOnline ? 'ON' : 'OFF'}
+     </button>`;
+
+  const khHtml =
+    `<button class="top-pill ${khOnline ? 'on' : 'off'}">
+       KH ${khOnline ? 'ON' : 'OFF'}
+     </button>`;
+
+  return { khHtml, dosHtml, lcdHtml, globalHtml };
+}
+
+
 // Carregar lista de dispositivos vinculados (KH/LCD/DOS)
 async function loadDevices() {
   const container = document.getElementById('deviceList');
@@ -209,6 +245,22 @@ async function loadDevices() {
     container.innerHTML = '';
     container.appendChild(frag);
 
+
+    // --- ESPELHO DA BARRA SUPERIOR DENTRO DE "MEUS DISPOSITIVOS" ---
+    const statusWrapper = document.createElement('div');
+    statusWrapper.className = 'devices-topbar-mirror';
+    statusWrapper.style.display = 'flex';
+    statusWrapper.style.gap = '8px';
+    statusWrapper.style.marginBottom = '12px';
+
+    const { khHtml, dosHtml, lcdHtml, globalHtml } = buildTopbarStatusButtons(devices);
+
+    statusWrapper.innerHTML = `${globalHtml} ${dosHtml} ${lcdHtml} ${khHtml}`;
+
+    // Insere os botões acima dos cards
+    container.prepend(statusWrapper);
+
+
     // Botão de atualização OTA (mesmo código que você já tinha)
     container.querySelectorAll('.btn-small[data-device-id]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -239,33 +291,6 @@ async function loadDevices() {
     container.innerHTML = '<div class="small-text">Erro ao carregar dispositivos.</div>';
   }
 }
-
-
-// Mesma regra de online/offline que o Common usa (5 min de janela)
-function computeOnlineFromLastSeen(lastSeen) {
-  if (!lastSeen) return false;
-
-  const last = typeof lastSeen === 'number'
-    ? lastSeen
-    : Date.parse(lastSeen);
-
-  if (!last || Number.isNaN(last)) return false;
-
-  const diffMs  = Date.now() - last;
-  const diffMin = diffMs / 60000;
-
-  return diffMin <= 5;
-}
-
-// Badge de status igual ao da topbar
-function renderDeviceStatusBadge(device) {
-  const isOnline   = computeOnlineFromLastSeen(device.lastSeen);
-  const statusText = isOnline ? 'Online' : 'Offline';
-  const statusClass = isOnline ? 'status-online' : 'status-offline';
-
-  return `<span class="device-status-badge ${statusClass}">${statusText}</span>`;
-}
-
 
 // Exportar dados
 async function exportData() {
