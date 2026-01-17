@@ -162,6 +162,7 @@ async function loadDevices() {
     const frag = document.createDocumentFragment();
 
     devices.forEach((d) => {
+      console.log('device item:', d);
       const div = document.createElement('div');
       div.className = 'device-item';
 
