@@ -187,18 +187,21 @@ async function loadDevices() {
       let statusClass = '';
 
       if (type === 'LCD') {
-        const isOn = lcdTopText === 'LCD ON';
+        const lcdStatus = d.lcdStatus || d.lcd_status || (d.online ? 'online' : 'offline');
+        const isOn = lcdStatus === 'online';
         statusLabel = isOn ? 'LCD ON' : 'LCD OFF';
         statusClass = isOn ? 'badge-on' : 'badge-off';
       } else if (type === 'DOSER') {
-        const isOn = dosTopText === 'DOS ON';
+        const dosingStatus = d.dosingStatus || d.dosing_status || (d.online ? 'online' : 'offline');
+        const isOn = dosingStatus === 'online';
         statusLabel = isOn ? 'DOS ON' : 'DOS OFF';
         statusClass = isOn ? 'badge-on' : 'badge-off';
       } else {
-        const online = !!d.online; // KH continua vindo da API
+        const online = !!d.online;
         statusLabel = online ? 'Online' : 'Offline';
         statusClass = online ? 'badge-on' : 'badge-off';
       }
+
 
       const right = document.createElement('div');
       right.innerHTML = `
