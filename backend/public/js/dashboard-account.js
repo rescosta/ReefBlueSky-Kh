@@ -243,20 +243,29 @@ async function loadDevices() {
     const data    = await res.json();
     const devices = data?.data || [];
 
-    console.log('devices DEBUG', devices);
-
     if (!devices.length) {
       container.innerHTML = '<div class="small-text">Nenhum dispositivo vinculado ainda.</div>';
       return;
     }
 
+    // pega o KH/DOS/LCD principais
     const kh  = devices.find(d => d.type === 'KH');
     const dos = devices.find(d => d.type === 'DOSER');
     const lcd = devices.find(d => d.type === 'LCD');
 
+    // status “online/offline” de cada um (se não vier lcdStatus/dosingStatus, cai no lastSeen)
     const khOnline  = kh  ? computeOnlineFromLastSeen(kh.lastSeen  || kh.last_seen)   : false;
-    const dosOnline = dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false;
-    const lcdOnline = lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false;
+
+    let dosStatus  = dos?.dosingStatus ?? null;
+    let lcdStatus  = lcd?.lcdStatus    ?? null;
+
+    const dosOnline = dosStatus
+      ? (dosStatus === 'online')
+      : (dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false);
+
+    const lcdOnline = lcdStatus
+      ? (lcdStatus === 'online')
+      : (lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false);
 
     // atualiza LCD/DOS dos spans “Devices” lá de cima
     setLcdStatusInDevices(lcd ? (lcdOnline ? 'online' : 'offline') : 'never');
@@ -276,7 +285,6 @@ async function loadDevices() {
         badge.textContent = 'Offline';
       }
     }
-
 
     const frag = document.createDocumentFragment();
 
