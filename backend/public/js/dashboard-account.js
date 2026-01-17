@@ -21,6 +21,82 @@ function initTopbar() {
   }
 }
 
+const timezones = [
+  { value: 'Pacific/Auckland',            label: 'UTC+12:00 — Pacific/Auckland' },
+  { value: 'Australia/Sydney',           label: 'UTC+10:00 — Australia/Sydney' },
+  { value: 'Australia/Brisbane',         label: 'UTC+10:00 — Australia/Brisbane' },
+  { value: 'Australia/Perth',            label: 'UTC+08:00 — Australia/Perth' },
+  { value: 'Asia/Tokyo',                 label: 'UTC+09:00 — Asia/Tokyo' },
+  { value: 'Asia/Seoul',                 label: 'UTC+09:00 — Asia/Seoul' },
+  { value: 'Asia/Shanghai',              label: 'UTC+08:00 — Asia/Shanghai' },
+  { value: 'Asia/Hong_Kong',             label: 'UTC+08:00 — Asia/Hong_Kong' },
+  { value: 'Asia/Singapore',             label: 'UTC+08:00 — Asia/Singapore' },
+  { value: 'Asia/Bangkok',               label: 'UTC+07:00 — Asia/Bangkok' },
+  { value: 'Asia/Jakarta',               label: 'UTC+07:00 — Asia/Jakarta' },
+  { value: 'Asia/Kolkata',               label: 'UTC+05:30 — Asia/Kolkata' },
+  { value: 'Asia/Dubai',                 label: 'UTC+04:00 — Asia/Dubai' },
+
+  { value: 'Europe/Moscow',              label: 'UTC+03:00 — Europe/Moscow' },
+  { value: 'Africa/Nairobi',             label: 'UTC+03:00 — Africa/Nairobi' },
+  { value: 'Africa/Johannesburg',        label: 'UTC+02:00 — Africa/Johannesburg' },
+  { value: 'Africa/Cairo',               label: 'UTC+02:00 — Africa/Cairo' },
+  { value: 'Europe/Athens',              label: 'UTC+02:00 — Europe/Athens' },
+  { value: 'Europe/Berlin',              label: 'UTC+01:00 — Europe/Berlin' },
+  { value: 'Europe/Paris',               label: 'UTC+01:00 — Europe/Paris' },
+  { value: 'Europe/Madrid',              label: 'UTC+01:00 — Europe/Madrid' },
+  { value: 'Europe/Amsterdam',           label: 'UTC+01:00 — Europe/Amsterdam' },
+  { value: 'Europe/Brussels',            label: 'UTC+01:00 — Europe/Brussels' },
+  { value: 'Europe/Zurich',              label: 'UTC+01:00 — Europe/Zurich' },
+  { value: 'Europe/Lisbon',              label: 'UTC+00:00 — Europe/Lisbon' },
+  { value: 'Europe/London',              label: 'UTC+00:00 — Europe/London' },
+  { value: 'UTC',                        label: 'UTC+00:00 — UTC' },
+
+  { value: 'America/Sao_Paulo',          label: 'UTC-03:00 — America/Sao_Paulo' },
+  { value: 'America/Bahia',              label: 'UTC-03:00 — America/Bahia' },
+  { value: 'America/Fortaleza',          label: 'UTC-03:00 — America/Fortaleza' },
+  { value: 'America/Recife',             label: 'UTC-03:00 — America/Recife' },
+  { value: 'America/Belem',              label: 'UTC-03:00 — America/Belem' },
+  { value: 'America/Maceio',             label: 'UTC-03:00 — America/Maceio' },
+  { value: 'America/Manaus',             label: 'UTC-04:00 — America/Manaus' },
+  { value: 'America/Campo_Grande',       label: 'UTC-04:00 — America/Campo_Grande' },
+  { value: 'America/Cuiaba',             label: 'UTC-04:00 — America/Cuiaba' },
+  { value: 'America/Boa_Vista',          label: 'UTC-04:00 — America/Boa_Vista' },
+  { value: 'America/Argentina/Buenos_Aires', label: 'UTC-03:00 — America/Argentina/Buenos_Aires' },
+  { value: 'America/Santiago',           label: 'UTC-03:00 — America/Santiago' },
+  { value: 'America/Montevideo',         label: 'UTC-03:00 — America/Montevideo' },
+  { value: 'America/Lima',               label: 'UTC-05:00 — America/Lima' },
+  { value: 'America/Bogota',             label: 'UTC-05:00 — America/Bogota' },
+  { value: 'America/La_Paz',             label: 'UTC-04:00 — America/La_Paz' },
+  { value: 'America/Asuncion',           label: 'UTC-04:00 — America/Asuncion' },
+
+  { value: 'America/St_Johns',           label: 'UTC-03:30 — America/St_Johns' },
+  { value: 'America/Halifax',            label: 'UTC-04:00 — America/Halifax' },
+  { value: 'America/New_York',           label: 'UTC-05:00 — America/New_York' },
+  { value: 'America/Chicago',            label: 'UTC-06:00 — America/Chicago' },
+  { value: 'America/Denver',             label: 'UTC-07:00 — America/Denver' },
+  { value: 'America/Phoenix',            label: 'UTC-07:00 — America/Phoenix' },
+  { value: 'America/Los_Angeles',        label: 'UTC-08:00 — America/Los_Angeles' },
+  { value: 'America/Vancouver',          label: 'UTC-08:00 — America/Vancouver' },
+  { value: 'America/Mexico_City',        label: 'UTC-06:00 — America/Mexico_City' },
+];
+
+
+function populateTimezoneSelect() {
+  const select = document.getElementById('accountTimezone');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">Selecione o fuso…</option>';
+
+  for (const tz of TIMEZONES) {
+    const opt = document.createElement('option');
+    opt.value = tz.value;
+    opt.textContent = tz.label;
+    select.appendChild(opt);
+  }
+}
+
+
+
 function getDevicesStatusBadgesHtml() {
   return `
     <span id="deviceStatusBadgeDevices" class="badge badge-off">Desconhecido</span>
@@ -243,6 +319,8 @@ async function loadDevices() {
     const data    = await res.json();
     const devices = data?.data || [];
 
+    console.log('ACCOUNT /user/devices RAW:', devices);
+
     if (!devices.length) {
       container.innerHTML = '<div class="small-text">Nenhum dispositivo vinculado ainda.</div>';
       return;
@@ -252,6 +330,9 @@ async function loadDevices() {
     const kh  = devices.find(d => d.type === 'KH');
     const dos = devices.find(d => d.type === 'DOSER');
     const lcd = devices.find(d => d.type === 'LCD');
+
+    console.log('ACCOUNT LCD OBJECT:', lcd);
+
 
     // KH sempre via lastSeen mesmo
     const khOnline = kh ? computeOnlineFromLastSeen(kh.lastSeen || kh.last_seen) : false;
@@ -587,11 +668,16 @@ function initAccountPage() {
     mirror.innerHTML = getDevicesStatusBadgesHtml();
   }
 
-
-  populateTimezoneSelect();
   loadAccountProfile();
   loadDevices();
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  initTopbar();
+  populateTimezoneSelect();
+  loadAccountProfile();
+});
+
 
 // Entrada
 document.addEventListener('DOMContentLoaded', initAccountPage);
