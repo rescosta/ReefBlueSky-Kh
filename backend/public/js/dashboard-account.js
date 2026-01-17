@@ -152,6 +152,7 @@ async function loadDevices() {
       const fw = d.firmwareVersion || 'N/A';
       const online = !!d.online;
 
+      // Ícone igual ao da barra (usa as mesmas classes CSS)
       let iconHtml = '';
       if (type === 'KH') {
         iconHtml = '<span class="icon-kh"></span>';
