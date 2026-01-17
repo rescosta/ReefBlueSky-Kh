@@ -151,6 +151,28 @@ async function loadDevices() {
       return;
     }
 
+    // Mesmo device selecionado no topo
+    const selectedId = (window.DashboardCommon &&
+      typeof DashboardCommon.getSelectedDeviceId === 'function')
+      ? DashboardCommon.getSelectedDeviceId()
+      : null;
+
+    let khConfig = null;
+    if (selectedId) {
+      try {
+        const resp = await apiFetch(
+          `/api/v1/user/devices/${encodeURIComponent(selectedId)}/kh-config`,
+          { method: 'GET' }
+        );
+        const json = await resp.json().catch(() => null);
+        if (resp.ok && json?.success && json.data) {
+          khConfig = json.data; // tem lcdStatus e dosingStatus frescos
+        }
+      } catch (e) {
+        console.error('Erro ao carregar KH config para account:', e);
+      }
+    }
+
     const frag = document.createDocumentFragment();
 
     devices.forEach((d) => {
@@ -181,17 +203,25 @@ async function loadDevices() {
       let statusClass = '';
 
       if (type === 'LCD') {
-        const lcdStatus = d.lcdStatus || d.lcd_status || 'offline';
-        const isOn = lcdStatus === 'online';
+        // se este LCD estiver associado ao KH selecionado, usa khConfig.lcdStatus
+        const isSelectedLcd = selectedId && d.parentDeviceId === selectedId;
+        const rawStatus = (isSelectedLcd && khConfig)
+          ? khConfig.lcdStatus
+          : (d.lcdStatus || d.lcd_status || 'offline');
+
+        const isOn = rawStatus === 'online';
         statusLabel = isOn ? 'LCD ON' : 'LCD OFF';
         statusClass = isOn ? 'badge-on' : 'badge-off';
       } else if (type === 'DOSER') {
-        const dosingStatus = d.dosingStatus || d.dosing_status || 'offline';
-        const isOn = dosingStatus === 'online';
+        const isSelectedDoser = selectedId && d.parentDeviceId === selectedId;
+        const rawStatus = (isSelectedDoser && khConfig)
+          ? khConfig.dosingStatus
+          : (d.dosingStatus || d.dosing_status || 'offline');
+
+        const isOn = rawStatus === 'online';
         statusLabel = isOn ? 'DOS ON' : 'DOS OFF';
         statusClass = isOn ? 'badge-on' : 'badge-off';
       } else {
-        // KH usa online do próprio device
         const online = !!d.online;
         statusLabel = online ? 'Online' : 'Offline';
         statusClass = online ? 'badge-on' : 'badge-off';
@@ -214,8 +244,7 @@ async function loadDevices() {
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
-});
-
+    });
 
     container.innerHTML = '';
     container.appendChild(frag);
@@ -250,6 +279,7 @@ async function loadDevices() {
     container.innerHTML = '<div class="small-text">Erro ao carregar dispositivos.</div>';
   }
 }
+
 
 // Exportar dados
 async function exportData() {
