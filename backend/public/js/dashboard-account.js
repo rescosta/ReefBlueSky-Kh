@@ -246,16 +246,27 @@ async function loadDevices() {
     container.appendChild(frag);
 
 
-    // Clona o mesmo bloco de status da topbar (ONLINE / LCD ON / DOS ON)
-    const topbarStatus = document.querySelector('.topbar-right'); // container dos badges na topbar
-    if (topbarStatus) {
-      const mirror = topbarStatus.cloneNode(true);
-      mirror.classList.add('devices-topbar-mirror');
+    // depois de container.appendChild(frag);
+
+    const topbarRight = document.querySelector('.topbar-right');
+    if (topbarRight) {
+      const mirror = document.createElement('div');
+      mirror.className = 'devices-topbar-mirror';
+      mirror.style.display = 'flex';
+      mirror.style.gap = '8px';
       mirror.style.marginBottom = '12px';
 
-      // Insere o clone acima da lista de dispositivos
+      const ids = ['deviceStatusBadge', 'lcdStatusIcon', 'dosingStatusIcon'];
+      ids.forEach((id) => {
+        const el = topbarRight.querySelector('#' + id);
+        if (el) {
+          mirror.appendChild(el.cloneNode(true));
+        }
+      });
+
       container.prepend(mirror);
     }
+
 
 
     // Botão de atualização OTA (mesmo código que você já tinha)
