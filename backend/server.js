@@ -81,6 +81,7 @@ function computeOnlineFromLastSeen(lastSeen, minutes = 5) {
 }
 
 
+
 function readWifiRssi(cb) {
   exec(
     "iwconfig wlan1 2>/dev/null | grep -i --color=never 'Signal level'",
