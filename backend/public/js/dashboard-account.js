@@ -246,20 +246,16 @@ async function loadDevices() {
     container.appendChild(frag);
 
 
-    // --- ESPELHO DA BARRA SUPERIOR DENTRO DE "MEUS DISPOSITIVOS" ---
-    const statusWrapper = document.createElement('div');
-    statusWrapper.className = 'devices-topbar-mirror';
-    statusWrapper.style.display = 'flex';
-    statusWrapper.style.gap = '8px';
-    statusWrapper.style.marginBottom = '12px';
+    // Clona o mesmo bloco de status da topbar
+    const topbarStatus = document.querySelector('.topbar-status'); // ajuste o seletor
+    if (topbarStatus) {
+      const mirror = topbarStatus.cloneNode(true);
+      mirror.classList.add('devices-topbar-mirror');
+      mirror.style.marginBottom = '12px';
 
-    const { khHtml, dosHtml, lcdHtml, globalHtml } = buildTopbarStatusButtons(devices);
-
-    statusWrapper.innerHTML = `${globalHtml} ${dosHtml} ${lcdHtml} ${khHtml}`;
-
-    // Insere os botões acima dos cards
-    container.prepend(statusWrapper);
-
+      // Coloca o clone acima da lista de dispositivos
+      container.prepend(mirror);
+    }
 
     // Botão de atualização OTA (mesmo código que você já tinha)
     container.querySelectorAll('.btn-small[data-device-id]').forEach((btn) => {
