@@ -151,27 +151,11 @@ async function loadDevices() {
       return;
     }
 
-    // Mesmo device selecionado no topo
-    const selectedId = (window.DashboardCommon &&
-      typeof DashboardCommon.getSelectedDeviceId === 'function')
-      ? DashboardCommon.getSelectedDeviceId()
-      : null;
-
-    let khConfig = null;
-    if (selectedId) {
-      try {
-        const resp = await apiFetch(
-          `/api/v1/user/devices/${encodeURIComponent(selectedId)}/kh-config`,
-          { method: 'GET' }
-        );
-        const json = await resp.json().catch(() => null);
-        if (resp.ok && json?.success && json.data) {
-          khConfig = json.data; // tem lcdStatus e dosingStatus frescos
-        }
-      } catch (e) {
-        console.error('Erro ao carregar KH config para account:', e);
-      }
-    }
+    // Lê diretamente o texto dos badges do topo
+    const lcdTopEl = document.getElementById('lcdStatusIcon');
+    const dosTopEl = document.getElementById('dosingStatusIcon');
+    const lcdTopText = lcdTopEl ? lcdTopEl.textContent.trim() : '';
+    const dosTopText = dosTopEl ? dosTopEl.textContent.trim() : '';
 
     const frag = document.createDocumentFragment();
 
@@ -198,31 +182,20 @@ async function loadDevices() {
         <span class="small-text">FW ${fw}</span>
       `;
 
-      // STATUS: espelhar topo
+      // STATUS: espelha o que o topo está mostrando
       let statusLabel = '';
       let statusClass = '';
 
       if (type === 'LCD') {
-        // se este LCD estiver associado ao KH selecionado, usa khConfig.lcdStatus
-        const isSelectedLcd = selectedId && d.parentDeviceId === selectedId;
-        const rawStatus = (isSelectedLcd && khConfig)
-          ? khConfig.lcdStatus
-          : (d.lcdStatus || d.lcd_status || 'offline');
-
-        const isOn = rawStatus === 'online';
+        const isOn = lcdTopText === 'LCD ON';
         statusLabel = isOn ? 'LCD ON' : 'LCD OFF';
         statusClass = isOn ? 'badge-on' : 'badge-off';
       } else if (type === 'DOSER') {
-        const isSelectedDoser = selectedId && d.parentDeviceId === selectedId;
-        const rawStatus = (isSelectedDoser && khConfig)
-          ? khConfig.dosingStatus
-          : (d.dosingStatus || d.dosing_status || 'offline');
-
-        const isOn = rawStatus === 'online';
+        const isOn = dosTopText === 'DOS ON';
         statusLabel = isOn ? 'DOS ON' : 'DOS OFF';
         statusClass = isOn ? 'badge-on' : 'badge-off';
       } else {
-        const online = !!d.online;
+        const online = !!d.online; // KH continua vindo da API
         statusLabel = online ? 'Online' : 'Offline';
         statusClass = online ? 'badge-on' : 'badge-off';
       }
