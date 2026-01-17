@@ -162,7 +162,7 @@ async function loadDevices() {
       const fw   = d.firmwareVersion || 'N/A';
 
       // Online igual ao Common, baseado em lastSeen
-      const online = computeOnlineFromLastSeen(d.lastSeen);
+      const online = !!d.online;
 
       // Ícone de tipo igual ao topo
       let iconHtml = '';
