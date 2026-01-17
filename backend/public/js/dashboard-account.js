@@ -151,11 +151,13 @@ async function loadDevices() {
       return;
     }
 
-    // Lê diretamente o texto dos badges do topo
-    const lcdTopEl = document.getElementById('lcdStatusIcon');
-    const dosTopEl = document.getElementById('dosingStatusIcon');
-    const lcdTopText = lcdTopEl ? lcdTopEl.textContent.trim() : '';
-    const dosTopText = dosTopEl ? dosTopEl.textContent.trim() : '';
+    const dosingTopEl = document.getElementById('dosingStatusIcon');
+    const dosingClone = dosingTopEl ? dosingTopEl.cloneNode(true) : null;
+    if (dosingClone) {
+      dosingClone.id = ''; // evita id duplicado
+      dosingClone.style.fontSize = '12px';
+      dosingClone.style.marginRight = '8px';
+    }
 
     const frag = document.createDocumentFragment();
 
@@ -182,45 +184,36 @@ async function loadDevices() {
         <span class="small-text">FW ${fw}</span>
       `;
 
-      // STATUS: espelha o que o topo está mostrando
-      let statusLabel = '';
-      let statusClass = '';
+      const right = document.createElement('div');
 
-      if (type === 'LCD') {
-        const lcdStatus = d.lcdStatus || d.lcd_status || (d.online ? 'online' : 'offline');
-        const isOn = lcdStatus === 'online';
-        statusLabel = isOn ? 'LCD ON' : 'LCD OFF';
-        statusClass = isOn ? 'badge-on' : 'badge-off';
-      } else if (type === 'DOSER') {
-        const dosingStatus = d.dosingStatus || d.dosing_status || (d.online ? 'online' : 'offline');
-        const isOn = dosingStatus === 'online';
-        statusLabel = isOn ? 'DOS ON' : 'DOS OFF';
-        statusClass = isOn ? 'badge-on' : 'badge-off';
+      if (type === 'DOSER' && dosingClone) {
+        // clona de novo pra não reutilizar o mesmo nó
+        const badge = dosingClone.cloneNode(true);
+        right.appendChild(badge);
       } else {
+        // fallback: badge simples baseado em online
         const online = !!d.online;
-        statusLabel = online ? 'Online' : 'Offline';
-        statusClass = online ? 'badge-on' : 'badge-off';
+        const span = document.createElement('span');
+        span.className = online ? 'badge-on' : 'badge-off';
+        span.style.marginRight = '8px';
+        span.textContent = online ? 'Online' : 'Offline';
+        right.appendChild(span);
       }
 
-
-      const right = document.createElement('div');
-      right.innerHTML = `
-        <span class="${statusClass}" style="margin-right: 8px;">
-          ${statusLabel}
-        </span>
-        <button
-          class="btn-small"
-          data-device-id="${d.deviceId}"
-          ${type === 'KH' && !d.online ? 'disabled' : ''}
-        >
-          Atualizar
-        </button>
-      `;
+      const btn = document.createElement('button');
+      btn.className = 'btn-small';
+      btn.dataset.deviceId = d.deviceId;
+      btn.textContent = 'Atualizar';
+      if (type === 'KH' && !d.online) {
+        btn.disabled = true;
+      }
+      right.appendChild(btn);
 
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
     });
+
 
     container.innerHTML = '';
     container.appendChild(frag);
