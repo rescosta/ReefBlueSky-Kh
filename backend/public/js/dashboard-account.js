@@ -150,9 +150,8 @@ async function loadDevices() {
       const name = d.name || d.id || 'Device';
       const type = d.type || 'KH';
       const fw = d.firmwareVersion || 'N/A';
-      const online = !!d.online; // continua igual
+      const online = !!d.online;
 
-      // Ícone opcional, se quiser manter (pode deixar string vazia)
       let iconHtml = '';
       if (type === 'KH') {
         iconHtml = '<span class="icon-kh"></span>';
@@ -170,11 +169,13 @@ async function loadDevices() {
 
       const right = document.createElement('div');
       right.innerHTML = `
+        <span class="${online ? 'badge-on' : 'badge-off'}" style="margin-right: 8px;">
+          ${online ? 'Online' : 'Offline'}
+        </span>
         <button
           class="btn-small"
           data-device-id="${d.deviceId}"
           ${online ? '' : 'disabled'}
-          style="margin-left: 8px;"
         >
           Atualizar
         </button>
@@ -184,6 +185,7 @@ async function loadDevices() {
       div.appendChild(right);
       frag.appendChild(div);
     });
+
 
 
     container.innerHTML = '';
