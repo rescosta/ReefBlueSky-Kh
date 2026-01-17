@@ -147,27 +147,61 @@ async function loadDevices() {
       const div = document.createElement('div');
       div.className = 'device-item';
 
-      // Esperado algo como: { id, name, type, lastSeenAt, firmwareVersion, online }
-      const name = d.name || d.id || 'Device';
+      const name = d.name || d.deviceId || 'Device';
       const type = d.type || '';
-      const fw = d.firmwareVersion || '';
+      const fw = d.firmwareVersion || 'N/A';
       const online = !!d.online;
 
       const left = document.createElement('div');
-      left.innerHTML = `<strong>${name}</strong><br/><span class="small-text">${type} — FW ${fw || 'N/A'}</span>`;
+      left.innerHTML =
+        `<strong>${name}</strong><br/>` +
+        `<span class="small-text">${type} — FW ${fw}</span>`;
 
       const right = document.createElement('div');
-      right.innerHTML = online
-        ? '<span class="badge-on">Online</span>'
-        : '<span class="badge-off">Offline</span>';
+      right.className = 'device-actions';
+      right.innerHTML = `
+        <div style="margin-bottom:4px;">
+          ${online
+            ? '<span class="badge-on">Online</span>'
+            : '<span class="badge-off">Offline</span>'}
+        </div>
+        <button class="btn-small" data-device-id="${d.deviceId}" ${online ? '' : 'disabled'}>
+          Atualizar firmware
+        </button>
+      `;
 
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
     });
 
+
     container.innerHTML = '';
     container.appendChild(frag);
+    container.querySelectorAll('.btn-small[data-device-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const deviceId = btn.getAttribute('data-device-id');
+        if (!deviceId) return;
+        if (!confirm(`Enviar comando de atualização para ${deviceId}?`)) return;
+
+        try {
+          const res = await apiFetch(`/api/v1/dev/device-command/${deviceId}`, {
+            method: 'POST',
+            body: JSON.stringify({ command: 'ota_update' }),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data?.success) {
+            alert(data?.message || 'Erro ao enviar comando de atualização.');
+            return;
+          }
+          alert('Comando de atualização enviado. O dispositivo deve reiniciar em instantes.');
+        } catch (err) {
+          console.error('Erro ao enviar comando OTA:', err);
+          alert('Erro ao enviar comando de atualização.');
+        }
+      });
+    });
+
   } catch (err) {
     console.error('Erro ao carregar devices:', err);
     container.innerHTML = '<div class="small-text">Erro ao carregar dispositivos.</div>';
