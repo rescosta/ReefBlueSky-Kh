@@ -1,493 +1,365 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>ReefBlueSky - Minha conta</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minha Conta - ReefBlueSky</title>
   <style>
-    /* Copiado do dashboard-main para manter o mesmo visual */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      max-width: 100%;
-      width: 100%;
-      overflow-x: hidden;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-        sans-serif;
-      background: #020617;
-      color: #e5e7eb;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1419;
+      color: #e0e0e0;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
     }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    /* TOPBAR (igual main) */
-    .topbar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 10px 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    }
-
-    @supports (padding: max(0px)) {
-      .topbar {
-        padding-left: max(10px, env(safe-area-inset-left));
-        padding-right: max(10px, env(safe-area-inset-right));
-      }
-    }
-
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .logo {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
-    .nav {
-      display: flex;
-      gap: 16px;
-      font-size: 14px;
-    }
-    .nav a {
-      opacity: 0.8;
-      padding-bottom: 2px;
-      border-bottom: 2px solid transparent;
-    }
-    .nav a.active {
-      opacity: 1;
-      border-color: #facc15;
-    }
-    .topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 14px;
-    }
-    .badge-ok,
-    .badge-error,
-    .badge,
-    .badge-on,
-    .badge-off {
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .badge-ok {
-      background: #16a34a33;
-      border: 1px solid #22c55e;
-      color: #bbf7d0;
-    }
-    .badge-error {
-      background: #b91c1c33;
-      border: 1px solid #f97373;
-      color: #fecaca;
-    }
-    .badge-on {
-      background: #16a34a33;
-      border: 1px solid #22c55e;
-      color: #bbf7d0;
-    }
-    .badge-off {
-      background: #111827;
-      border: 1px solid #4b5563;
-      color: #9ca3af;
-    }
-
-    /* Ícones de device (mesmo visual da barra superior) */
-    .icon-kh,
-    .icon-lcd,
-    .icon-doser {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      margin-right: 6px;
-    }
-
-/* Ajusta cores conforme a barra/topo */
-.icon-kh {
-  background: #22c55e33;
-  border: 1px solid #22c55e;
-  color: #bbf7d0;
-}
-
-.icon-lcd {
-  background: #0ea5e933;
-  border: 1px solid #0ea5e9;
-  color: #bae6fd;
-}
-
-.icon-doser {
-  background: #f9731633;
-  border: 1px solid #f97316;
-  color: #ffedd5;
-}
-
-
-    .btn-small {
-      border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      background: #0f172a;
-      color: #e5e7eb;
-    }
-    .btn-small:hover {
-      background: #111827;
-    }
-
-    .menu-toggle {
-      display: none;
-      background: none;
-      border: 0;
-      padding: 6px;
-      cursor: pointer;
-    }
-    .menu-toggle span {
-      display: block;
-      width: 18px;
-      height: 2px;
-      background: #e5e7eb;
-      border-radius: 999px;
-      margin: 3px 0;
-    }
-   
-    #deviceSelect {
-      background-color: #020617;
-      color: #e5e7eb;
-      border: 1px solid #374151;
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 13px;
-    }
-
-    .side-menu {
-      position: fixed;
+    
+    #topbar-root {
+      position: sticky;
       top: 0;
-      left: 0;
-      width: 72%;
-      max-width: 280px;
-      height: 100%;
-      background: #020617;
-      color: #e5e7eb;
-      transform: translateX(-100%);
-      transition: transform 0.25s ease-out;
-      z-index: 40;
-      padding: 24px 16px;
+      z-index: 100;
+      background: #1a1f27;
+      border-bottom: 1px solid #2a3038;
     }
-    .side-menu.open {
-      transform: translateX(0);
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
     }
-    .side-menu a {
-      display: block;
-      padding: 10px 0;
-      font-size: 16px;
+    
+    .page-header {
+      margin-bottom: 30px;
     }
-    .side-close {
-      background: none;
-      border: 0;
-      color: #9ca3af;
-      font-size: 24px;
-      margin-bottom: 16px;
-      cursor: pointer;
-    }
-
-    @media (max-width: 768px) {
-      .nav {
-        display: none;
-      }
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 8px 12px;
-        gap: 4px;
-      }
-      .topbar-left {
-        justify-content: center;
-        order: 1;
-      }
-      .logo {
-        font-size: 20px;
-      }
-      .topbar-right {
-        order: 2;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 8px;
-        font-size: 12px;
-      }
-      .menu-toggle {
-        display: flex !important;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 8px;
-        width: 36px;
-      }
-      .menu-toggle span {
-        width: 20px;
-        height: 2px;
-        background: #e5e7eb;
-        border-radius: 1px;
-        margin: 2px 0;
-      }
-    }
-
-    /* Layout principal da página Minha conta */
-    .content {
-      flex: 1;
-      padding: 12px 10px 16px;
-      display: grid;
-      grid-template-columns: 2fr 1.2fr;
-      gap: 16px;
-    }
-
-    @media (max-width: 960px) {
-      .content {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .col {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .card {
-      background: #020617;
-      border-radius: 10px;
-      padding: 14px 16px;
-      border: 1px solid #1f2937;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    
+    .page-title {
+      font-size: 28px;
+      font-weight: 600;
       margin-bottom: 8px;
     }
-    .card-title {
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+    
+    .page-subtitle {
+      font-size: 14px;
       color: #9ca3af;
     }
-    .card-subtitle {
-      font-size: 12px;
-      color: #6b7280;
+    
+    .section {
+      background: #1a1f27;
+      border: 1px solid #2a3038;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
     }
-
+    
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .section-subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+    
     .form-group {
-      margin-bottom: 10px;
-      font-size: 13px;
+      margin-bottom: 16px;
     }
-    .form-group label {
+    
+    .form-label {
       display: block;
-      margin-bottom: 4px;
-      color: #9ca3af;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 6px 8px;
-      border-radius: 6px;
-      border: 1px solid #374151;
-      background: #020617;
-      color: #e5e7eb;
       font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #d1d5db;
     }
-
-    .section-actions {
-      margin-top: 8px;
-      display: flex;
-      gap: 8px;
+    
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f1419;
+      border: 1px solid #2a3038;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 14px;
+      transition: border-color 0.2s;
     }
-
-    .btn-danger {
+    
+    .form-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      background: #131824;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    
+    .btn {
+      display: inline-block;
+      padding: 10px 16px;
+      background: #3b82f6;
+      color: white;
       border: none;
       border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
-      background: #7f1d1d;
-      color: #fecaca;
+      transition: background 0.2s;
     }
+    
+    .btn:hover {
+      background: #2563eb;
+    }
+    
+    .btn-secondary {
+      background: #4b5563;
+    }
+    
+    .btn-secondary:hover {
+      background: #5a6678;
+    }
+    
+    .btn-danger {
+      background: #ef4444;
+    }
+    
     .btn-danger:hover {
-      background: #991b1b;
+      background: #dc2626;
     }
-
+    
     .small-text {
       font-size: 12px;
-      color: #6b7280;
-      margin-top: 4px;
+      color: #9ca3af;
     }
-
-    .device-list {
-      font-size: 13px;
+    
+    .error {
+      color: #ef4444;
     }
+    
+    /* ===== DEVICE LIST STYLES ===== */
+    #deviceList {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    
     .device-item {
-      padding: 6px 0;
-      border-bottom: 1px solid #1f2937;
+      background: #0f1419;
+      border: 1px solid #2a3038;
+      border-radius: 8px;
+      padding: 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .device-item:hover {
+      border-color: #3b82f6;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    }
+    
+    .device-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+      gap: 12px;
     }
-    .device-item:last-child {
-      border-bottom: none;
+    
+    .device-info {
+      flex: 1;
     }
-
-    .footer {
-      font-size: 11px;
+    
+    .device-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e0e0e0;
+      margin-bottom: 4px;
+    }
+    
+    .device-id {
+      font-size: 12px;
       color: #6b7280;
-      padding: 6px 10px 10px;
+      font-family: monospace;
+    }
+    
+    .device-actions {
       display: flex;
-      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    
+    /* ===== STATUS BADGE STYLES (SINCRONIZADO COM COMMON.JS) ===== */
+    .device-status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    
+    .device-status-badge.status-online {
+      background-color: #10b981;
+      color: white;
+    }
+    
+    .device-status-badge.status-offline {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .btn-update {
+      padding: 6px 12px;
+      background: #4b5563;
+      color: #e0e0e0;
+      border: 1px solid #2a3038;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    
+    .btn-update:hover {
+      background: #5a6678;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      
+      .device-header {
+        flex-direction: column;
+      }
+      
+      .device-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      
+      #deviceList {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- Topbar será injetada por common.js -->
   <div id="topbar-root"></div>
-
-  <!-- painel lateral -->
-  <div id="sideMenu" class="side-menu">
-    <button id="closeMenu" class="side-close">×</button>
-    <a href="dashboard-main.html">Principal</a>
-    <a href="dashboard-graficos.html">Gráficos</a>
-    <a href="dashboard-config.html">Configurações</a>
-    <a href="dashboard-sistema.html">Sistema</a>
-    <a href="dashboard-dosing.html">Dosadora</a>
-    <a href="dashboard-logs.html">Dev</a>
-    <a href="dashboard-account.html">Minha conta</a>
-    <a href="#" id="menuLogout">Sair</a>
-  </div>
-
-  <div class="content">
-    <div class="col">
-      <!-- Dados do perfil -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Minha conta</div>
-            <div class="card-subtitle">Dados do usuário e segurança</div>
-          </div>
-        </div>
+  
+  <div class="container">
+    <!-- MINHA CONTA -->
+    <div class="page-header">
+      <h1 class="page-title">Minha Conta</h1>
+      <p class="page-subtitle">Dados do usuário e segurança</p>
+    </div>
+    
+    <!-- PERFIL -->
+    <div class="section">
+      <h2 class="section-title">Perfil</h2>
+      
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="accountEmail" class="form-input" disabled>
+        <div class="small-text">Email usado para login e notificações.</div>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Nome</label>
+        <input type="text" id="accountName" class="form-input" placeholder="Seu nome completo">
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Fuso Horário</label>
+        <select id="accountTimezone" class="form-input">
+          <option value="">Selecione um fuso horário</option>
+          <option value="America/Sao_Paulo">America/Sao_Paulo (BRT)</option>
+          <option value="America/New_York">America/New_York (EST/EDT)</option>
+          <option value="Europe/London">Europe/London (GMT/BST)</option>
+          <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+          <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
+        </select>
+        <div class="small-text">Usado para horários de alertas e medições.</div>
+      </div>
+      
+      <button class="btn" onclick="saveProfile()">Salvar Perfil</button>
+    </div>
+    
+    <!-- SENHA -->
+    <div class="section">
+      <h2 class="section-title">Senha</h2>
+      <p class="section-subtitle">Alterar senha de acesso</p>
+      
+      <div class="form-group">
+        <label class="form-label">Senha Atual</label>
+        <input type="password" id="currentPassword" class="form-input" placeholder="Sua senha atual">
+      </div>
+      
+      <div class="form-row">
         <div class="form-group">
-          <label for="accountEmail">Email</label>
-          <input type="email" id="accountEmail" disabled />
-          <div class="small-text">Email usado para login e notificações.</div>
+          <label class="form-label">Nova Senha</label>
+          <input type="password" id="newPassword" class="form-input" placeholder="Nova senha">
         </div>
+        
         <div class="form-group">
-          <label for="accountName">Nome</label>
-          <input type="text" id="accountName" placeholder="Seu nome" />
-        </div>
-        <div class="form-group">
-          <label for="accountTimezone">Fuso horário</label>
-          <select id="accountTimezone">
-            <option value="">Selecione o fuso…</option>
-          </select>
-          <div class="small-text">Usado para horários de alertas e medições.</div>
-        </div>
-        <div class="section-actions">
-          <button id="btnSaveProfile" class="btn-small">Salvar perfil</button>
+          <label class="form-label">Confirmar Senha</label>
+          <input type="password" id="confirmPassword" class="form-input" placeholder="Confirme a nova senha">
         </div>
       </div>
-
-      <!-- Senha -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Senha</div>
-            <div class="card-subtitle">Alterar senha de acesso</div>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="currentPassword">Senha atual</label>
-          <input type="password" id="currentPassword" />
-        </div>
-        <div class="form-group">
-          <label for="newPassword">Nova senha</label>
-          <input type="password" id="newPassword" />
-        </div>
-        <div class="form-group">
-          <label for="confirmPassword">Confirmar nova senha</label>
-          <input type="password" id="confirmPassword" />
-        </div>
-        <div class="section-actions">
-          <button id="btnChangePassword" class="btn-small">Alterar senha</button>
-        </div>
-        <div class="small-text">
-          Use uma senha forte. Essa ação pode encerrar sessões ativas em outros dispositivos.
-        </div>
+      
+      <div class="small-text" style="margin-bottom: 12px;">
+        Use uma senha forte. Essa ação pode encerrar sessões ativas em outros dispositivos.
+      </div>
+      
+      <button class="btn btn-secondary" onclick="changePassword()">Alterar Senha</button>
+    </div>
+    
+    <!-- DISPOSITIVOS -->
+    <div class="section">
+      <h2 class="section-title">Meus Dispositivos</h2>
+      <p class="section-subtitle">KH, dosadoras e LCD vinculados</p>
+      
+      <div id="deviceList">
+        <div class="small-text">Carregando dispositivos...</div>
       </div>
     </div>
-
-    <div class="col">
-      <!-- Dispositivos -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Meus dispositivos</div>
-            <div class="card-subtitle">KH, dosadoras e LCD vinculados</div>
-          </div>
-        </div>
-        <div id="deviceList" class="device-list">
-          <!-- preenchido via JS -->
-          <div class="small-text">Carregando dispositivos...</div>
-        </div>
-      </div>
-
-      <!-- Dados e privacidade -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Dados e privacidade</div>
-            <div class="card-subtitle">Exportar dados ou excluir conta</div>
-          </div>
-        </div>
-        <div class="section-actions">
-          <button id="btnExportData" class="btn-small">Exportar meus dados</button>
-        </div>
-        <div class="small-text">
+    
+    <!-- DADOS E PRIVACIDADE -->
+    <div class="section">
+      <h2 class="section-title">Dados e Privacidade</h2>
+      <p class="section-subtitle">Exportar dados ou excluir conta</p>
+      
+      <div class="form-group">
+        <p class="small-text" style="margin-bottom: 12px;">
           Exporta histórico de medições e configurações em formato JSON/CSV.
-        </div>
-        <div style="margin-top: 12px; border-top: 1px solid #1f2937; padding-top: 10px;">
-          <div class="small-text" style="margin-bottom: 6px;">
-            Exclusão permanente da conta e de todos os dados associados.
-          </div>
-          <button id="btnDeleteAccount" class="btn-danger">Excluir minha conta</button>
-        </div>
+        </p>
+        <button class="btn btn-secondary" onclick="alert('Exportação em desenvolvimento')">Exportar Meus Dados</button>
+      </div>
+      
+      <div class="form-group">
+        <p class="small-text" style="margin-bottom: 12px;">
+          Exclusão permanente da conta e de todos os dados associados.
+        </p>
+        <button class="btn btn-danger" onclick="alert('Recurso em desenvolvimento. Contate o suporte.')">Deletar Conta</button>
       </div>
     </div>
   </div>
-
-  <div class="footer">
-    <div id="userInfo">Usuário --</div>
-    <div>ReefBlueSky KH Monitor — Dashboard web</div>
-  </div>
-
+  
+  <!-- Scripts -->
   <script src="js/dashboard-common.js"></script>
   <script src="js/dashboard-account.js"></script>
 </body>
