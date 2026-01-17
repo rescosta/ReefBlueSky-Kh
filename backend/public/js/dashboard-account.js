@@ -184,15 +184,18 @@ async function loadDevices() {
       right.style.alignItems = 'center';
       right.style.gap = '8px';
 
-      // NOVO: badge espelhado da topbar, usando lastSeen
-      const statusBadgeHtml = renderDeviceStatusBadge(d);
-      right.innerHTML = statusBadgeHtml;
+      // >>> AQUI passa a ser exatamente a mesma lógica da topbar
+      const isOnline = computeOnlineFromLastSeen(d.lastSeen ?? d.last_seen);
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'device-status-badge ' + (isOnline ? 'status-online' : 'status-offline');
+      statusSpan.textContent = isOnline ? 'Online' : 'Offline';
+      right.appendChild(statusSpan);
 
       const btn = document.createElement('button');
       btn.className = 'btn-small';
       btn.dataset.deviceId = d.deviceId;
       btn.textContent = 'Atualizar';
-      if (type === 'KH' && !computeOnlineFromLastSeen(d.lastSeen)) {
+      if (type === 'KH' && !isOnline) {
         btn.disabled = true;
       }
       right.appendChild(btn);
@@ -201,6 +204,7 @@ async function loadDevices() {
       div.appendChild(right);
       frag.appendChild(div);
     });
+
 
     container.innerHTML = '';
     container.appendChild(frag);
