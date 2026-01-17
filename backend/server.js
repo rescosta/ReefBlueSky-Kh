@@ -1904,6 +1904,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
         d.last_seen AS lastSeen,
         d.lcd_status,
         d.dosing_status,
+        d.firmware_version,
         d.createdAt,
         d.updatedAt
       FROM devices d
@@ -1913,7 +1914,7 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
 
     if (type) {
       sql += ' AND d.type = ?';
-      params.push(type);   // "KH" ou "LCD"
+      params.push(type);   // "KH", "LCD", "DOSER"
     }
 
     sql += ' ORDER BY d.createdAt DESC';
@@ -1924,18 +1925,25 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
       const dosingStatus =
         r.dosing_status === 'online' ? 'online' : 'offline';
 
+      const lastSeenMs = r.lastSeen ? new Date(r.lastSeen).getTime() : null;
+
+      const FIVE_MIN = 5 * 60 * 1000;
+      const online = !!(lastSeenMs && (Date.now() - lastSeenMs) < FIVE_MIN);
+
       return {
         id:        r.id,
         deviceId:  r.deviceId,
         name:      r.name,
         type:      r.type,
         localIp:   r.localIp,
-        lastSeen:  r.lastSeen ? new Date(r.lastSeen).getTime() : null,
+        lastSeen:  lastSeenMs,
         lcdStatus:
           r.lcd_status === 'online' || r.lcd_status === 'offline'
             ? r.lcd_status
             : 'offline',
         dosingStatus,
+        firmwareVersion: r.firmware_version || null,
+        online,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
       };
@@ -2524,6 +2532,7 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
     if (conn) try { conn.release(); } catch (_) {}
   }
 });
+
 
 
 
