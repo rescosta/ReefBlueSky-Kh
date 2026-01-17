@@ -246,16 +246,17 @@ async function loadDevices() {
     container.appendChild(frag);
 
 
-    // Clona o mesmo bloco de status da topbar
-    const topbarStatus = document.querySelector('.topbar-status'); // ajuste o seletor
+    // Clona o mesmo bloco de status da topbar (ONLINE / LCD ON / DOS ON)
+    const topbarStatus = document.querySelector('.topbar-right'); // container dos badges na topbar
     if (topbarStatus) {
       const mirror = topbarStatus.cloneNode(true);
       mirror.classList.add('devices-topbar-mirror');
       mirror.style.marginBottom = '12px';
 
-      // Coloca o clone acima da lista de dispositivos
+      // Insere o clone acima da lista de dispositivos
       container.prepend(mirror);
     }
+
 
     // Botão de atualização OTA (mesmo código que você já tinha)
     container.querySelectorAll('.btn-small[data-device-id]').forEach((btn) => {
