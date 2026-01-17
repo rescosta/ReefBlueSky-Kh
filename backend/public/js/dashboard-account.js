@@ -127,7 +127,7 @@ async function loadDevices() {
   container.innerHTML = '<div class="small-text">Carregando dispositivos...</div>';
 
   try {
-    const res = await apiFetch('/api/v1/devices/my-devices', { method: 'GET' });
+    const res = await apiFetch('/api/v1/user/devices', { method: 'GET' });
     if (!res.ok) {
       container.innerHTML = '<div class="small-text">Erro ao carregar dispositivos.</div>';
       return;
