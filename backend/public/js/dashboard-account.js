@@ -21,6 +21,7 @@ function initTopbar() {
   }
 }
 
+
 // Preencher campos do perfil com /auth/me
 async function loadAccountProfile() {
   try {
@@ -113,6 +114,51 @@ async function changePassword() {
   }
 }
 
+function setLcdStatusInDevices(status) {
+  const el = document.getElementById('lcdStatusIconDevices');
+  if (!el) return;
+
+  // mesma lógica de setLcdStatus, só mudando o id
+  if (status === undefined || status === null) return;
+  if (status === 'never') {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'inline-block';
+  if (status === 'online') {
+    el.textContent = 'LCD ON';
+    el.className = 'badge-on';
+    el.title = 'Display remoto conectado';
+  } else {
+    el.textContent = 'LCD OFF';
+    el.className = 'badge-off';
+    el.title = 'Display remoto desconectado';
+  }
+}
+
+function setDosingStatusInDevices(status) {
+  const el = document.getElementById('dosingStatusIconDevices');
+  if (!el) return;
+
+  if (status !== 'online' && el.textContent === 'DOS ON') return;
+  if (status === undefined || status === null) return;
+  if (status === 'never') {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'inline-block';
+  if (status === 'online') {
+    el.textContent = 'DOS ON';
+    el.className = 'badge-on';
+    el.title = 'Dosadora conectada';
+  } else {
+    el.textContent = 'DOS OFF';
+    el.className = 'badge-off';
+    el.title = 'Dosadora desconectada';
+  }
+}
+
+
 // Mesma regra de online/offline que o Common usa (5 min de janela)
 function computeOnlineFromLastSeen(lastSeen) {
   if (!lastSeen) return false;
@@ -138,6 +184,9 @@ function buildTopbarStatusButtons(devices) {
   const khOnline  = kh  ? computeOnlineFromLastSeen(kh.lastSeen || kh.last_seen)   : false;
   const dosOnline = dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false;
   const lcdOnline = lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false;
+
+  setLcdStatusInDevices(lcd ? (lcdOnline ? 'online' : 'offline') : 'never');
+  setDosingStatusInDevices(dos ? (dosOnline ? 'online' : 'offline') : 'never');
 
   const anyOnline = khOnline || dosOnline || lcdOnline;
 
@@ -244,30 +293,6 @@ async function loadDevices() {
 
     container.innerHTML = '';
     container.appendChild(frag);
-
-
-    // depois de container.appendChild(frag);
-
-    const topbarRight = document.querySelector('.topbar-right');
-    if (topbarRight) {
-      const mirror = document.createElement('div');
-      mirror.className = 'devices-topbar-mirror';
-      mirror.style.display = 'flex';
-      mirror.style.gap = '8px';
-      mirror.style.marginBottom = '12px';
-
-      const ids = ['deviceStatusBadge', 'lcdStatusIcon', 'dosingStatusIcon'];
-      ids.forEach((id) => {
-        const el = topbarRight.querySelector('#' + id);
-        if (el) {
-          mirror.appendChild(el.cloneNode(true));
-        }
-      });
-
-      container.prepend(mirror);
-    }
-
-
 
     // Botão de atualização OTA (mesmo código que você já tinha)
     container.querySelectorAll('.btn-small[data-device-id]').forEach((btn) => {
