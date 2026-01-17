@@ -147,34 +147,43 @@ async function loadDevices() {
       const div = document.createElement('div');
       div.className = 'device-item';
 
-      const name = d.name || d.deviceId || 'Device';
-      const type = d.type || '';
-      const fw = d.firmwareVersion || 'N/A';
-      const online = !!d.online;
+      const name = d.name || d.id || 'Device';
+      const type = d.type || 'KH';
+      const online = !!d.online; // já vem pronto do /api/v1/user/devices
+
+      // Mesmo mapeamento visual que o topo usa (ícones por tipo)
+      let iconHtml = '';
+      if (type === 'KH') {
+        iconHtml = '<span class="icon-kh"></span>';
+      } else if (type === 'DOSER') {
+        iconHtml = '<span class="icon-doser"></span>';
+      } else if (type === 'LCD') {
+        iconHtml = '<span class="icon-lcd"></span>';
+      }
+
+      // (Opcional) mesma cor de badge por tipo que você usa no topo
+      let typeBadgeClass = 'badge';
+      if (type === 'KH') typeBadgeClass = 'badge-ok';
+      if (type === 'DOSER') typeBadgeClass = 'badge-on';
+      if (type === 'LCD') typeBadgeClass = 'badge-off';
 
       const left = document.createElement('div');
-      left.innerHTML =
-        `<strong>${name}</strong><br/>` +
-        `<span class="small-text">${type} — FW ${fw}</span>`;
+      left.innerHTML = `
+        <span class="${typeBadgeClass}">
+          ${iconHtml} ${name}
+        </span><br>
+        <span class="small-text">${type}</span>
+      `;
 
       const right = document.createElement('div');
-      right.className = 'device-actions';
-      right.innerHTML = `
-        <div style="margin-bottom:4px;">
-          ${online
-            ? '<span class="badge-on">Online</span>'
-            : '<span class="badge-off">Offline</span>'}
-        </div>
-        <button class="btn-small" data-device-id="${d.deviceId}" ${online ? '' : 'disabled'}>
-          Atualizar firmware
-        </button>
-      `;
+      right.innerHTML = online
+        ? '<span class="badge-on">Online</span>'
+        : '<span class="badge-off">Offline</span>';
 
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
     });
-
 
     container.innerHTML = '';
     container.appendChild(frag);
