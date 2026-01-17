@@ -253,23 +253,27 @@ async function loadDevices() {
     const dos = devices.find(d => d.type === 'DOSER');
     const lcd = devices.find(d => d.type === 'LCD');
 
-    // status “online/offline” de cada um (se não vier lcdStatus/dosingStatus, cai no lastSeen)
-    const khOnline  = kh  ? computeOnlineFromLastSeen(kh.lastSeen  || kh.last_seen)   : false;
+    // KH sempre via lastSeen mesmo
+    const khOnline = kh ? computeOnlineFromLastSeen(kh.lastSeen || kh.last_seen) : false;
 
-    let dosStatus  = dos?.dosingStatus ?? null;
-    let lcdStatus  = lcd?.lcdStatus    ?? null;
-
-    const dosOnline = dosStatus
-      ? (dosStatus === 'online')
+    // DOS: usa dosingStatus se vier, senão lastSeen
+    const dosStatusFromApi = dos?.dosingStatus ?? dos?.dosing_status ?? null;
+    const dosOnline = dosStatusFromApi
+      ? (dosStatusFromApi === 'online')
       : (dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false);
 
-    const lcdOnline = lcdStatus
-      ? (lcdStatus === 'online')
+    // LCD: usa lcdStatus se vier, senão lastSeen
+    const lcdStatusFromApi = lcd?.lcdStatus ?? lcd?.lcd_status ?? null;
+    const lcdOnline = lcdStatusFromApi
+      ? (lcdStatusFromApi === 'online')
       : (lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false);
 
-    // atualiza LCD/DOS dos spans “Devices” lá de cima
-    setLcdStatusInDevices(lcd ? (lcdOnline ? 'online' : 'offline') : 'never');
-    setDosingStatusInDevices(dos ? (dosOnline ? 'online' : 'offline') : 'never');
+    // status final que vai para os spans globais da account
+    const finalDosStatus = !dos ? 'never' : (dosOnline ? 'online' : 'offline');
+    const finalLcdStatus = !lcd ? 'never' : (lcdOnline ? 'online' : 'offline');
+
+    setDosingStatusInDevices(finalDosStatus);
+    setLcdStatusInDevices(finalLcdStatus);
 
     // badge global “Desconhecido / Online / Offline”
     const badge = document.getElementById('deviceStatusBadgeDevices');
@@ -285,6 +289,7 @@ async function loadDevices() {
         badge.textContent = 'Offline';
       }
     }
+
 
     const frag = document.createDocumentFragment();
 
