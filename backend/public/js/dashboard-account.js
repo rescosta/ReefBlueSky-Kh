@@ -176,7 +176,7 @@ function computeOnlineFromLastSeen(lastSeen) {
 }
 
 // Gera os mesmos botões de status da barra superior
-function buildTopbarStatusButtons(devices) {
+/*function buildTopbarStatusButtons(devices) {
   const kh  = devices.find(d => d.type === 'KH');
   const dos = devices.find(d => d.type === 'DOSER');
   const lcd = devices.find(d => d.type === 'LCD');
@@ -211,7 +211,7 @@ function buildTopbarStatusButtons(devices) {
      </button>`;
 
   return { khHtml, dosHtml, lcdHtml, globalHtml };
-}
+}*/
 
 
 // Carregar lista de dispositivos vinculados (KH/LCD/DOS)
