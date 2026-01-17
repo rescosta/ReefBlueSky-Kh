@@ -21,6 +21,18 @@ function initTopbar() {
   }
 }
 
+function getDevicesStatusBadgesHtml() {
+  return `
+    <span id="deviceStatusBadgeDevices" class="badge badge-off">Desconhecido</span>
+    <span id="lcdStatusIconDevices" class="badge-off" style="display:none; font-size:12px;">
+      LCD OFF
+    </span>
+    <span id="dosingStatusIconDevices" class="badge-off" style="display:none; font-size:12px;">
+      DOS OFF
+    </span>
+  `;
+}
+
 
 // Preencher campos do perfil com /auth/me
 async function loadAccountProfile() {
@@ -397,6 +409,115 @@ function populateTimezoneSelect() {
   });
 }
 
+function getDeviceItemHtml(dev) {
+  const baseName = dev.name?.trim() || dev.deviceId;
+
+  // ids únicos por deviceId
+  const lcdId   = `lcdStatusIcon-${dev.deviceId}`;
+  const dosId   = `dosingStatusIcon-${dev.deviceId}`;
+  const badgeId = `deviceStatusBadge-${dev.deviceId}`;
+
+  return `
+    <div class="device-item">
+      <div>
+        <div>${baseName}</div>
+        <div class="small-text">${dev.type}</div>
+      </div>
+
+      <div style="display:flex; gap:6px; align-items:center; font-size:12px;">
+        <span id="${badgeId}" class="badge badge-off">Desconhecido</span>
+
+        <span id="${lcdId}" class="badge-off" style="display:none; font-size:12px;">
+          LCD OFF
+        </span>
+
+        <span id="${dosId}" class="badge-off" style="display:none; font-size:12px;">
+          DOS OFF
+        </span>
+      </div>
+    </div>
+  `;
+}
+
+
+function renderDevices(devices) {
+  const list = document.getElementById('deviceList');
+  if (!list) return;
+
+  if (!devices.length) {
+    list.innerHTML = '<div class="small-text">Nenhum dispositivo vinculado.</div>';
+    return;
+  }
+
+  list.innerHTML = devices.map(getDeviceItemHtml).join('');
+}
+
+
+function updatePerDeviceBadges(dev) {
+  const badge = document.getElementById(`deviceStatusBadge-${dev.deviceId}`);
+  const lcdEl = document.getElementById(`lcdStatusIcon-${dev.deviceId}`);
+  const dosEl = document.getElementById(`dosingStatusIcon-${dev.deviceId}`);
+
+  // status geral (lastSeen)
+  if (badge) {
+    const last = typeof dev.lastSeen === 'number'
+      ? dev.lastSeen
+      : Date.parse(dev.lastSeen);
+    if (!last || Number.isNaN(last)) {
+      badge.className = 'badge badge-off';
+      badge.textContent = 'Desconhecido';
+    } else {
+      const diffMin = (Date.now() - last) / 60000;
+      if (diffMin < 5) {
+        badge.className = 'badge badge-on';
+        badge.textContent = 'Online';
+      } else {
+        badge.className = 'badge badge-off';
+        badge.textContent = 'Offline';
+      }
+    }
+  }
+
+  // LCD
+  if (lcdEl) {
+    const status = dev.lcdStatus; // mesmo campo que você já usa na topbar
+    if (status === undefined || status === null) {
+      lcdEl.style.display = 'none';
+    } else {
+      lcdEl.style.display = 'inline-block';
+      if (status === 'online') {
+        lcdEl.textContent = 'LCD ON';
+        lcdEl.className = 'badge-on';
+        lcdEl.title = 'Display remoto conectado';
+      } else {
+        lcdEl.textContent = 'LCD OFF';
+        lcdEl.className = 'badge-off';
+        lcdEl.title = 'Display remoto desconectado';
+      }
+    }
+  }
+
+  // DOS
+  if (dosEl) {
+    const status = dev.dosingStatus;
+    if (status === undefined || status === null) {
+      dosEl.style.display = 'none';
+    } else {
+      dosEl.style.display = 'inline-block';
+      if (status === 'online') {
+        dosEl.textContent = 'DOS ON';
+        dosEl.className = 'badge-on';
+        dosEl.title = 'Dosadora conectada';
+      } else {
+        dosEl.textContent = 'DOS OFF';
+        dosEl.className = 'badge-off';
+        dosEl.title = 'Dosadora desconectada';
+      }
+    }
+  }
+}
+
+
 function initAccountPage() {
   initAccountTopbar();
 
@@ -419,6 +540,12 @@ function initAccountPage() {
     e.preventDefault();
     deleteAccount();
   });
+
+  const mirror = document.querySelector('.devices-topbar-mirror');
+  if (mirror) {
+    mirror.innerHTML = getDevicesStatusBadgesHtml();
+  }
+
 
   populateTimezoneSelect();
   loadAccountProfile();
