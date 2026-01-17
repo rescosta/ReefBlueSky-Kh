@@ -149,9 +149,10 @@ async function loadDevices() {
 
       const name = d.name || d.id || 'Device';
       const type = d.type || 'KH';
-      const online = !!d.online; // já vem pronto do /api/v1/user/devices
+      const fw = d.firmwareVersion || 'N/A';
+      const online = !!d.online; // continua igual
 
-      // Mesmo mapeamento visual que o topo usa (ícones por tipo)
+      // Ícone opcional, se quiser manter (pode deixar string vazia)
       let iconHtml = '';
       if (type === 'KH') {
         iconHtml = '<span class="icon-kh"></span>';
@@ -161,29 +162,29 @@ async function loadDevices() {
         iconHtml = '<span class="icon-lcd"></span>';
       }
 
-      // (Opcional) mesma cor de badge por tipo que você usa no topo
-      let typeBadgeClass = 'badge';
-      if (type === 'KH') typeBadgeClass = 'badge-ok';
-      if (type === 'DOSER') typeBadgeClass = 'badge-on';
-      if (type === 'LCD') typeBadgeClass = 'badge-off';
-
       const left = document.createElement('div');
       left.innerHTML = `
-        <span class="${typeBadgeClass}">
-          ${iconHtml} ${name}
-        </span><br>
-        <span class="small-text">${type}</span>
+        <strong>${iconHtml} ${name}</strong><br>
+        <span class="small-text">FW ${fw}</span>
       `;
 
       const right = document.createElement('div');
-      right.innerHTML = online
-        ? '<span class="badge-on">Online</span>'
-        : '<span class="badge-off">Offline</span>';
+      right.innerHTML = `
+        <button
+          class="btn-small"
+          data-device-id="${d.deviceId}"
+          ${online ? '' : 'disabled'}
+          style="margin-left: 8px;"
+        >
+          Atualizar
+        </button>
+      `;
 
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
     });
+
 
     container.innerHTML = '';
     container.appendChild(frag);
