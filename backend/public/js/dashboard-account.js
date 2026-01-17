@@ -185,6 +185,10 @@ async function loadDevices() {
       `;
 
       const right = document.createElement('div');
+      right.style.display = 'flex';
+      right.style.alignItems = 'center';
+      right.style.gap = '8px';
+
 
       if (type === 'DOSER' && dosingClone) {
         // clona de novo pra não reutilizar o mesmo nó
