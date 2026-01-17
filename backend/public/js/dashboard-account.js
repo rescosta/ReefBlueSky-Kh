@@ -161,10 +161,6 @@ async function loadDevices() {
       const type = d.type || 'KH';
       const fw   = d.firmwareVersion || 'N/A';
 
-      // Online igual ao Common, baseado em lastSeen
-      const online = !!d.online;
-
-      // Ícone de tipo igual ao topo
       let iconHtml = '';
       if (type === 'KH') {
         iconHtml = '<span class="icon-kh">KH</span>';
@@ -180,15 +176,36 @@ async function loadDevices() {
         <span class="small-text">FW ${fw}</span>
       `;
 
+      // STATUS: espelhar topo
+      let statusLabel = '';
+      let statusClass = '';
+
+      if (type === 'LCD') {
+        const lcdStatus = d.lcdStatus || d.lcd_status || 'offline';
+        const isOn = lcdStatus === 'online';
+        statusLabel = isOn ? 'LCD ON' : 'LCD OFF';
+        statusClass = isOn ? 'badge-on' : 'badge-off';
+      } else if (type === 'DOSER') {
+        const dosingStatus = d.dosingStatus || d.dosing_status || 'offline';
+        const isOn = dosingStatus === 'online';
+        statusLabel = isOn ? 'DOS ON' : 'DOS OFF';
+        statusClass = isOn ? 'badge-on' : 'badge-off';
+      } else {
+        // KH usa online do próprio device
+        const online = !!d.online;
+        statusLabel = online ? 'Online' : 'Offline';
+        statusClass = online ? 'badge-on' : 'badge-off';
+      }
+
       const right = document.createElement('div');
       right.innerHTML = `
-        <span class="${online ? 'badge-on' : 'badge-off'}" style="margin-right: 8px;">
-          ${online ? 'Online' : 'Offline'}
+        <span class="${statusClass}" style="margin-right: 8px;">
+          ${statusLabel}
         </span>
         <button
           class="btn-small"
           data-device-id="${d.deviceId}"
-          ${online ? '' : 'disabled'}
+          ${type === 'KH' && !d.online ? 'disabled' : ''}
         >
           Atualizar
         </button>
@@ -197,7 +214,8 @@ async function loadDevices() {
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
-    });
+});
+
 
     container.innerHTML = '';
     container.appendChild(frag);
