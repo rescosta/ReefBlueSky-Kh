@@ -26,7 +26,16 @@ const dosingUserRoutes = require('./dosing-user-routes');
 const dosingIotRoutes  = require('./dosing-iot-routes'); 
 const dosingDeviceRoutes = require('./dosing-device-routes');
 
+
+
 const axios = require('axios');
+
+const {
+  getUserTimezone,
+  formatWithUserTimezone,
+  formatDoserWithTimezone,
+} = require('./user-timezone');
+
 
 dotenv.config();
 
@@ -353,7 +362,8 @@ async function checkDevicesOnlineStatus() {
               d.type,
               d.last_seen,
               d.offline_alert_sent,
-              u.email
+              u.email,
+              u.timezone
          FROM devices d
          JOIN users u ON u.id = d.userId
         WHERE d.last_seen IS NOT NULL`
@@ -374,19 +384,12 @@ async function checkDevicesOnlineStatus() {
 
         try {
           const lastSeenDate = new Date(row.last_seen);
-          const lastSeenBr = lastSeenDate.toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
+          const lastSeenBr = await formatWithUserTimezone(row.userId, lastSeenDate);
+
 
           const text =
             `⚠️Seu dispositivo ${row.deviceId} parece estar offline há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-            `Último sinal recebido em: ${lastSeenBr} (horário de Brasília).\n\n` +
+            `Último sinal recebido em: ${lastSeenBr}.\n\n` +
             `Verifique alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
 
           // Atualiza flag apenas se ainda estava 0; evita race com outro loop
@@ -412,7 +415,7 @@ async function checkDevicesOnlineStatus() {
             await sendTelegramForUser(
               row.userId,
               `⚠️*${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-              `Último sinal em: ${lastSeenBr} (Brasília).`
+              `Último sinal em: ${lastSeenBr}.`
             );
 
           }
@@ -437,19 +440,11 @@ async function checkDevicesOnlineStatus() {
           console.log('[ALERT DEBUG] UPDATE result.affectedRows=', result.affectedRows);
           if (result.affectedRows > 0) {
             const subject = `ReefBlueSky KH - Device ${row.deviceId} voltou ONLINE`;
-            const nowBr = new Date().toLocaleString('pt-BR', {
-              timeZone: 'America/Sao_Paulo',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            });
+            const nowBr = await formatWithUserTimezone(row.userId, new Date());
 
             const text =
               `Seu dispositivo ${row.deviceId} voltou a se comunicar com o servidor.\n` +
-              `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
+              `Último sinal recebido agora em ${nowBr}.`;
 
             console.log('[ALERT DEBUG] Enviando email de ONLINE para', row.email);
             await mailTransporter.sendMail({
@@ -472,7 +467,7 @@ async function checkDevicesOnlineStatus() {
             await sendTelegramForUser(
               row.userId,
               `✅ *${deviceLabel}* voltou *ONLINE*.\n` +
-              `Último sinal em: ${nowBr} (Brasília).`
+              `Último sinal em: ${nowBr}.`
             );
           }
         } catch (err) {
@@ -495,7 +490,9 @@ async function checkDevicesOnlineStatus() {
             dd.last_seen,
             dd.online,
             dd.offline_alert_sent,
-            u.email
+            dd.timezone      AS dosingTimezone,
+            u.email,
+            u.timezone       AS userTimezone
        FROM dosing_devices dd
        JOIN users u ON u.id = dd.user_id
       WHERE dd.last_seen IS NOT NULL`
@@ -506,24 +503,18 @@ async function checkDevicesOnlineStatus() {
     const isOffline = !lastMs || (now - lastMs > OFFLINE_THRESHOLD_MS);
 
     const deviceLabel = drow.name || drow.esp_uid;
-    const lastSeenBr = lastMs
-      ? new Date(lastMs).toLocaleString('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        })
-      : 'desconhecido';
+    const { tz, text: lastSeenBr } = await formatDoserWithTimezone({
+      timezone: drow.dosingTimezone,   // se usou AS no SELECT
+      userTimezone: drow.userTimezone, // idem
+      last_seen: drow.last_seen,
+    });
 
     // 2.1 – OFFLINE (dosadora)
     if (isOffline && !drow.offline_alert_sent) {
       try {
         const text =
           `⚠️Seu dosador ${deviceLabel} parece estar offline há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-          `Último sinal recebido em: ${lastSeenBr} (horário de Brasília).\n\n` +
+          `Último sinal recebido em: ${lastSeenBr}.\n\n` +
           `Verifique alimentação elétrica, Wi-Fi e o próprio dispositivo.`;
 
         const result = await conn.query(
@@ -546,7 +537,7 @@ async function checkDevicesOnlineStatus() {
           await sendTelegramForUser(
             drow.user_id,
             `⚠️ *${deviceLabel}* (dosadora) parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-            `Último sinal em: ${lastSeenBr} (Brasília).`
+            `Último sinal em: ${lastSeenBr}.`
           );
         }
       } catch (err) {
@@ -565,19 +556,16 @@ async function checkDevicesOnlineStatus() {
         );
 
         if (result.affectedRows > 0) {
-          const nowBr = new Date().toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
+          const nowTz = await formatDoserWithTimezone({
+            timezone: drow.dosingTimezone,
+            userTimezone: drow.userTimezone,
+            last_seen: new Date(), // agora
           });
+          const nowBr = nowTz.text;
 
           const text =
             `Seu dosador ${deviceLabel} voltou a se comunicar com o servidor.\n` +
-            `Último sinal recebido agora em ${nowBr} (horário de Brasília).`;
+            `Último sinal recebido agora em ${nowBr}.`;
 
           // Email ONLINE
           await mailTransporter.sendMail({
@@ -591,7 +579,7 @@ async function checkDevicesOnlineStatus() {
           await sendTelegramForUser(
             drow.user_id,
             `✅ *${deviceLabel}* (dosadora) voltou *ONLINE*.\n` +
-            `Último sinal em: ${nowBr} (Brasília).`
+            `Último sinal em: ${nowBr}.`
           );
         }
       } catch (err) {
@@ -612,8 +600,6 @@ async function checkDevicesOnlineStatus() {
     );
   }
 
-
-
     // alerta de LCD offline ---
     const lcdRows = await conn.query(
       `SELECT d.id,
@@ -622,7 +608,8 @@ async function checkDevicesOnlineStatus() {
               d.lcd_last_seen,
               d.lcd_status,
               d.lcd_offline_alert_sent,
-              u.email
+              u.email,
+              u.timezone
          FROM devices d
          JOIN users u ON u.id = d.userId
         WHERE d.type = 'KH'
@@ -668,20 +655,13 @@ async function checkDevicesOnlineStatus() {
       // LCD OFFLINE e ainda não mandou alerta
       if (isLcdOffline && !row.lcd_offline_alert_sent) {
         try {
-          const lastSeenBr = new Date(lastMs).toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
+          const lastSeenDate = new Date(lastMs);
+          const lastSeenBr = await formatWithUserTimezone(row.userId, lastSeenDate);
 
           const text =
             `O display LCD associado ao device ${row.deviceId} ` +
             `não envia sinais há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-            `Último ping do LCD em: ${lastSeenBr} (horário de Brasília).\n\n` +
+            `Último ping do LCD em: ${lastSeenBr}.\n\n` +
             `Verifique alimentação do display e conexão Wi‑Fi.`;
 
           const result = await conn.query(
@@ -704,7 +684,7 @@ async function checkDevicesOnlineStatus() {
             await sendTelegramForUser(
               row.userId,
               `⚠️ LCD do device *${deviceLabel}* parece estar *OFFLINE* há mais de ${OFFLINE_THRESHOLD_MINUTES} minutos.\n` +
-              `Último ping do LCD em: ${lastSeenBr} (Brasília).`
+              `Último ping do LCD em: ${lastSeenBr}.`
             );
           }
         } catch (err) {
@@ -725,20 +705,13 @@ async function checkDevicesOnlineStatus() {
           );
 
           if (result.affectedRows > 0) {
-            const nowBr = new Date().toLocaleString('pt-BR', {
-              timeZone: 'America/Sao_Paulo',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            });
+            const nowBr = await formatWithUserTimezone(row.userId, new Date());
+
 
             const subject = `ReefBlueSky KH - LCD do device ${row.deviceId} voltou ONLINE`;
             const text =
               `O display LCD associado ao device ${row.deviceId} voltou a se comunicar com o servidor.\n` +
-              `Último ping agora em: ${nowBr} (horário de Brasília).`;
+              `Último ping agora em: ${nowBr}.`;
 
             await mailTransporter.sendMail({
               from: ALERT_FROM,
@@ -751,7 +724,7 @@ async function checkDevicesOnlineStatus() {
             await sendTelegramForUser(
               row.userId,
               `✅ LCD do device *${deviceLabel}* voltou *ONLINE*.\n` +
-              `Último ping em: ${nowBr} (Brasília).`
+              `Último ping em: ${nowBr}.`
             );
           }
           
@@ -1191,7 +1164,7 @@ app.post(
 app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
   console.log('API POST /api/v1/auth/register');
 
-  const { email, password } = req.body;
+  const { email, password, timezone, } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({
@@ -1274,8 +1247,8 @@ app.post('/api/v1/auth/register', authLimiter, async (req, res) => {
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
 
     const result = await conn.query(
-      'INSERT INTO users (email, passwordHash, createdAt, updatedAt, verificationCode, verificationExpiresAt, isVerified) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [email, passwordHash, now, now, verificationCode, expiresAt, 0]
+      'INSERT INTO users (email, passwordHash, createdAt, updatedAt, verificationCode, verificationExpiresAt, isVerified, timezone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [email, passwordHash, now, now, verificationCode, expiresAt, 0, timezone || null]
     );
 
     const newUserId = Number(result.insertId);
