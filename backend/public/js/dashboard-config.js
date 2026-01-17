@@ -156,6 +156,30 @@ function updatePumpStatus(pumpId, running, direction) {
 }
 
 
+function updateLevelsFromDevice(device) {
+  if (!device) return;
+
+  const a = device.levelA;
+  const b = device.levelB;
+  const c = device.levelC;
+
+  if (levelAEl) {
+    levelAEl.textContent = a ? 'COM água (Ativado)' : 'SEM água (Desativado)';
+    levelAEl.className = a ? 'badge badge-green' : 'badge badge-gray';
+  }
+
+  if (levelBEl) {
+    levelBEl.textContent = b ? 'COM água (Ativado)' : 'SEM água (Desativado)';
+    levelBEl.className = b ? 'badge badge-green' : 'badge badge-gray';
+  }
+
+  if (levelCEl) {
+    levelCEl.textContent = c ? 'COM água (Ativado)' : 'SEM água (Desativado)';
+    levelCEl.className = c ? 'badge badge-green' : 'badge badge-gray';
+  }
+}
+
+
 // Stubs de API (para você ligar no server.js depois)
 
 async function apiLoadDeviceConfig(deviceId) {
