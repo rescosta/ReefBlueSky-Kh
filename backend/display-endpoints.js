@@ -49,7 +49,7 @@ router.post('/register', async (req, res) => {
 
     // 1) Verificar usuário
     const users = await conn.query(
-      'SELECT id, email, passwordHash, isVerified FROM users WHERE email = ? LIMIT 1',
+      'SELECT id, email, passwordHash, isVerified, timezone FROM users WHERE email = ? LIMIT 1',
       [email]
     );
 
@@ -105,12 +105,15 @@ router.post('/register', async (req, res) => {
         ? parseInt(JWT_DISPLAY_EXPIRY) * 24 * 60 * 60
         : 30 * 24 * 60 * 60;
 
+    const userTimezone = user.timezone || 'UTC';
+
     return res.json({
       success: true,
       displayToken,
       refreshToken,
       expiresIn: expiresInSeconds,
-      mainDevices
+      mainDevices,
+      userTimezone,
     });
   } catch (err) {
     console.error('[DISPLAY] ERRO /register:', err.message);
@@ -258,8 +261,11 @@ router.get('/latest', authDisplayMiddleware, async (req, res) => {
          phsample    AS ph_sample,
          timestamp,
          status,
-         confidence
+         confidence,
+         u.timezone    AS userTimezone
        FROM measurements
+       JOIN devices d ON d.deviceId = measurements.deviceId
+       JOIN users   u ON u.id = d.userId
        WHERE deviceId = ?
        ORDER BY timestamp DESC
        LIMIT 1`,
@@ -286,7 +292,9 @@ router.get('/latest', authDisplayMiddleware, async (req, res) => {
       ph_sample: m.ph_sample,
       timestamp: m.timestamp,
       status: m.status || 'unknown',
-      confidence: m.confidence || 0
+      confidence: m.confidence || 0,
+      userTimezone: m.userTimezone || 'UTC', 
+
     });
   } catch (err) {
     console.error('[DISPLAY] ERRO /latest:', err.message);
