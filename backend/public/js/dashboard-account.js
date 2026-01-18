@@ -87,7 +87,7 @@ function populateTimezoneSelect() {
 
   select.innerHTML = '<option value="">Selecione o fuso…</option>';
 
-  for (const tz of TIMEZONES) {
+  for (const tz of timezones) {
     const opt = document.createElement('option');
     opt.value = tz.value;
     opt.textContent = tz.label;
