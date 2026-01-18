@@ -96,20 +96,6 @@ function populateTimezoneSelect() {
 }
 
 
-
-function getDevicesStatusBadgesHtml() {
-  return `
-    <span id="deviceStatusBadgeDevices" class="badge badge-off">Desconhecido</span>
-    <span id="lcdStatusIconDevices" class="badge-off" style="display:none; font-size:12px;">
-      LCD OFF
-    </span>
-    <span id="dosingStatusIconDevices" class="badge-off" style="display:none; font-size:12px;">
-      DOS OFF
-    </span>
-  `;
-}
-
-
 // Preencher campos do perfil com /auth/me
 async function loadAccountProfile() {
   try {
