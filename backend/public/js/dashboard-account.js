@@ -396,7 +396,5 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnDeleteAccount')
     ?.addEventListener('click', (e) => { e.preventDefault(); deleteAccount(); });
 
-  const mirror = document.querySelector('.devices-topbar-mirror');
-  if (mirror) mirror.innerHTML = getDevicesStatusBadgesHtml();
 });
 
