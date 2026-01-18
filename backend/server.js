@@ -3189,6 +3189,67 @@ app.put(
   }
 );
 
+// GET: status de firmware do device para o dashboard
+app.get(
+  '/api/v1/dev/device-firmware-status/:deviceId',
+  authUserMiddleware,
+  async (req, res) => {
+    const userId  = req.user.userId;
+    const { deviceId } = req.params;
+
+    let conn;
+    try {
+      conn = await pool.getConnection();
+
+      // garante que o device pertence ao usuário
+      const rows = await conn.query(
+        `SELECT firmware_version, type
+           FROM devices
+          WHERE deviceId = ? AND userId = ?
+          LIMIT 1`,
+        [deviceId, userId]
+      );
+
+      if (!rows || rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Device não encontrado para este usuário',
+        });
+      }
+
+      const dev = rows[0];
+      const currentVersion = dev.firmware_version || 'N/A';
+
+
+      const latestByType = {
+        KH:    process.env.LATEST_FW_KH    || currentVersion,
+        DOSER: process.env.LATEST_FW_DOSER || currentVersion,
+        LCD:   process.env.LATEST_FW_LCD   || currentVersion,
+      };
+
+      const latestVersion = latestByType[dev.type] || currentVersion;
+      const upToDate = currentVersion === latestVersion;
+
+      return res.json({
+        success: true,
+        data: {
+          currentVersion,
+          latestVersion,
+          upToDate,
+        },
+      });
+    } catch (err) {
+      console.error('GET /api/v1/dev/device-firmware-status error', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Erro ao consultar firmware',
+      });
+    } finally {
+      if (conn) try { conn.release(); } catch (e) {}
+    }
+  }
+);
+
 
 // ESP busca comandos pendentes
 app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
