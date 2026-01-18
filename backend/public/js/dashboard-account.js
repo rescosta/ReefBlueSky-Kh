@@ -515,21 +515,6 @@ function initAccountTopbar() {
   if (accountLink) accountLink.classList.add('active');
 }
 
-const TIMEZONES = [ /* ... mantém igual ... */ ];
-
-function populateTimezoneSelect() {
-  const select = document.getElementById('accountTimezone');
-  if (!select) return;
-
-  const sorted = [...TIMEZONES].sort((a, b) => a.name.localeCompare(b.name));
-
-  sorted.forEach((tz) => {
-    const opt = document.createElement('option');
-    opt.value = tz.name;
-    opt.textContent = `${tz.name} (${tz.offset})`;
-    select.appendChild(opt);
-  });
-}
 
 function getDeviceItemHtml(dev) {
   const baseName = dev.name?.trim() || dev.deviceId;
@@ -640,44 +625,23 @@ function updatePerDeviceBadges(dev) {
 }
 
 
-function initAccountPage() {
-  initAccountTopbar();
-
-  document.getElementById('btnSaveProfile')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    saveProfile();
-  });
-
-  document.getElementById('btnChangePassword')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    changePassword();
-  });
-
-  document.getElementById('btnExportData')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    exportData();
-  });
-
-  document.getElementById('btnDeleteAccount')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    deleteAccount();
-  });
-
-  const mirror = document.querySelector('.devices-topbar-mirror');
-  if (mirror) {
-    mirror.innerHTML = getDevicesStatusBadgesHtml();
-  }
-
-  loadAccountProfile();
-  loadDevices();
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  initTopbar();
+  initTopbar();            // monta topbar padrão
+  initAccountTopbar();     // marca menu Minha conta (se ainda quiser)
   populateTimezoneSelect();
   loadAccountProfile();
+  loadDevices();
+
+  document.getElementById('btnSaveProfile')
+    ?.addEventListener('click', (e) => { e.preventDefault(); saveProfile(); });
+  document.getElementById('btnChangePassword')
+    ?.addEventListener('click', (e) => { e.preventDefault(); changePassword(); });
+  document.getElementById('btnExportData')
+    ?.addEventListener('click', (e) => { e.preventDefault(); exportData(); });
+  document.getElementById('btnDeleteAccount')
+    ?.addEventListener('click', (e) => { e.preventDefault(); deleteAccount(); });
+
+  const mirror = document.querySelector('.devices-topbar-mirror');
+  if (mirror) mirror.innerHTML = getDevicesStatusBadgesHtml();
 });
 
-
-// Entrada
-document.addEventListener('DOMContentLoaded', initAccountPage);
