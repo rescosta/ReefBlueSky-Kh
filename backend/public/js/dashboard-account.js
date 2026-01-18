@@ -202,105 +202,6 @@ async function changePassword() {
   }
 }
 
-function setLcdStatusInDevices(status) {
-  const el = document.getElementById('lcdStatusIconDevices');
-  if (!el) return;
-
-  // mesma lógica de setLcdStatus, só mudando o id
-  if (status === undefined || status === null) return;
-  if (status === 'never') {
-    el.style.display = 'none';
-    return;
-  }
-  el.style.display = 'inline-block';
-  if (status === 'online') {
-    el.textContent = 'LCD ON';
-    el.className = 'badge-on';
-    el.title = 'Display remoto conectado';
-  } else {
-    el.textContent = 'LCD OFF';
-    el.className = 'badge-off';
-    el.title = 'Display remoto desconectado';
-  }
-}
-
-function setDosingStatusInDevices(status) {
-  const el = document.getElementById('dosingStatusIconDevices');
-  if (!el) return;
-
-  if (status !== 'online' && el.textContent === 'DOS ON') return;
-  if (status === undefined || status === null) return;
-  if (status === 'never') {
-    el.style.display = 'none';
-    return;
-  }
-  el.style.display = 'inline-block';
-  if (status === 'online') {
-    el.textContent = 'DOS ON';
-    el.className = 'badge-on';
-    el.title = 'Dosadora conectada';
-  } else {
-    el.textContent = 'DOS OFF';
-    el.className = 'badge-off';
-    el.title = 'Dosadora desconectada';
-  }
-}
-
-
-// Mesma regra de online/offline que o Common usa (5 min de janela)
-function computeOnlineFromLastSeen(lastSeen) {
-  if (!lastSeen) return false;
-
-  const last = typeof lastSeen === 'number'
-    ? lastSeen
-    : Date.parse(lastSeen);
-
-  if (!last || Number.isNaN(last)) return false;
-
-  const diffMs  = Date.now() - last;
-  const diffMin = diffMs / 60000;
-
-  return diffMin <= 5;
-}
-
-// Gera os mesmos botões de status da barra superior
-/*function buildTopbarStatusButtons(devices) {
-  const kh  = devices.find(d => d.type === 'KH');
-  const dos = devices.find(d => d.type === 'DOSER');
-  const lcd = devices.find(d => d.type === 'LCD');
-
-  const khOnline  = kh  ? computeOnlineFromLastSeen(kh.lastSeen || kh.last_seen)   : false;
-  const dosOnline = dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false;
-  const lcdOnline = lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false;
-
-  setLcdStatusInDevices(lcd ? (lcdOnline ? 'online' : 'offline') : 'never');
-  setDosingStatusInDevices(dos ? (dosOnline ? 'online' : 'offline') : 'never');
-
-  const anyOnline = khOnline || dosOnline || lcdOnline;
-
-  const globalHtml =
-    `<button class="top-pill ${anyOnline ? 'on' : 'off'}">
-       ${anyOnline ? 'Online' : 'Offline'}
-     </button>`;
-
-  const dosHtml =
-    `<button class="top-pill ${dosOnline ? 'on' : 'off'}">
-       DOS ${dosOnline ? 'ON' : 'OFF'}
-     </button>`;
-
-  const lcdHtml =
-    `<button class="top-pill ${lcdOnline ? 'on' : 'off'}">
-       LCD ${lcdOnline ? 'ON' : 'OFF'}
-     </button>`;
-
-  const khHtml =
-    `<button class="top-pill ${khOnline ? 'on' : 'off'}">
-       KH ${khOnline ? 'ON' : 'OFF'}
-     </button>`;
-
-  return { khHtml, dosHtml, lcdHtml, globalHtml };
-}*/
-
 
 // Carregar lista de dispositivos vinculados (KH/LCD/DOS)
 async function loadDevices() {
@@ -326,53 +227,8 @@ async function loadDevices() {
       return;
     }
 
-    // pega o KH/DOS/LCD principais
-    const kh  = devices.find(d => d.type === 'KH');
-    const dos = devices.find(d => d.type === 'DOSER');
-    const lcd = devices.find(d => d.type === 'LCD');
-
-    console.log('ACCOUNT LCD OBJECT:', lcd);
-
-
-    // KH sempre via lastSeen mesmo
-    const khOnline = kh ? computeOnlineFromLastSeen(kh.lastSeen || kh.last_seen) : false;
-
-    // DOS: usa dosingStatus se vier, senão lastSeen
-    const dosStatusFromApi = dos?.dosingStatus ?? dos?.dosing_status ?? null;
-    const dosOnline = dosStatusFromApi
-      ? (dosStatusFromApi === 'online')
-      : (dos ? computeOnlineFromLastSeen(dos.lastSeen || dos.last_seen) : false);
-
-    // LCD: usa lcdStatus se vier, senão lastSeen
-    const lcdStatusFromApi = lcd?.lcdStatus ?? lcd?.lcd_status ?? null;
-    const lcdOnline = lcdStatusFromApi
-      ? (lcdStatusFromApi === 'online')
-      : (lcd ? computeOnlineFromLastSeen(lcd.lastSeen || lcd.last_seen) : false);
-
-    // status final que vai para os spans globais da account
-    const finalDosStatus = !dos ? 'never' : (dosOnline ? 'online' : 'offline');
-    const finalLcdStatus = !lcd ? 'never' : (lcdOnline ? 'online' : 'offline');
-
-    setDosingStatusInDevices(finalDosStatus);
-    setLcdStatusInDevices(finalLcdStatus);
-
-    // badge global “Desconhecido / Online / Offline”
-    const badge = document.getElementById('deviceStatusBadgeDevices');
-    if (badge) {
-      if (!kh && !dos && !lcd) {
-        badge.className = 'badge badge-off';
-        badge.textContent = 'Desconhecido';
-      } else if (khOnline || dosOnline || lcdOnline) {
-        badge.className = 'badge badge-on';
-        badge.textContent = 'Online';
-      } else {
-        badge.className = 'badge badge-off';
-        badge.textContent = 'Offline';
-      }
-    }
-
-
     const frag = document.createDocumentFragment();
+
 
     devices.forEach((d) => {
       console.log('device item:', d);
@@ -403,26 +259,24 @@ async function loadDevices() {
       right.style.alignItems = 'center';
       right.style.gap = '8px';
 
-      // >>> AQUI passa a ser exatamente a mesma lógica da topbar
-      const isOnline = computeOnlineFromLastSeen(d.lastSeen ?? d.last_seen);
+      // span de status para firmware
       const statusSpan = document.createElement('span');
-      statusSpan.className = 'device-status-badge ' + (isOnline ? 'status-online' : 'status-offline');
-      statusSpan.textContent = isOnline ? 'Online' : 'Offline';
+      statusSpan.className = 'device-status-badge';
+      statusSpan.setAttribute('data-device-id', d.deviceId);
+      statusSpan.textContent = ''; // vazio até clicar
       right.appendChild(statusSpan);
 
       const btn = document.createElement('button');
       btn.className = 'btn-small';
       btn.dataset.deviceId = d.deviceId;
       btn.textContent = 'Atualizar';
-      if (type === 'KH' && !isOnline) {
-        btn.disabled = true;
-      }
       right.appendChild(btn);
 
       div.appendChild(left);
       div.appendChild(right);
       frag.appendChild(div);
     });
+
 
 
     container.innerHTML = '';
@@ -433,25 +287,50 @@ async function loadDevices() {
       btn.addEventListener('click', async () => {
         const deviceId = btn.getAttribute('data-device-id');
         if (!deviceId) return;
-        if (!confirm(`Enviar comando de atualização para ${deviceId}?`)) return;
+
+        const statusSpan = container.querySelector(
+          `.device-status-badge[data-device-id="${deviceId}"]`
+        );
+
+
+        if (statusSpan) {
+          statusSpan.innerHTML = '<span class="spinner"></span> Verificando...';
+        }
 
         try {
-          const res = await apiFetch(`/api/v1/dev/device-command/${deviceId}`, {
-            method: 'POST',
-            body: JSON.stringify({ command: 'ota_update' }),
+          const res = await apiFetch(`/api/v1/dev/device-firmware-status/${deviceId}`, {
+            method: 'GET',
           });
           const data = await res.json().catch(() => null);
+
           if (!res.ok || !data?.success) {
-            alert(data?.message || 'Erro ao enviar comando de atualização.');
+            alert(data?.message || 'Erro ao consultar firmware.');
+            if (statusSpan) statusSpan.textContent = 'Erro';
             return;
           }
-          alert('Comando de atualização enviado. O dispositivo deve reiniciar em instantes.');
+
+          const { currentVersion, latestVersion, upToDate } = data.data;
+
+          if (statusSpan) {
+            if (upToDate) {
+              statusSpan.textContent = `Atualizado (${currentVersion})`;
+              statusSpan.className = 'device-status-badge status-ok';
+            } else {
+              statusSpan.textContent = `Atualização: ${currentVersion} → ${latestVersion}`;
+              statusSpan.className = 'device-status-badge status-update';
+            }
+          }
         } catch (err) {
-          console.error('Erro ao enviar comando OTA:', err);
-          alert('Erro ao enviar comando de atualização.');
+          console.error('Erro ao consultar firmware:', err);
+          if (statusSpan) {
+            statusSpan.textContent = 'Erro';
+            statusSpan.className = 'device-status-badge status-error';
+          }
+          alert('Erro ao consultar firmware.');
         }
       });
     });
+
 
   } catch (err) {
     console.error('Erro ao carregar devices:', err);
@@ -514,116 +393,6 @@ function initAccountTopbar() {
   const accountLink = document.getElementById('menu-account');
   if (accountLink) accountLink.classList.add('active');
 }
-
-
-function getDeviceItemHtml(dev) {
-  const baseName = dev.name?.trim() || dev.deviceId;
-
-  // ids únicos por deviceId
-  const lcdId   = `lcdStatusIcon-${dev.deviceId}`;
-  const dosId   = `dosingStatusIcon-${dev.deviceId}`;
-  const badgeId = `deviceStatusBadge-${dev.deviceId}`;
-
-  return `
-    <div class="device-item">
-      <div>
-        <div>${baseName}</div>
-        <div class="small-text">${dev.type}</div>
-      </div>
-
-      <div style="display:flex; gap:6px; align-items:center; font-size:12px;">
-        <span id="${badgeId}" class="badge badge-off">Desconhecido</span>
-
-        <span id="${lcdId}" class="badge-off" style="display:none; font-size:12px;">
-          LCD OFF
-        </span>
-
-        <span id="${dosId}" class="badge-off" style="display:none; font-size:12px;">
-          DOS OFF
-        </span>
-      </div>
-    </div>
-  `;
-}
-
-
-function renderDevices(devices) {
-  const list = document.getElementById('deviceList');
-  if (!list) return;
-
-  if (!devices.length) {
-    list.innerHTML = '<div class="small-text">Nenhum dispositivo vinculado.</div>';
-    return;
-  }
-
-  list.innerHTML = devices.map(getDeviceItemHtml).join('');
-}
-
-
-function updatePerDeviceBadges(dev) {
-  const badge = document.getElementById(`deviceStatusBadge-${dev.deviceId}`);
-  const lcdEl = document.getElementById(`lcdStatusIcon-${dev.deviceId}`);
-  const dosEl = document.getElementById(`dosingStatusIcon-${dev.deviceId}`);
-
-  // status geral (lastSeen)
-  if (badge) {
-    const last = typeof dev.lastSeen === 'number'
-      ? dev.lastSeen
-      : Date.parse(dev.lastSeen);
-    if (!last || Number.isNaN(last)) {
-      badge.className = 'badge badge-off';
-      badge.textContent = 'Desconhecido';
-    } else {
-      const diffMin = (Date.now() - last) / 60000;
-      if (diffMin < 5) {
-        badge.className = 'badge badge-on';
-        badge.textContent = 'Online';
-      } else {
-        badge.className = 'badge badge-off';
-        badge.textContent = 'Offline';
-      }
-    }
-  }
-
-  // LCD
-  if (lcdEl) {
-    const status = dev.lcdStatus; // mesmo campo que você já usa na topbar
-    if (status === undefined || status === null) {
-      lcdEl.style.display = 'none';
-    } else {
-      lcdEl.style.display = 'inline-block';
-      if (status === 'online') {
-        lcdEl.textContent = 'LCD ON';
-        lcdEl.className = 'badge-on';
-        lcdEl.title = 'Display remoto conectado';
-      } else {
-        lcdEl.textContent = 'LCD OFF';
-        lcdEl.className = 'badge-off';
-        lcdEl.title = 'Display remoto desconectado';
-      }
-    }
-  }
-
-  // DOS
-  if (dosEl) {
-    const status = dev.dosingStatus;
-    if (status === undefined || status === null) {
-      dosEl.style.display = 'none';
-    } else {
-      dosEl.style.display = 'inline-block';
-      if (status === 'online') {
-        dosEl.textContent = 'DOS ON';
-        dosEl.className = 'badge-on';
-        dosEl.title = 'Dosadora conectada';
-      } else {
-        dosEl.textContent = 'DOS OFF';
-        dosEl.className = 'badge-off';
-        dosEl.title = 'Dosadora desconectada';
-      }
-    }
-  }
-}
-
 
 document.addEventListener('DOMContentLoaded', () => {
   initTopbar();            // monta topbar padrão
