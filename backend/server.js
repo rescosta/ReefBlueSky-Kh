@@ -29,7 +29,9 @@ const dosingIotRoutes  = require('./dosing-iot-routes');
 const dosingDeviceRoutes = require('./dosing-device-routes');
 
 const path = require('path');
-const { FW_DIR, getLatestFirmwareForType } = require('./iot-ota');
+
+const fetch = require('node-fetch');
+const { getLatestFirmwareForType, buildGithubFirmwareUrl } = require('./iot-ota');
 
 const axios = require('axios');
 
@@ -1170,16 +1172,35 @@ app.post(
   }
 );
 
-app.get('/ota/:type/latest.bin', (req, res) => {
+app.get('/ota/:type/latest.bin', async (req, res) => {
   const type = req.params.type.toUpperCase();
   const latest = getLatestFirmwareForType(type);
   if (!latest) {
     return res.status(404).json({ error: `Nenhum firmware para ${type}` });
   }
-  const binPath = path.join(FW_DIR, latest);
-  res.set('Content-Type', 'application/octet-stream');
-  res.set('Content-Disposition', `attachment; filename=${latest}`);
-  res.sendFile(binPath);
+
+  // segurança básica no nome
+  if (!/^[A-Za-z0-9_.-]+\.bin$/.test(latest)) {
+    return res.status(400).json({ error: 'Nome de firmware inválido' });
+  }
+
+  const url = buildGithubFirmwareUrl(latest);
+  console.log('[OTA] Proxy GitHub ->', url);
+
+  try {
+    const gh = await fetch(url);
+    if (!gh.ok) {
+      console.error('[OTA] GitHub HTTP', gh.status);
+      return res.status(gh.status).json({ error: 'Falha ao buscar firmware no GitHub' });
+    }
+
+    res.set('Content-Type', 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename=${latest}`);
+    gh.body.pipe(res);
+  } catch (err) {
+    console.error('Erro proxy OTA GitHub:', err);
+    res.status(500).json({ error: 'Erro interno ao baixar firmware' });
+  }
 });
 
 
