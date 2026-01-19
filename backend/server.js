@@ -1184,24 +1184,21 @@ app.get('/ota/:type/latest.bin', async (req, res) => {
     return res.status(400).json({ error: 'Nome de firmware inválido' });
   }
 
-  const url = buildGithubFirmwareUrl(latest);
-  console.log('[OTA] Proxy GitHub ->', url);
+  const filePath = path.join(FW_DIR, latest);
+  console.log('[OTA] Enviando firmware local:', filePath);
 
-  try {
-    const gh = await fetch(url);
-    if (!gh.ok) {
-      console.error('[OTA] GitHub HTTP', gh.status);
-      return res.status(gh.status).json({ error: 'Falha ao buscar firmware no GitHub' });
+  res.set('Content-Type', 'application/octet-stream');
+  res.set('Content-Disposition', `attachment; filename=${latest}`);
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error('[OTA] Erro ao enviar arquivo local:', err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Erro interno ao baixar firmware' });
+      }
     }
-
-    res.set('Content-Type', 'application/octet-stream');
-    res.set('Content-Disposition', `attachment; filename=${latest}`);
-    gh.body.pipe(res);
-  } catch (err) {
-    console.error('Erro proxy OTA GitHub:', err);
-    res.status(500).json({ error: 'Erro interno ao baixar firmware' });
-  }
+  });
 });
+
 
 app.get('/ota/:type/version.json', (req, res) => {
   const latest = getLatestFirmwareForType(req.params.type.toUpperCase());
