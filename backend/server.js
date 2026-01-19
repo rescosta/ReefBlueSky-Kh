@@ -26,7 +26,8 @@ const dosingUserRoutes = require('./dosing-user-routes');
 const dosingIotRoutes  = require('./dosing-iot-routes'); 
 const dosingDeviceRoutes = require('./dosing-device-routes');
 
-
+const path = require('path');
+const { FW_DIR, getLatestFirmwareForType } = require('./iot-ota');
 
 const axios = require('axios');
 
@@ -97,8 +98,6 @@ function readWifiRssi(cb) {
     }
   );
 }
-
-
 
 // === TELEGRAM ===
 
@@ -830,6 +829,10 @@ app.use('/api/v1/iot/dosing', dosingDeviceRoutes);
 app.use('/api/v1/iot/dosing', dosingIotRoutes);
 
 
+// 🔹 Rotas Firmware
+app.use('/firmware', express.static('public/firmware'));
+
+
 function buildTokenPayload(userRow) {
   return {
     userId: userRow.id,
@@ -1164,6 +1167,43 @@ app.post(
     }
   }
 );
+
+app.get('/ota/:type/latest.bin', (req, res) => {
+  const type = req.params.type.toUpperCase();
+  const latest = getLatestFirmwareForType(type);
+  if (!latest) {
+    return res.status(404).json({ error: `Nenhum firmware para ${type}` });
+  }
+  const binPath = path.join(FW_DIR, latest);
+  res.set('Content-Type', 'application/octet-stream');
+  res.set('Content-Disposition', `attachment; filename=${latest}`);
+  res.sendFile(binPath);
+});
+
+
+app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
+  const deviceId = req.user.deviceId;
+  const { firmwareVersion } = req.body || {};
+  if (!firmwareVersion) {
+    return res.status(400).json({ success: false, message: 'firmwareVersion obrigatório' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query(
+      'UPDATE devices SET firmwareversion = ?, updatedAt = NOW() WHERE deviceId = ?',
+      [firmwareVersion, deviceId]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('POST /device/firmware error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao atualizar firmwareVersion' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
+
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
@@ -3189,63 +3229,81 @@ app.put(
   }
 );
 
-// GET: status de firmware do device para o dashboard
-app.get(
-  '/api/v1/dev/device-firmware-status/:deviceId',
-  authUserMiddleware,
-  async (req, res) => {
-    const userId  = req.user.userId;
-    const { deviceId } = req.params;
+// GET /api/v1/dev/device-firmware-status/:deviceId
+app.get('/api/v1/dev/device-firmware-status/:deviceId', authMiddleware, async (req, res) => {
+  const deviceId = req.params.deviceId;
 
-    let conn;
-    try {
-      conn = await pool.getConnection();
+  // 1) Buscar no banco: tipo (KH/LCD/DOSER) e firmwareVersion atual
+  // Exemplo genérico, adapta ao teu schema:
+  const conn = await pool.getConnection();
+  try {
+    const rows = await conn.query(
+      'SELECT type, firmware_version FROM devices WHERE deviceId = ? LIMIT 1',
+      [deviceId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Device não encontrado' });
+    }
+    const dev = rows[0];
+    const currentVersion = dev.firmware_version || null;
+    const type = dev.type.toUpperCase(); // 'KH' | 'LCD' | 'DOSER'
 
-      // garante que o device pertence ao usuário
-      const rows = await conn.query(
-        `SELECT firmware_version, type
-           FROM devices
-          WHERE deviceId = ? AND userId = ?
-          LIMIT 1`,
-        [deviceId, userId]
-      );
-
-      if (!rows || rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'Device não encontrado para este usuário',
-        });
-      }
-
-      const dev = rows[0];
-      const currentVersion = dev.firmware_version || 'N/A';
-
-
-      const latestByType = {
-        KH:    process.env.LATEST_FW_KH    || currentVersion,
-        DOSER: process.env.LATEST_FW_DOSER || currentVersion,
-        LCD:   process.env.LATEST_FW_LCD   || currentVersion,
-      };
-
-      const latestVersion = latestByType[dev.type] || currentVersion;
-      const upToDate = currentVersion === latestVersion;
-
+    // 2) Descobrir latest para o tipo
+    const latestFile = getLatestFirmwareForType(type);
+    if (!latestFile) {
       return res.json({
         success: true,
         data: {
           currentVersion,
-          latestVersion,
-          upToDate,
+          latestVersion: null,
+          upToDate: true, // ou false, como preferir se não existir firmware
         },
       });
-    } catch (err) {
-      console.error('GET /api/v1/dev/device-firmware-status error', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Erro ao consultar firmware',
+    }
+
+    const latestVersion = latestFile.replace('.bin', ''); // ex: RBS_KH_260118
+    const upToDate = currentVersion === latestVersion;
+
+    res.json({
+      success: true,
+      data: {
+        currentVersion,
+        latestVersion,
+        upToDate,
+      },
+    });
+  } catch (err) {
+    console.error('device-firmware-status error', err);
+    res.status(500).json({ success: false, message: 'Erro interno' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/api/v1/dev/device-firmware-update/:deviceId',
+  authMiddleware,
+  async (req, res) => {
+    const deviceId = req.params.deviceId;
+    const userId = req.user.userId;
+
+    try {
+      const rows = await pool.query(
+        'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+        [deviceId, userId]
+      );
+      if (!rows.length) {
+        return res.status(404).json({ success: false, message: 'Device não encontrado' });
+      }
+
+      await cloudAuth.sendCommandToDevice(deviceId, {
+        action: 'otaupdate',
+        params: null,
       });
-    } finally {
-      if (conn) try { conn.release(); } catch (e) {}
+
+      res.json({ success: true, message: 'Comando OTA enviado para o dispositivo.' });
+    } catch (err) {
+      console.error('device-firmware-update error', err);
+      res.status(500).json({ success: false, message: 'Erro ao enviar comando OTA.' });
     }
   }
 );
