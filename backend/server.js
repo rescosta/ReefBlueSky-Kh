@@ -1194,7 +1194,7 @@ app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
   try {
     conn = await pool.getConnection();
     await conn.query(
-      'UPDATE devices SET firmwareversion = ?, updatedAt = NOW() WHERE deviceId = ?',
+      'UPDATE devices SET firmware_version = ?, updatedAt = NOW() WHERE deviceId = ?',
       [firmwareVersion, deviceId]
     );
     return res.json({ success: true });
