@@ -10,6 +10,8 @@
  * - Compatibilidade com Cloudflare Tunnel
  */
 
+console.log('### BOOT server.js em', __dirname);
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -3228,6 +3230,8 @@ app.put(
     }
   }
 );
+
+console.log('### Registrando rota FW');
 
 console.log('Registrando rota: GET /api/v1/dev/device-firmware-status/:deviceId');
 
