@@ -3287,7 +3287,7 @@ app.get('/api/v1/dev/device-firmware-status/:deviceId', authUserMiddleware, asyn
 });
 
 app.post('/api/v1/dev/device-firmware-update/:deviceId',
-  authMiddleware,
+  authUserMiddleware,
   async (req, res) => {
     const deviceId = req.params.deviceId;
     const userId = req.user.userId;
