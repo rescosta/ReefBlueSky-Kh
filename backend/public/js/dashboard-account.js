@@ -297,15 +297,68 @@ async function loadDevices() {
 
           const { currentVersion, latestVersion, upToDate } = data.data;
 
-          if (statusSpan) {
-            if (upToDate) {
-              statusSpan.textContent = `Atualizado (${currentVersion})`;
-              statusSpan.className = 'device-status-badge status-ok';
-            } else {
+          if (!upToDate) {
+            if (statusSpan) {
               statusSpan.textContent = `Atualização: ${currentVersion} → ${latestVersion}`;
               statusSpan.className = 'device-status-badge status-update';
             }
+
+            const wantUpdate = confirm(
+              `Nova versão disponível para este dispositivo.\n\n` +
+              `Versão atual: ${currentVersion || 'desconhecida'}\n` +
+              `Versão nova:  ${latestVersion}\n\n` +
+              `Deseja iniciar a atualização agora?`
+            );
+
+            if (wantUpdate) {
+              try {
+                if (statusSpan) {
+                  statusSpan.innerHTML = '<span class="spinner"></span> Atualizando...';
+                  statusSpan.className = 'device-status-badge status-update';
+                }
+
+                const resUpdate = await apiFetch(`/api/v1/user/devices/${deviceId}/commands`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'otaupdate',
+                    payload: null,
+                  }),
+                });
+
+                const dataUpdate = await resUpdate.json().catch(() => null);
+
+                if (!resUpdate.ok || !dataUpdate?.success) {
+                  alert(dataUpdate?.message || 'Erro ao iniciar atualização.');
+                  if (statusSpan) {
+                    statusSpan.textContent = 'Erro';
+                    statusSpan.className = 'device-status-badge status-error';
+                  }
+                  return;
+                }
+
+                alert('Atualização iniciada. O dispositivo pode reiniciar durante o processo.');
+
+                // opcional: reconsultar status depois de alguns segundos
+                setTimeout(() => {
+                  btn.click(); // reusa a lógica de verificação
+                }, 8000);
+              } catch (err) {
+                console.error('Erro ao iniciar atualização', err);
+                alert('Erro ao iniciar atualização.');
+                if (statusSpan) {
+                  statusSpan.textContent = 'Erro';
+                  statusSpan.className = 'device-status-badge status-error';
+                }
+              }
+            }
+          } else {
+            if (statusSpan) {
+              statusSpan.textContent = `Atualizado (${currentVersion})`;
+              statusSpan.className = 'device-status-badge status-ok';
+            }
           }
+
         } catch (err) {
           console.error('Erro ao consultar firmware:', err);
           if (statusSpan) {
