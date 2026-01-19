@@ -223,6 +223,9 @@ async function loadDevices() {
 
       const name = d.name || d.id || 'Device';
       const type = d.type || 'KH';
+      const rawFw = d.firmwareVersion || 'N/A';
+      const fw    = rawFw.replace(/\.bin$/i, '');
+      
       const fw   = d.firmwareVersion || 'N/A';
 
       let iconHtml = '';
