@@ -25,6 +25,7 @@ FILES_JS=(
   "dosing-user-routes.js"
   "server.js"
   "user-timezone.js"
+  "iot-ota.js"
 )
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
