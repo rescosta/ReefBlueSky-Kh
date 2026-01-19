@@ -3229,6 +3229,8 @@ app.put(
   }
 );
 
+console.log('Registrando rota: GET /api/v1/dev/device-firmware-status/:deviceId');
+
 // GET /api/v1/dev/device-firmware-status/:deviceId
 app.get('/api/v1/dev/device-firmware-status/:deviceId', authUserMiddleware, async (req, res) => {
   const deviceId = req.params.deviceId;
