@@ -188,6 +188,50 @@ async function changePassword() {
   }
 }
 
+async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
+  try {
+    const res  = await apiFetch(`/api/v1/dev/device-firmware-status/${deviceId}`, {
+      method: 'GET',
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.success) {
+      statusSpan.textContent = 'Erro';
+      statusSpan.className   = 'device-status-badge status-error';
+      btn.disabled = true;
+      btn.classList.add('btn-disabled');
+      return;
+    }
+
+    const { currentVersion, latestVersion, upToDate } = data.data || {};
+
+    // Sem firmware novo
+    if (upToDate || !latestVersion || currentVersion === latestVersion) {
+      statusSpan.textContent = `Atualizado (${currentVersion || 'N/A'})`;
+      statusSpan.className   = 'device-status-badge status-ok';
+
+      btn.disabled = true;
+      btn.classList.add('btn-disabled');
+      btn.textContent = 'Atualizar';
+      return;
+    }
+
+    // Há firmware mais novo → mostra à esquerda qual é e habilita botão
+    statusSpan.textContent = `Novo: ${latestVersion}`;
+    statusSpan.className   = 'device-status-badge status-update';
+
+    btn.disabled = false;
+    btn.classList.remove('btn-disabled');
+    btn.textContent = 'Atualizar';
+  } catch (err) {
+    console.error('Erro ao consultar firmware (auto):', err);
+    statusSpan.textContent = 'Erro';
+    statusSpan.className   = 'device-status-badge status-error';
+    btn.disabled = true;
+    btn.classList.add('btn-disabled');
+  }
+}
+
 
 // Carregar lista de dispositivos vinculados (KH/LCD/DOS)
 async function loadDevices() {
@@ -251,14 +295,19 @@ async function loadDevices() {
       const statusSpan = document.createElement('span');
       statusSpan.className = 'device-status-badge';
       statusSpan.setAttribute('data-device-id', d.deviceId);
-      statusSpan.textContent = ''; // vazio até clicar
+      statusSpan.textContent = 'Verificando...';
       right.appendChild(statusSpan);
 
       const btn = document.createElement('button');
       btn.className = 'btn-small';
       btn.dataset.deviceId = d.deviceId;
       btn.textContent = 'Atualizar';
+      btn.disabled = true;                 // começa desativado
+      btn.classList.add('btn-disabled');   // classe CSS para deixá-lo “apagado”
       right.appendChild(btn);
+
+      // dispara checagem automática ao carregar a lista
+      checkFirmwareStatusForDevice(d.deviceId, statusSpan, btn);
 
       div.appendChild(left);
       div.appendChild(right);
@@ -343,7 +392,7 @@ async function loadDevices() {
 
                 // opcional: reconsultar status depois de alguns segundos
                 setTimeout(() => {
-                  btn.click(); // reusa a lógica de verificação
+                  checkFirmwareStatusForDevice(deviceId, statusSpan, btn);
                 }, 8000);
               } catch (err) {
                 console.error('Erro ao iniciar atualização', err);
