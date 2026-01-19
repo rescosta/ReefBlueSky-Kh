@@ -1203,6 +1203,10 @@ app.get('/ota/:type/latest.bin', async (req, res) => {
   }
 });
 
+app.get('/ota/:type/version.json', (req, res) => {
+  const latest = getLatestFirmwareForType(req.params.type.toUpperCase());
+  res.json({ version: latest || null });
+});
 
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
   const deviceId = req.user.deviceId;
@@ -1226,6 +1230,7 @@ app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
     if (conn) try { conn.release(); } catch (e) {}
   }
 });
+
 
 
 // ============================================================================
@@ -4169,6 +4174,11 @@ Pressione Ctrl+C para parar o servidor
 });
 
 }
+
+app._router.stack
+  .filter(r => r.route && r.route.path)
+  .forEach(r => console.log('[ROUTE]', r.route.stack[0].method.toUpperCase(), r.route.path));
+
 
 startServer();
 
