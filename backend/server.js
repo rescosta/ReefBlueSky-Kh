@@ -3230,7 +3230,7 @@ app.put(
 );
 
 // GET /api/v1/dev/device-firmware-status/:deviceId
-app.get('/api/v1/dev/device-firmware-status/:deviceId', authMiddleware, async (req, res) => {
+app.get('/api/v1/dev/device-firmware-status/:deviceId', authUserMiddleware, async (req, res) => {
   const deviceId = req.params.deviceId;
 
   // 1) Buscar no banco: tipo (KH/LCD/DOSER) e firmwareVersion atual
