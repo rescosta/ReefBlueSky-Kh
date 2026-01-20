@@ -181,73 +181,48 @@ router.get('/ota/ping', (req, res) => {
 
 router.post('/api/device/ota-log', async (req, res) => {
   try {
-    // Validar JWT (assumindo middleware de auth já passou)
-    const userId = req.user?.userId;
-    const deviceId = req.user?.deviceId;
-    
-    if (!userId || !deviceId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const { device_id, device_type, event, firmware_version, error } = req.body;
 
-    const { device_type, event, firmware_version, error } = req.body;
-
-    if (!device_type || !event || !firmware_version) {
+    if (!device_id || !device_type || !event || !firmware_version) {
       return res.status(400).json({
-        error: 'Missing required fields: device_type, event, firmware_version',
-      });
-    }
-
-    // Validar event type
-    const validEvents = ['started', 'success', 'failed', 'webota_started', 'webota_success', 'webota_failed'];
-    if (!validEvents.includes(event)) {
-      return res.status(400).json({
-        error: `Invalid event type. Must be one of: ${validEvents.join(', ')}`,
+        error: 'Missing required fields: device_id, device_type, event, firmware_version',
       });
     }
 
     console.log(
-      `[OTA] /ota-log - device=${deviceId}, type=${device_type}, event=${event}, fw=${firmware_version}`
+      `[OTA] /ota-log - device=${device_id}, type=${device_type}, event=${event}, fw=${firmware_version}`
     );
 
-    // Log no banco
-    await logOtaEvent(deviceId, device_type, event, firmware_version, error || null);
+    await logOtaEvent(device_id, device_type, event, firmware_version, error || null);
 
-    // Se foi sucesso, atualizar versão de firmware no devices
     if (event === 'success' || event === 'webota_success') {
       let conn;
       try {
         conn = await pool.getConnection();
         await conn.query(
           `UPDATE devices SET firmware_version = ? WHERE id = ?`,
-          [firmware_version, deviceId]
+          [firmware_version, device_id]
         );
-        console.log(`[OTA] Firmware version updated: device=${deviceId}, fw=${firmware_version}`);
+        console.log(
+          `[OTA] Firmware version updated: device=${device_id}, fw=${firmware_version}`
+        );
       } finally {
         if (conn) try { conn.release(); } catch (e) {}
       }
     }
 
-    // Enviar notificação Telegram se configurado (opcional)
-    const msg = `🔄 OTA ${event.toUpperCase()}\n` +
-                `Device: ${device_type}\n` +
-                `Firmware: ${firmware_version}\n` +
-                `${error ? 'Erro: ' + error : 'OK'}`;
-    
-    // (Implementar se tiver função sendTelegramForUser no seu backend)
-    // await sendTelegramForUser(userId, msg);
-
     res.json({
       success: true,
       message: `OTA event logged: ${event}`,
-      device_id: deviceId,
+      device_id,
       event,
     });
-
   } catch (err) {
     console.error('[OTA] Erro em /ota-log:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 /**
  * GET /api/device/:id/ota-history
