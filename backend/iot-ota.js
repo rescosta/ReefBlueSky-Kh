@@ -17,11 +17,6 @@ const FW_DIR = path.join(__dirname, 'firmware');
 console.log('[DEBUG] carregando iot-ota.js FW_DIR=', FW_DIR);
 
 
-router.get('/ota/ping', (req, res) => {
-  console.log('[OTA] /ota/ping hit');
-  res.json({ ok: true });
-});
-
 // ======== HELPERS ========
 
 /**
@@ -178,26 +173,18 @@ async function getLatestOtaStatus(deviceId) {
 
 const router = express.Router();
 
-/**
- * POST /api/device/ota-log
- * 
- * Recebe eventos OTA do ESP32
- * 
- * Body:
- * {
- *   "device_type": "KH",
- *   "event": "started" | "success" | "failed",
- *   "firmware_version": "RBS_KH_260120.bin",
- *   "timestamp": 1705779600,
- *   "error": "..." (opcional, se failed)
- * }
- */
+router.get('/ota/ping', (req, res) => {
+  console.log('[OTA] /ota/ping hit');
+  res.json({ ok: true });
+});
+
+
 router.post('/api/device/ota-log', async (req, res) => {
   try {
     // Validar JWT (assumindo middleware de auth já passou)
-    const userId = req.user?.id;
-    const deviceId = req.device?.id;
-
+    const userId = req.user?.userId;
+    const deviceId = req.user?.deviceId;
+    
     if (!userId || !deviceId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
