@@ -1,5 +1,5 @@
 // iot-ota.js - OTA routes e utilitários
-console.log('[DEBUG] carregando iot-ota.js FW_DIR=', FW_DIR);
+
 
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +13,9 @@ const GITHUB_FW_BASE =
 
 // Diretório local (fallback opcional)
 const FW_DIR = path.join(__dirname, 'firmware');
+
+console.log('[DEBUG] carregando iot-ota.js FW_DIR=', FW_DIR);
+
 
 // ======== HELPERS ========
 
