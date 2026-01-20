@@ -866,7 +866,7 @@ app.get('/dashboard', (req, res) => {
 });
 
 // 🔹 Rotas OTA (iot-ota.js)
-app.use('/', verifyToken, otaRouter);
+app.use(otaRouter);
 console.log('[DEBUG] otaRouter montado em / com verifyToken');
 
 
