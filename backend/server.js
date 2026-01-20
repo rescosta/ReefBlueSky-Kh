@@ -1172,39 +1172,6 @@ app.post(
   }
 );
 
-app.get('/ota/:type/latest.bin', async (req, res) => {
-  const type = req.params.type.toUpperCase();
-  const latest = getLatestFirmwareForType(type);
-  if (!latest) {
-    return res.status(404).json({ error: `Nenhum firmware para ${type}` });
-  }
-
-  // segurança básica no nome
-  if (!/^[A-Za-z0-9_.-]+\.bin$/.test(latest)) {
-    return res.status(400).json({ error: 'Nome de firmware inválido' });
-  }
-
-  const filePath = path.join(FW_DIR, latest);
-  console.log('[OTA] Enviando firmware local:', filePath);
-
-  res.set('Content-Type', 'application/octet-stream');
-  res.set('Content-Disposition', `attachment; filename=${latest}`);
-  res.sendFile(filePath, (err) => {
-    if (err) {
-      console.error('[OTA] Erro ao enviar arquivo local:', err.message);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Erro interno ao baixar firmware' });
-      }
-    }
-  });
-});
-
-
-app.get('/ota/:type/version.json', (req, res) => {
-  const latest = getLatestFirmwareForType(req.params.type.toUpperCase());
-  res.json({ version: latest || null });
-});
-
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
   const deviceId = req.user.deviceId;
   const { firmwareVersion } = req.body || {};

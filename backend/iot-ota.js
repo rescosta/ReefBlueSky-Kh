@@ -19,17 +19,18 @@ const FW_DIR = path.join(__dirname, 'firmware');
  * Busca arquivo .bin mais recente para tipo de device
  */
 function getLatestFirmwareForType(type /* 'KH' | 'LCD' | 'DOSER' */) {
-  const files = fs.existsSync(FW_DIR) ? fs.readdirSync(FW_DIR) : [];
-  const prefix = `RBS_${type}_`;
-  const candidates = files.filter(
-    (f) => f.startsWith(prefix) && f.endsWith('.bin')
-  );
+  const dir = path.join(FW_DIR, type);   // ex: firmware/KH
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  const prefix = `RBS_${type}_`;         // ainda garante formato do nome
 
+  const candidates = files.filter(
+    (f) => typeof f === 'string' && f.startsWith(prefix) && f.endsWith('.bin')
+  );
   if (!candidates.length) return null;
 
   const parseVer = (name) => {
-    const base = name.replace('.bin', ''); // RBS_KH_260118
-    const parts = base.split('_'); // ["RBS","KH","260118"]
+    const base = name.replace('.bin', '');
+    const parts = base.split('_');       // ["RBS","KH","260120"]
     return parts[2] || '000000';
   };
 
@@ -358,6 +359,9 @@ router.get('/ota/:type/latest.bin', async (req, res) => {
       return res.status(400).json({ error: 'Invalid firmware type' });
     }
 
+    // Diretório específico do tipo
+    const dir = path.join(FW_DIR, type);   // ex: firmware/KH
+
     // Tentar buscar arquivo local primeiro
     let localFile = null;
     try {
@@ -368,7 +372,6 @@ router.get('/ota/:type/latest.bin', async (req, res) => {
 
     let downloadUrl;
 
-    // Se não achou ou veio tipo inválido, cai direto pro fallback
     if (!localFile || typeof localFile !== 'string') {
       console.log(`[OTA] Nenhum arquivo local para type=${type}, usando fallback GitHub`);
       downloadUrl = GITHUB_FW_BASE + `RBS_${type}_latest.bin`;
@@ -380,16 +383,15 @@ router.get('/ota/:type/latest.bin', async (req, res) => {
     }
 
     // Servir arquivo local
-    const filepath = path.join(FW_DIR, localFile);
+    const filepath = path.join(dir, localFile);  // <- usa dir aqui
 
-    // Validar que arquivo existe
     if (!fs.existsSync(filepath)) {
       console.warn(`[OTA] Arquivo local não encontrado: ${filepath}`);
       downloadUrl = buildGithubFirmwareUrl(localFile);
       return res.redirect(downloadUrl);
     }
 
-    console.log(`[OTA] Servindo firmware local: ${localFile}`);
+    console.log(`[OTA] Servindo firmware local: ${localFile} de ${filepath}`);
     return res.download(filepath);
 
   } catch (err) {
@@ -397,6 +399,7 @@ router.get('/ota/:type/latest.bin', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 // ======== EXPORTS ========
