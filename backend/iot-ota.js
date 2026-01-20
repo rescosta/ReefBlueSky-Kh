@@ -181,41 +181,21 @@ router.get('/ota/ping', (req, res) => {
 
 router.post('/api/device/ota-log', async (req, res) => {
   try {
-    const { device_id, device_type, event, firmware_version, error } = req.body;
+    const { device_type, event, firmware_version, error } = req.body;
 
-    if (!device_id || !device_type || !event || !firmware_version) {
+    if (!device_type || !event || !firmware_version) {
       return res.status(400).json({
-        error: 'Missing required fields: device_id, device_type, event, firmware_version',
+        error: 'Missing required fields: device_type, event, firmware_version',
       });
     }
 
-    console.log(
-      `[OTA] /ota-log - device=${device_id}, type=${device_type}, event=${event}, fw=${firmware_version}`
-    );
+    console.log(`[OTA] /ota-log - type=${device_type}, event=${event}, fw=${firmware_version}`);
 
-    await logOtaEvent(device_id, device_type, event, firmware_version, error || null);
-
-    if (event === 'success' || event === 'webota_success') {
-      let conn;
-      try {
-        conn = await pool.getConnection();
-        await conn.query(
-          `UPDATE devices SET firmware_version = ? WHERE id = ?`,
-          [firmware_version, device_id]
-        );
-        console.log(
-          `[OTA] Firmware version updated: device=${device_id}, fw=${firmware_version}`
-        );
-      } finally {
-        if (conn) try { conn.release(); } catch (e) {}
-      }
-    }
+    await logOtaEvent(null, device_type, event, firmware_version, error);
 
     res.json({
       success: true,
       message: `OTA event logged: ${event}`,
-      device_id,
-      event,
     });
   } catch (err) {
     console.error('[OTA] Erro em /ota-log:', err.message);
