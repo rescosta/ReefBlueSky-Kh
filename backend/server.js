@@ -30,7 +30,6 @@ const dosingDeviceRoutes = require('./dosing-device-routes');
 
 const path = require('path');
 
-//const { FW_DIR, getLatestFirmwareForType } = require('./iot-ota');
 const { router: otaRouter, otaInit: initOtaLogsTable } = require('./iot-ota');
 
 const axios = require('axios');
@@ -53,6 +52,14 @@ const os = require('os');
 const { exec } = require('child_process');
 
 const APP_VERSION = process.env.APP_VERSION || 'dev';
+
+
+const app = express();
+app.set('trust proxy', 1); 
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || '...';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...';
+
 
 function detectNetType() {
   const ifaces = os.networkInterfaces();
@@ -761,13 +768,6 @@ setInterval(async () => {
 console.log('[ALERT] Monitor de devices online/offline iniciado.');
 
 
-const app = express();
-app.set('trust proxy', 1); 
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || '...';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...';
-
-
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -862,6 +862,9 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(__dirname + '/public/dashboard-main.html');
 });
 
+// 🔹 Rotas OTA (iot-ota.js)
+app.use(otaRouter);
+console.log('[DEBUG] otaRouter montado em /');
 
 
 // ============================================================================
@@ -4067,12 +4070,7 @@ async function startServer() {
     await initOtaLogsTable();
     console.log('[OTA] device_ota_events pronta');
 
-    // 2) Registrar router OTA (depois dos middlewares de auth!)
-    app.use(otaRouter);
-    console.log('[DEBUG] otaRouter montado em /');
-    console.log('[OTA] rotas registradas');
-
-    // 3) Iniciar servidor HTTP
+    // 2) Iniciar servidor HTTP
     app.listen(PORT, () => {
       console.log(`
         
@@ -4120,7 +4118,7 @@ Pressione Ctrl+C para parar o servidor
   `);
 });
 
-    // 4) Log das rotas (como você já faz hoje)
+    // 3) Log das rotas (como você já faz hoje)
     app._router.stack
       .filter(r => r.route && r.route.path)
       .forEach(r => console.log('[ROUTE]', r.route.stack[0].method.toUpperCase(), r.route.path));
