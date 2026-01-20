@@ -4058,30 +4058,6 @@ app.get('/api/v1/health', (req, res) => {
  * O tunnel encaminha tráfego HTTPS para http://localhost:PORT
  */
 
-// ============================================================================
-// [ERRO] Tratamento de Erros
-// ============================================================================
-
-// 404 - Rota não encontrada
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'Rota não encontrada',
-        path: req.path,
-        method: req.method
-    });
-});
-
-// Erro global
-app.use((err, req, res, next) => {
-    console.error('[ERROR] Erro não tratado:', err);
-    
-    res.status(err.status || 500).json({
-        success: false,
-        message: err.message || 'Erro interno do servidor',
-        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-});
 
 // [BOOT] Inicialização do Servidor
 // ============================================================================
@@ -4154,6 +4130,31 @@ Pressione Ctrl+C para parar o servidor
     process.exit(1);
   }
 }
+
+// ============================================================================
+// [ERRO] Tratamento de Erros
+// ============================================================================
+
+// 404 - Rota não encontrada
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Rota não encontrada',
+        path: req.path,
+        method: req.method
+    });
+});
+
+// Erro global
+app.use((err, req, res, next) => {
+    console.error('[ERROR] Erro não tratado:', err);
+    
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Erro interno do servidor',
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
 
 startServer();
 
