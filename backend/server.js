@@ -28,6 +28,9 @@ const dosingUserRoutes = require('./dosing-user-routes');
 const dosingIotRoutes  = require('./dosing-iot-routes'); 
 const dosingDeviceRoutes = require('./dosing-device-routes');
 
+const { getLatestFirmwareForType } = require('./iot-ota');
+
+
 const path = require('path');
 
 const { router: otaRouter, otaInit: initOtaLogsTable } = require('./iot-ota');
@@ -2882,8 +2885,6 @@ app.put('/api/v1/user/telegram-config', authUserMiddleware, async (req, res) => 
   }
 });
 
-
-
 // PUT /pump4-calib: salva mL/s da bomba 4 no backend
 app.put(
   '/api/v1/user/devices/:deviceId/pump4-calib',
@@ -3255,13 +3256,15 @@ app.get('/api/v1/dev/device-firmware-status/:deviceId', authUserMiddleware, asyn
         data: {
           currentVersion,
           latestVersion: null,
-          upToDate: true, // ou false, como preferir se não existir firmware
+          upToDate: true,
         },
       });
     }
 
-    const latestVersion = latestFile.replace('.bin', ''); // ex: RBS_KH_260118
-    const upToDate = currentVersion === latestVersion;
+    // normaliza tirando .bin dos dois
+    const latestVersion = latestFile.replace(/\.bin$/i, '');
+    const currentNorm   = (currentVersion || '').replace(/\.bin$/i, '');
+    const upToDate      = currentNorm && currentNorm === latestVersion;
 
     res.json({
       success: true,
