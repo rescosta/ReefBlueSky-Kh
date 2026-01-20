@@ -1,4 +1,5 @@
 // iot-ota.js - OTA routes e utilitários
+console.log('[DEBUG] carregando iot-ota.js FW_DIR=', FW_DIR);
 
 const fs = require('fs');
 const path = require('path');

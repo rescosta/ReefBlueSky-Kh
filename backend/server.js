@@ -4093,6 +4093,7 @@ async function startServer() {
 
     // 2) Registrar router OTA (depois dos middlewares de auth!)
     app.use(otaRouter);
+    console.log('[DEBUG] otaRouter montado em /');
     console.log('[OTA] rotas registradas');
 
     // 3) Iniciar servidor HTTP
