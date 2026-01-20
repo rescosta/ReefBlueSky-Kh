@@ -30,7 +30,7 @@ const dosingDeviceRoutes = require('./dosing-device-routes');
 
 const path = require('path');
 
-const { FW_DIR, getLatestFirmwareForType } = require('./iot-ota');
+//const { FW_DIR, getLatestFirmwareForType } = require('./iot-ota');
 const { router: otaRouter, otaInit: initOtaLogsTable } = require('./iot-ota');
 
 const axios = require('axios');

@@ -17,6 +17,11 @@ const FW_DIR = path.join(__dirname, 'firmware');
 console.log('[DEBUG] carregando iot-ota.js FW_DIR=', FW_DIR);
 
 
+router.get('/ota/ping', (req, res) => {
+  console.log('[OTA] /ota/ping hit');
+  res.json({ ok: true });
+});
+
 // ======== HELPERS ========
 
 /**
