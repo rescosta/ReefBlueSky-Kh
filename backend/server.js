@@ -31,6 +31,7 @@ const dosingDeviceRoutes = require('./dosing-device-routes');
 const path = require('path');
 
 const { FW_DIR, getLatestFirmwareForType } = require('./iot-ota');
+const { router: otaRouter, otaInit: initOtaLogsTable } = require('./iot-ota');
 
 const axios = require('axios');
 
@@ -4115,16 +4116,22 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ============================================================================
 // [BOOT] Inicialização do Servidor
 // ============================================================================
+async function startServer() {
+  try {
+    // 1) Inicializar tabela OTA logs
+    await initOtaLogsTable();
+    console.log('[OTA] device_ota_events pronta');
 
-function startServer() {
-    
-   
-    // Iniciar servidor HTTP
-app.listen(PORT, () => {
-  console.log(`
+    // 2) Registrar router OTA (depois dos middlewares de auth!)
+    app.use(otaRouter);
+    console.log('[OTA] rotas registradas');
+
+    // 3) Iniciar servidor HTTP
+    app.listen(PORT, () => {
+      console.log(`
+        
 ╔════════════════════════════════════════════════════════════╗
 ║     ReefBlueSky KH Monitor - Backend Node.js (Rev07)       ║
 ╚════════════════════════════════════════════════════════════╝
@@ -4169,12 +4176,16 @@ Pressione Ctrl+C para parar o servidor
   `);
 });
 
+    // 4) Log das rotas (como você já faz hoje)
+    app._router.stack
+      .filter(r => r.route && r.route.path)
+      .forEach(r => console.log('[ROUTE]', r.route.stack[0].method.toUpperCase(), r.route.path));
+
+  } catch (err) {
+    console.error('[BOOT] Erro ao iniciar servidor:', err);
+    process.exit(1);
+  }
 }
-
-app._router.stack
-  .filter(r => r.route && r.route.path)
-  .forEach(r => console.log('[ROUTE]', r.route.stack[0].method.toUpperCase(), r.route.path));
-
 
 startServer();
 
