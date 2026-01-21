@@ -110,6 +110,13 @@
     .btn-small:hover {
       background: #111827;
     }
+
+    .btn-small.btn-disabled {
+      opacity: 0.4;        /* deixa mais “apagado” */
+      cursor: default;     /* não mostra mãozinha */
+      pointer-events: none;/* ignora cliques mesmo se algo falhar no disabled */
+    }
+
     .device-selector {
       display: flex;
       align-items: center;
