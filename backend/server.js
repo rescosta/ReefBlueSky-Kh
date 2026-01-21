@@ -1183,9 +1183,11 @@ app.post(
   }
 );
 
+/*
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
   console.log('FW REPORT body=', req.body);
   console.log('FW REPORT user=', req.user);
+
   const deviceId = req.user.deviceId;
   const { firmwareVersion } = req.body || {};
   if (!firmwareVersion) {
@@ -1207,8 +1209,39 @@ app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
     if (conn) try { conn.release(); } catch (e) {}
   }
 });
+*/
 
+app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
+  console.log('FW REPORT body=', req.body);
+  console.log('FW REPORT user=', req.user);
 
+  let deviceId = req.user.deviceId;
+  const { firmwareVersion, mainDeviceId } = req.body || {};
+
+  // Se veio de displayToken, usa mainDeviceId como alvo
+  if (!deviceId && req.user.type === 'display' && mainDeviceId) {
+    deviceId = mainDeviceId;
+  }
+
+  if (!firmwareVersion || !deviceId) {
+    return res.status(400).json({ success: false, message: 'firmwareVersion ou deviceId ausente' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.query(
+      'UPDATE devices SET firmware_version = ?, updatedAt = NOW() WHERE deviceId = ?',
+      [firmwareVersion, deviceId]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('POST /device/firmware error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao atualizar firmwareVersion' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
