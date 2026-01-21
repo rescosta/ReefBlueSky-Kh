@@ -210,12 +210,12 @@ async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
 
     // Sem firmware novo
     if (upToDate || !latestVersion || currentVersion === latestVersion) {
-      statusSpan.textContent = 'Atualizado';
-      statusSpan.className   = 'device-status-badge status-ok';
+      statusSpan.textContent = '';
+      statusSpan.className   = 'device-status-badge';
 
       btn.disabled = true;
       btn.classList.add('btn-disabled');
-      btn.textContent = 'Atualizar';
+      btn.textContent = 'Atualizado';
       return;
     }
 
@@ -411,11 +411,12 @@ async function loadDevices() {
             }
           } else {
             if (statusSpan) {
-              statusSpan.textContent = 'Atualizado';
-              statusSpan.className   = 'device-status-badge status-ok';
+              statusSpan.textContent = '';
+              statusSpan.className   = 'device-status-badge';
             }
             btn.disabled = true;
             btn.classList.add('btn-disabled');
+            btn.textContent = 'Atualizado'; 
 
           }
 
