@@ -1185,6 +1185,73 @@ app.post(
   }
 );
 
+app.post('/api/display/register-device', authUserMiddleware, async (req, res) => {
+  console.log('[DISPLAY] POST /api/display/register-device via server.js');
+
+  const userId = req.user.userId;
+  const { deviceId, deviceType, mainDeviceId } = req.body || {};
+
+  if (!deviceId || deviceType !== 'LCD') {
+    return res.status(400).json({
+      success: false,
+      message: 'deviceId ou deviceType inválidos'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      'SELECT id FROM devices WHERE deviceId = ? LIMIT 1',
+      [deviceId]
+    );
+
+    if (!rows.length) {
+      await conn.query(
+        `INSERT INTO devices (deviceId, name, type, userId, mainDeviceId, createdAt, updatedAt)
+         VALUES (?, ?, 'LCD', ?, ?, NOW(), NOW())`,
+        [deviceId, deviceId, userId, mainDeviceId || null]
+      );
+    }
+
+    const devicePayload = {
+      userId,
+      deviceId,
+      iat: Math.floor(Date.now() / 1000)
+    };
+
+    const deviceToken = jwt.sign(devicePayload, JWT_SECRET, { expiresIn: '30d' });
+
+    const refreshToken = jwt.sign(
+      { userId, deviceId, type: 'refresh' },
+      JWT_REFRESH_SECRET,
+      { expiresIn: '90d' }
+    );
+
+    const expiresInSeconds = 30 * 24 * 60 * 60;
+
+    return res.json({
+      success: true,
+      deviceToken,
+      refreshToken,
+      expiresIn: expiresInSeconds
+    });
+  } catch (err) {
+    console.error('[DISPLAY] ERRO /register-device:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao registrar device LCD'
+    });
+  } finally {
+    if (conn) {
+      try { conn.release(); } catch (e) {}
+    }
+  }
+});
+
+
+
 /*
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
   console.log('FW REPORT body=', req.body);
