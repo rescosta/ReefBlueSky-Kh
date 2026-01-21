@@ -227,6 +227,62 @@ router.post('/ping', authDisplayMiddleware, async (req, res) => {
 });
 
 /**
+ * GET /api/display/commands
+ * Cabeçalho: Authorization: Bearer <displayToken>
+ * Retorna: { success: true, action: "none" } ou { success: true, action: "otaupdate", url: "https://...bin" }
+ */
+router.get('/commands', authDisplayMiddleware, async (req, res) => {
+  console.log('[DISPLAY] GET /api/display/commands');
+  const displayId = req.display.displayId;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      `SELECT id, action, payload
+         FROM display_commands
+        WHERE displayId = ?
+          AND consumedAt IS NULL
+        ORDER BY createdAt DESC
+        LIMIT 1`,
+      [displayId]
+    );
+
+    if (!rows.length) {
+      return res.json({ success: true, action: 'none' });
+    }
+
+    const cmd = rows[0];  // <<< aqui estava o bug: precisa pegar rows[0]
+    let payload = {};
+    try {
+      payload = cmd.payload ? JSON.parse(cmd.payload) : {};
+    } catch (_) {}
+
+    if (cmd.action === 'otaupdate' && payload.url) {
+      await conn.query(
+        'UPDATE display_commands SET consumedAt = NOW() WHERE id = ?',
+        [cmd.id]
+      );
+      return res.json({
+        success: true,
+        action: 'otaupdate',
+        url: payload.url
+      });
+    }
+
+    return res.json({ success: true, action: 'none' });
+  } catch (err) {
+    console.error('[DISPLAY] ERRO /commands:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar comandos do display'
+    });
+  } finally {
+    if (conn) { try { conn.release(); } catch (e) {} }
+  }
+});
+
+/**
  * GET /api/display/latest?deviceId=...
  * Cabeçalho: Authorization: Bearer <displayToken>
  * Retorna última medição de KH para o deviceId
@@ -363,5 +419,93 @@ router.post('/refresh', authDisplayMiddleware, async (req, res) => {
     });
   }
 });
+
+/**
+ * POST /api/display/register-device
+ * Cabeçalho: Authorization: Bearer <userToken>  (MESMO token do /auth/login)
+ * Body: { deviceId, deviceType: "LCD", mainDeviceId }
+ *
+ * Retorna: { success: true, deviceToken, refreshToken, expiresIn }
+ */
+router.post('/register-device', async (req, res) => {
+  console.log('[DISPLAY] POST /api/display/register-device');
+
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Token de usuário não fornecido' });
+  }
+
+  const userToken = authHeader.substring(7);
+  let decodedUser;
+  try {
+    decodedUser = jwt.verify(userToken, JWT_SECRET);
+  } catch (err) {
+    console.error('[DISPLAY] register-device: userToken inválido', err.message);
+    return res.status(401).json({ success: false, message: 'Token de usuário inválido' });
+  }
+
+  const userId = decodedUser.userId;
+  const { deviceId, deviceType, mainDeviceId } = req.body || {};
+
+  if (!deviceId || deviceType !== 'LCD') {
+    return res.status(400).json({
+      success: false,
+      message: 'deviceId ou deviceType inválidos'
+    });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 1) Garante que o device LCD exista na tabela devices
+    const rows = await conn.query(
+      'SELECT id FROM devices WHERE deviceId = ? LIMIT 1',
+      [deviceId]
+    );
+
+    if (!rows.length) {
+      await conn.query(
+        `INSERT INTO devices (deviceId, name, type, userId, mainDeviceId, createdAt, updatedAt)
+         VALUES (?, ?, 'LCD', ?, ?, NOW(), NOW())`,
+        [deviceId, deviceId, userId, mainDeviceId || null]
+      );
+    }
+
+    // 2) Gerar deviceToken igual KH/DOSER (payload com deviceId + userId)
+    const devicePayload = {
+      userId,
+      deviceId
+    };
+
+    const deviceToken = jwt.sign(devicePayload, JWT_SECRET, { expiresIn: '30d' });
+    const refreshToken = jwt.sign(
+      { ...devicePayload, type: 'refresh' },
+      JWT_REFRESH_EXPIRY ? JWT_REFRESH_EXPIRY : JWT_SECRET,
+      { expiresIn: JWT_REFRESH_EXPIRY || '90d' }
+    );
+
+    const expiresInSeconds = 30 * 24 * 60 * 60;
+
+    return res.json({
+      success: true,
+      deviceToken,
+      refreshToken,
+      expiresIn: expiresInSeconds
+    });
+  } catch (err) {
+    console.error('[DISPLAY] ERRO /register-device:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao registrar device LCD'
+    });
+  } finally {
+    if (conn) {
+      try { conn.release(); } catch (e) {}
+    }
+  }
+});
+
+
 
 module.exports = router;
