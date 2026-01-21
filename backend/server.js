@@ -58,6 +58,11 @@ const APP_VERSION = process.env.APP_VERSION || 'dev';
 
 
 const app = express();
+app.use((req, res, next) => {
+  console.log('[REQ]', req.method, req.url);
+  next();
+});
+
 app.set('trust proxy', 1); 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || '...';
@@ -2636,6 +2641,7 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
     const deviceId = req.user.deviceId;
     const userId = req.user.userId;
     console.log('[API] POST /api/v1/device/health - Device:', deviceId);
+    console.log('HEALTH RAW body =', req.body); 
 
     const health = req.body || {};
 
