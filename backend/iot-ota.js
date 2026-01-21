@@ -181,6 +181,8 @@ router.get('/ota/ping', (req, res) => {
 
 router.post('/api/device/ota-log', async (req, res) => {
   try {
+
+    console.log('[OTA] body=', req.body);
     const { device_type, event, firmware_version, error } = req.body;
 
     if (!device_type || !event || !firmware_version) {

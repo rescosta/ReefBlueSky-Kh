@@ -1179,6 +1179,8 @@ app.post(
 );
 
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
+  console.log('FW REPORT body=', req.body);
+  console.log('FW REPORT user=', req.user);
   const deviceId = req.user.deviceId;
   const { firmwareVersion } = req.body || {};
   if (!firmwareVersion) {
