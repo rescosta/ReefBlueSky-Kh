@@ -205,9 +205,12 @@ async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
 
     const { currentVersion, latestVersion, upToDate } = data.data || {};
 
+    const curNoBin  = (currentVersion || '').replace(/\.bin$/i, '');
+    const latestNoBin = (latestVersion || '').replace(/\.bin$/i, '');
+
     // Sem firmware novo
     if (upToDate || !latestVersion || currentVersion === latestVersion) {
-      statusSpan.textContent = `Atualizado (${currentVersion || 'N/A'})`;
+      statusSpan.textContent = 'Atualizado';
       statusSpan.className   = 'device-status-badge status-ok';
 
       btn.disabled = true;
@@ -217,7 +220,7 @@ async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
     }
 
     // Há firmware mais novo → mostra à esquerda qual é e habilita botão
-    statusSpan.textContent = `Novo: ${latestVersion}`;
+    statusSpan.textContent = `Novo: ${latestNoBin}`;
     statusSpan.className   = 'device-status-badge status-update';
 
     btn.disabled = false;
@@ -348,16 +351,19 @@ async function loadDevices() {
 
           const { currentVersion, latestVersion, upToDate } = data.data;
 
+          const curNoBin    = (currentVersion || '').replace(/\.bin$/i, '');
+          const latestNoBin = (latestVersion  || '').replace(/\.bin$/i, '');
+
           if (!upToDate) {
             if (statusSpan) {
-              statusSpan.textContent = `Atualização: ${currentVersion} → ${latestVersion}`;
-              statusSpan.className = 'device-status-badge status-update';
+              statusSpan.textContent = `Atualização: ${curNoBin || 'desconhecida'} → ${latestNoBin}`;
+              statusSpan.className   = 'device-status-badge status-update';
             }
 
             const wantUpdate = confirm(
               `Nova versão disponível para este dispositivo.\n\n` +
-              `Versão atual: ${currentVersion || 'desconhecida'}\n` +
-              `Versão nova:  ${latestVersion}\n\n` +
+              `Versão atual: ${curNoBin || 'desconhecida'}\n` +
+              `Versão nova:  ${latestNoBin}\n\n` +
               `Deseja iniciar a atualização agora?`
             );
 
@@ -405,8 +411,8 @@ async function loadDevices() {
             }
           } else {
             if (statusSpan) {
-              statusSpan.textContent = `Atualizado (${currentVersion})`;
-              statusSpan.className = 'device-status-badge status-ok';
+              statusSpan.textContent = 'Atualizado';
+              statusSpan.className   = 'device-status-badge status-ok';
             }
           }
 
