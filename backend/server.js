@@ -3789,7 +3789,7 @@ return res.json({
 
 
 // Rota IoT para o KH Monitor enviar health + níveis
-app.post('/device/health', async (req, res) => {
+/*app.post('/device/health', async (req, res) => {
   try {
     const body = req.body || {};
 
@@ -3845,7 +3845,7 @@ app.post('/device/health', async (req, res) => {
     console.error('Error in /device/health', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
-});
+});*/
 
 // Dashboard de Gráficos
 
