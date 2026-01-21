@@ -414,6 +414,9 @@ async function loadDevices() {
               statusSpan.textContent = 'Atualizado';
               statusSpan.className   = 'device-status-badge status-ok';
             }
+            btn.disabled = true;
+            btn.classList.add('btn-disabled');
+
           }
 
         } catch (err) {
