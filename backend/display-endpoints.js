@@ -4,10 +4,11 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
-// Use as mesmas variáveis do server.js (ajuste se o nome for diferente)
-const JWT_SECRET = process.env.JWT_SECRET || 'seu-secret-super-seguro-aqui-mude-em-producao';
-const JWT_DISPLAY_EXPIRY = process.env.JWT_DISPLAY_EXPIRY || '30d'; // 30 dias
-const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '90d'; // 90 dias
+const JWT_SECRET = process.env.JWT_SECRET || '...';           // igual ao server.js
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...'; // igual ao server.js
+const JWT_DISPLAY_EXPIRY = process.env.JWT_DISPLAY_EXPIRY || '30d';
+const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '90d';
+
 
 // IMPORTAR POOL DO SERVER
 // Se preferir, exporte o pool do server.js e faça require aqui.
@@ -26,6 +27,7 @@ const pool = mariadb.createPool({
 function generateDisplayToken(payload, expiresIn) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
+
 
 /**
  * POST /api/display/register
@@ -438,7 +440,8 @@ router.post('/register-device', async (req, res) => {
   const userToken = authHeader.substring(7);
   let decodedUser;
   try {
-    decodedUser = jwt.verify(userToken, JWT_SECRET);
+  decodedUser = jwt.verify(userToken, JWT_SECRET);
+
   } catch (err) {
     console.error('[DISPLAY] register-device: userToken inválido', err.message);
     return res.status(401).json({ success: false, message: 'Token de usuário inválido' });
@@ -472,27 +475,30 @@ router.post('/register-device', async (req, res) => {
       );
     }
 
-    // 2) Gerar deviceToken igual KH/DOSER (payload com deviceId + userId)
-    const devicePayload = {
-      userId,
-      deviceId
-    };
+  // 2) Gerar deviceToken igual KH/DOSER (payload com deviceId + userId)
+  const devicePayload = {
+    userId,
+    deviceId,
+    iat: Math.floor(Date.now() / 1000)
+  };
 
-    const deviceToken = jwt.sign(devicePayload, JWT_SECRET, { expiresIn: '30d' });
-    const refreshToken = jwt.sign(
-      { ...devicePayload, type: 'refresh' },
-      JWT_REFRESH_EXPIRY ? JWT_REFRESH_EXPIRY : JWT_SECRET,
-      { expiresIn: JWT_REFRESH_EXPIRY || '90d' }
-    );
+  const deviceToken = jwt.sign(devicePayload, JWT_SECRET, { expiresIn: '30d' });
 
-    const expiresInSeconds = 30 * 24 * 60 * 60;
+  const refreshToken = jwt.sign(
+    { userId, deviceId, type: 'refresh' },
+    JWT_REFRESH_SECRET,
+    { expiresIn: '90d' }
+  );
 
-    return res.json({
-      success: true,
-      deviceToken,
-      refreshToken,
-      expiresIn: expiresInSeconds
-    });
+  const expiresInSeconds = 30 * 24 * 60 * 60;
+
+  return res.json({
+    success: true,
+    deviceToken,
+    refreshToken,
+    expiresIn: expiresInSeconds
+  });
+
   } catch (err) {
     console.error('[DISPLAY] ERRO /register-device:', err.message);
     return res.status(500).json({
