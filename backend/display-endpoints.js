@@ -8,6 +8,8 @@ const JWT_SECRET = process.env.JWT_SECRET || '...';           // igual ao server
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...'; // igual ao server.js
 const JWT_DISPLAY_EXPIRY = process.env.JWT_DISPLAY_EXPIRY || '30d';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '90d';
+console.log('JWT_SECRET em display-endpoints =', JWT_SECRET);
+
 
 
 // IMPORTAR POOL DO SERVER
@@ -433,14 +435,20 @@ router.post('/register-device', async (req, res) => {
   console.log('[DISPLAY] POST /api/display/register-device');
 
   const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  console.log('[DISPLAY] register-device authHeader =', authHeader);   // <<< log novo
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'Token de usuário não fornecido' });
   }
 
   const userToken = authHeader.substring(7);
+  console.log('[DISPLAY] register-device userToken snippet:', userToken.slice(0, 40), '...');
+
   let decodedUser;
   try {
   decodedUser = jwt.verify(userToken, JWT_SECRET);
+  console.log('[DISPLAY] register-device decodedUser:', decodedUser);
+
 
   } catch (err) {
     console.error('[DISPLAY] register-device: userToken inválido', err.message);

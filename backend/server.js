@@ -67,6 +67,8 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || '...';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '...';
+console.log('JWT_SECRET em display-endpoints =', JWT_SECRET);
+
 
 
 function detectNetType() {
