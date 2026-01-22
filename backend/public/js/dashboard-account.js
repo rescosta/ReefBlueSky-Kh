@@ -310,6 +310,33 @@ async function openConnectionTestModal(device) {
         last.ago || '-'
       }${last.iso ? ` (${last.iso})` : ''}</p>
     `;
+
+    // Atualiza bolinha de status na lista
+    const dot = document.querySelector(
+      `.device-status-dot[data-device-id="${device.deviceId}"]`
+    );
+    if (dot) {
+      dot.classList.remove('online', 'offline');
+      dot.classList.add(d.online ? 'online' : 'offline');
+    }
+
+    // Bloqueia Atualizar se offline
+    const fwBtn = document.querySelector(
+      `.btn-fw-update[data-device-id="${device.deviceId}"]`
+    );
+    if (fwBtn) {
+      if (!d.online) {
+        fwBtn.disabled = true;
+        fwBtn.classList.add('btn-disabled');
+        fwBtn.textContent = 'Offline';
+      } else {
+        // volta ao texto normal se tiver update
+        fwBtn.textContent = 'Atualizar';
+        // não muda disabled aqui; quem decide é o checkFirmwareStatusForDevice
+      }
+    }
+
+
   } catch (err) {
     console.error('Erro ao testar conexão:', err);
     content.textContent = 'Erro ao testar conexão.';
@@ -364,9 +391,14 @@ async function loadDevices() {
 
       const left = document.createElement('div');
       left.innerHTML = `
-        <strong>${iconHtml} ${name}</strong><br>
+        <strong>
+          ${iconHtml} ${name}
+          <span class="device-status-dot offline"
+                data-device-id="${d.deviceId}"></span>
+        </strong><br>
         <span class="small-text">FW ${fw}</span>
       `;
+
 
       const right = document.createElement('div');
       right.style.display = 'flex';
@@ -418,6 +450,14 @@ async function loadDevices() {
       btn.addEventListener('click', async () => {
         const deviceId = btn.getAttribute('data-device-id');
         if (!deviceId) return;
+
+
+        // Se texto indicar Offline, não segue
+        if (btn.textContent === 'Offline') {
+          alert('Este dispositivo está offline. Conecte-o antes de iniciar a atualização.');
+          return;
+        }
+
 
         const statusSpan = container.querySelector(
           `.device-status-badge[data-device-id="${deviceId}"]`
