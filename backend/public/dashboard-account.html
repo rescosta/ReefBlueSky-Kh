@@ -184,6 +184,39 @@
       margin-right: 4px;
     }
 
+
+    #connectionTestModal {
+      position: fixed !important;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999 !important;
+      flex-direction: column;
+      padding: 20px;
+      box-sizing: border-box;
+      cursor: pointer;  
+
+    }
+
+    #connectionTestModal.show {
+      display: flex !important;
+    }
+
+    #connectionTestContent {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 90%;
+      max-height: 80%;
+      overflow: auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
@@ -354,6 +387,32 @@
       display: flex;
       justify-content: space-between;
     }
+
+    #connectionTestModal {
+      cursor: pointer !important;
+    }
+
+    #connectionTestModal #connectionTestContent,
+    #connectionTestModal button {
+      cursor: default !important;
+      pointer-events: auto !important;
+    }
+
+    #connectionTestModal:not(:hover) button {
+      pointer-events: none;
+    }
+
+    /* Título no conteúdo (estilizado) */
+    #connectionTestContent p {
+      margin: 8px 0;
+      color: #020617;
+      font-size: 14px;
+    }
+
+    #connectionTestContent strong {
+      color: #1f2937;
+    }
+
   </style>
 </head>
 <body>
