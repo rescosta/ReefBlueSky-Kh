@@ -673,48 +673,91 @@
         }
 
 
-        @media (max-width: 768px) {
-            .controls {
-                grid-template-columns: 1fr;
-            }
 
-            .form-row {
-                grid-template-columns: 1fr;
-            }
 
-            .checkbox-group {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .navbar-menu {
-                gap: 15px;
-                font-size: 11px;
-                margin-left: 20px;
-            }
-
-            .navbar-right {
-                gap: 10px;
-            }
-
-            table {
-                font-size: 11px;
-            }
-
-            th, td {
-                padding: 6px;
-            }
+          @media (max-width: 768px) {
+        /* esconder menu textual e rótulos que ocupam espaço */
+        .nav {
+          display: none;
         }
+        .device-selector span:first-child {
+          display: none;
+        }
+        .device-selector {
+          max-width: 150px;
+        }
+        .device-selector select {
+          width: 100%;
+        }
+        #lcdStatusIcon {
+          font-size: 10px;
+          padding: 2px 8px;
+        }
+        #logoutBtn {
+          display: none;
+        }
+
+        /* topo em duas linhas: logo em cima, infos embaixo */
+        .topbar {
+          flex-direction: column;
+          align-items: stretch;
+          padding: 8px 12px;
+          gap: 4px;
+        }
+
+        .topbar-left {
+          justify-content: center;
+          order: 1;
+        }
+
+        .logo {
+          font-size: 20px;
+        }
+
+        .topbar-right {
+          order: 2;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 8px;      /* já “enxuga” a direita */
+          font-size: 12px;
+        }
+
+        /* hambúrguer com três barras empilhadas */
+        .menu-toggle {
+          display: flex !important;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          padding: 8px;
+          width: 36px;
+        }
+        .menu-toggle span {
+          width: 20px;
+          height: 2px;
+          background: #e5e7eb;
+          border-radius: 1px;
+          margin: 2px 0;
+        }
+
+      }
     </style>
 </head>
 <body>
 
     <div id="topbar-root"></div>
 
-    <!-- Header -->
-     <!-- <div class="page-header"> -->
-         <!-- <h1>🌊 Dosadora Balling</h1> -->
-         <!-- <p>Gerenciador de dosadoras automáticas para aquários marinhos</p> -->
-     <!-- </div> -->
+      <!-- painel lateral -->
+    <div id="sideMenu" class="side-menu">
+      <button id="closeMenu" class="side-close">×</button>
+      <a href="dashboard-main.html">Principal</a>
+      <a href="dashboard-graficos.html">Gráficos</a>
+      <a href="dashboard-config.html">Configurações</a>
+      <a href="dashboard-sistema.html">Sistema</a>
+      <a href="dashboard-dosing.html">Dosadora</a>
+      <a href="dashboard-logs.html">Dev</a>
+      <a href="dashboard-account.html">Minha Conta</a>
+      <a href="#" id="menuLogout">Sair</a>
+    </div>
 
     <div class="container">
         <!-- Alert Box -->
