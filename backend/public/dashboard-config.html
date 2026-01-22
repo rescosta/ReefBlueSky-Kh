@@ -4,133 +4,18 @@
   <meta charset="UTF-8" />
   <title>ReefBlueSky - Configurações</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/dashboard-base.css">
+
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      max-width: 100%;
-      width: 100%;
-      overflow-x: hidden;
-    }
-    :root {
-      --vh: 100vh;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-        sans-serif;
-      background: #020617;
-      color: #e5e7eb;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    a { color: inherit; text-decoration: none; }
-
-    /* TOPBAR (mesmo CSS das outras telas) */
-    /* TOPBAR */
-    .topbar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      /* antes: padding: 10px 24px; */
-      padding: 10px 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    }
-
-    @supports (padding: max(0px)) {
-      .topbar {
-        padding-left: max(10px, env(safe-area-inset-left));
-        padding-right: max(10px, env(safe-area-inset-right));
-      }
-    }
-
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .logo {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
-    .nav {
-      display: flex;
-      gap: 16px;
-      font-size: 14px;
-    }
-    .nav a {
-      opacity: 0.8;
-      padding-bottom: 2px;
-      border-bottom: 2px solid transparent;
-    }
-    .nav a.active {
-      opacity: 1;
-      border-color: #facc15;
-    }
-    .topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 14px;
-    }
-    .badge,
-    .badge-on,
-    .badge-off {
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .badge-on {
-      background: #16a34a33;
-      border: 1px solid #22c55e;
-      color: #bbf7d0;
-    }
-    .badge-off {
-      background: #111827;
-      border: 1px solid #4b5563;
-      color: #9ca3af;
-    }
-    .btn-small {
-      border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      background: #0f172a;
-      color: #e5e7eb;
-    }
-    .btn-small:hover {
-      background: #111827;
-    }
-    .device-selector {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-    }
-    .device-selector select {
-      background: #020617;
-      color: #e5e7eb;
-      border-radius: 6px;
-      border: 1px solid #374151;
-      padding: 4px 8px;
-      font-size: 13px;
-    }
-
     /* LAYOUT */
     .content {
       flex: 1;
-      padding: 12px 10px 16px; 
+      padding: 12px 10px 16px;
       display: grid;
       grid-template-columns: 2fr 1.5fr;
       gap: 16px;
     }
+
     @media (max-width: 960px) {
       .content {
         grid-template-columns: 1fr;
@@ -144,18 +29,21 @@
       border: 1px solid #1f2937;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
     }
+
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
+
     .card-title {
       font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: #9ca3af;
     }
+
     .card-subtitle {
       font-size: 13px;
       color: #6b7280;
@@ -172,9 +60,11 @@
       gap: 4px;
       font-size: 13px;
     }
+
     .field-row:last-of-type {
       border-bottom: none;
     }
+
     .field-row label {
       font-size: 13px;
       color: #e5e7eb;
@@ -208,6 +98,7 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
     }
+
     .btn-primary:hover {
       filter: brightness(1.05);
     }
@@ -230,6 +121,7 @@
       align-items: center;
       gap: 6px;
     }
+
     .btn-abort:hover {
       filter: brightness(1.05);
     }
@@ -242,7 +134,7 @@
       border-radius: 999px;
       font-size: 11px;
       font-weight: 600;
-      min-width: 54px;   
+      min-width: 54px;
     }
 
     .field-row.inline {
@@ -253,8 +145,8 @@
     }
 
     .field-row.inline span:first-child {
-      flex: 1 1 auto;      /* ocupa o espaço da esquerda */
-      max-width: 65%;      /* não deixa o texto ir até a borda direita */
+      flex: 1 1 auto;
+      max-width: 65%;
     }
 
     .badge-level-on {
@@ -262,6 +154,7 @@
       border: 1px solid #22c55e;
       color: #bbf7d0;
     }
+
     .badge-level-off {
       background: #b91c1c33;
       border: 1px solid #f97373;
@@ -274,12 +167,14 @@
       font-size: 12px;
       margin-top: 4px;
     }
+
     .pump-table th,
     .pump-table td {
       padding: 6px 4px;
       border-bottom: 1px solid #1f2937;
       text-align: center;
     }
+
     .pump-table th {
       color: #9ca3af;
     }
@@ -292,6 +187,7 @@
       background: #111827;
       overflow: hidden;
     }
+
     .progress-inner {
       position: absolute;
       top: 0;
@@ -304,14 +200,6 @@
     .hint {
       font-size: 11px;
       color: #6b7280;
-    }
-
-    .footer {
-      font-size: 11px;
-      color: #6b7280;
-      padding: 6px 24px 10px;
-      display: flex;
-      justify-content: space-between;
     }
 
     .form-row {
@@ -333,104 +221,13 @@
 
     .form-hint {
       display: block;
-      font-size: 11px;      
+      font-size: 11px;
       color: #6b7280;
       margin-top: 0.25rem;
     }
 
-        .menu-toggle {
-      display: none;        /* desktop */
-      background: none;
-      border: 0;
-      padding: 6px;
-      cursor: pointer;
-    }
-    .menu-toggle span {
-      display: block;
-      width: 18px;
-      height: 2px;
-      background: #e5e7eb;
-      border-radius: 999px;
-      margin: 3px 0;
-    }
-
-    .side-menu {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 72%;
-      max-width: 280px;
-      height: 100%;
-      background: #020617;
-      color: #e5e7eb;
-      transform: translateX(-100%);
-      transition: transform 0.25s ease-out;
-      z-index: 40;
-      padding: 24px 16px;
-    }
-    .side-menu.open {
-      transform: translateX(0);
-    }
-    .side-menu a {
-      display: block;
-      padding: 10px 0;
-      font-size: 16px;
-    }
-    .side-close {
-      background: none;
-      border: 0;
-      color: #9ca3af;
-      font-size: 24px;
-      margin-bottom: 16px;
-      cursor: pointer;
-    }
-
     @media (max-width: 768px) {
-      .nav { display: none; }
-
-      .device-selector span:first-child { display: none; }
-      .device-selector { max-width: 150px; }
-      .device-selector select { width: 100%; }
-
-      #lcdStatusIcon { font-size: 10px; padding: 2px 8px; }
-      #logoutBtn { display: none; }
-
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 8px 12px;
-        gap: 4px;
-      }
-      .topbar-left {
-        justify-content: center;
-        order: 1;
-      }
-      .logo { font-size: 20px; }
-
-      .topbar-right {
-        order: 2;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 8px;
-        font-size: 12px;
-      }
-
-      .menu-toggle {
-        display: flex !important;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 8px;
-        width: 36px;
-      }
-      .menu-toggle span {
-        width: 20px;
-        height: 2px;
-        background: #e5e7eb;
-        border-radius: 1px;
-        margin: 2px 0;
-      }
-        /* Quebrar inline em duas linhas no mobile */
+      /* Quebrar inline em duas linhas no mobile */
       .inline {
         flex-direction: column;
         align-items: stretch;
@@ -444,18 +241,18 @@
         width: 100%;
         overflow-x: auto;
       }
+
       .pump-table table {
         width: 100%;
-        min-width: 420px; /* permite scroll horizontal só na tabela se precisar */
-      } 
+        min-width: 420px;
+      }
 
       .form-row {
-       flex-direction: column;
+        flex-direction: column;
       }
     }
-
-
   </style>
+
 </head>
 <body>
   <div id="topbar-root"></div>
