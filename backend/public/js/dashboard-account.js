@@ -412,22 +412,25 @@ async function loadDevices() {
       const div = document.createElement('div');
       div.className = 'device-item';
 
-      let name = d.name || d.deviceId || 'Device';
       const type = d.type || 'KH';
+      let name;
 
-      // Se não tiver name customizado, gera um nome curto a partir do deviceId
-      if (!d.name && d.deviceId) {
-        const parts = d.deviceId.split('-'); // ex.: ['RBS', 'LCD', 'CCBA97F3BD8C']
+      if (d.deviceId) {
+        const parts = d.deviceId.split('-'); // ['RBS','LCD','7C2C...']
 
         if (type === 'LCD' && parts.length >= 2) {
-          // Fica "LCD RBS-LCD"
-          name = `LCD RBS-${parts[1]}`;
-        } else if (type === 'KH') {
-          name = 'KH RBS-KH';
-        } else if (type === 'DOSER') {
-          name = 'DOS RBS-DOSER';
+          name = `LCD ${parts[0]}-${parts[1]}`;      // "LCD RBS-LCD"
+        } else if (type === 'KH' && parts.length >= 2) {
+          name = `${parts[0]}-${parts[1]}`;          // "RBS-KH"
+        } else if (type === 'DOSER' && parts.length >= 2) {
+          name = `${parts[0]}-${parts[1]}`;          // "RBS-DOSER"
+        } else {
+          name = d.deviceId;
         }
+      } else {
+        name = d.name || 'Device';
       }
+
 
       const rawFw = d.firmwareVersion || 'N/A';
       const fw    = rawFw.replace(/\.bin$/i, '');
