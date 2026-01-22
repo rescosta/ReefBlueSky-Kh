@@ -1183,7 +1183,7 @@ app.get('/api/v1/user/devices/:deviceId/test-connection',
       // 3) Calcular online/ago
       const now         = Date.now();
       const lastSeenMs  = lastSeen ? new Date(lastSeen).getTime() : 0;
-      const ONLINE_MS   = 2 * 60 * 1000; // 2 minutos (ajustável)
+      const ONLINE_MS   = 5 * 60 * 1000; // 5 minutos (ajustável)
       const isOnline    = lastSeenMs && (now - lastSeenMs <= ONLINE_MS);
 
       function formatAgo(msDiff) {
