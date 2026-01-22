@@ -529,7 +529,7 @@ function getFooterHtml() {
         Usuário: <span id="footerUser">-----</span>
       </div>
       <div class="footer-copy">
-        @ReefBlueSky — todos os direitos reservados
+        @ReefBlueSky 2026 — todos os direitos reservados
       </div>
     </div>
   `;
