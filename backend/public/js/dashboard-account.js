@@ -278,6 +278,17 @@ async function autoCheckConnectionForDevice(device) {
 }
 
 
+function initPasswordToggles() {
+  document.querySelectorAll('[data-toggle-password]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-toggle-password');
+      const input = document.getElementById(targetId);
+      if (!input) return;
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  });
+}
+
 
 // ===== Modal de Teste de Conexão =====
 let connectionModalEl = null;
@@ -695,6 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
   populateTimezoneSelect();
   loadAccountProfile();
   loadDevices();
+  initPasswordToggles(); 
 
   document.getElementById('btnSaveProfile')
     ?.addEventListener('click', (e) => { e.preventDefault(); saveProfile(); });
