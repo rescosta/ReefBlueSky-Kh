@@ -440,6 +440,8 @@ async function initTopbar() {
 
   await applyRoleMenuVisibility();
 
+ initFooter();  
+
   const devs = await loadDevicesCommon();
   if (devs.length) {
     updateDeviceStatusBadge();
@@ -523,17 +525,29 @@ function setLcdStatus(status) {
 function getFooterHtml() {
   return `
     <div class="footer">
-      <div id="userInfo">Usuário --</div>
-      <div>ReefBlueSky KH Monitor — Dashboard web</div>
+      <div class="footer-user">
+        Usuário: <span id="footerUser">-----</span>
+      </div>
+      <div class="footer-copy">
+        @ReefBlueSky — todos os direitos reservados
+      </div>
     </div>
   `;
 }
 
+
 function initFooter() {
   const root = document.getElementById('footer-root');
   if (!root) return;
+
   root.innerHTML = getFooterHtml();
+
+  const span = document.getElementById('footerUser');
+  if (span && currentUser && currentUser.email) {
+    span.textContent = currentUser.email;
+  }
 }
+
 
 
 function setDosingStatus(status) {
@@ -577,6 +591,7 @@ window.DashboardCommon = {
   applyRoleMenuVisibility,
   setLcdStatus,
   setDosingStatus,
+  initFooter,          
   currentUserRole: 'user',
 };
 
