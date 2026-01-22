@@ -1166,7 +1166,21 @@ app.get('/api/v1/user/devices/:deviceId/test-connection',
 
       const dev = devRows[0];
       const deviceType = dev.type; // 'KH' | 'LCD' | 'DOSER'
-      const lastSeen   = dev.last_seen; // datetime ou null
+      let lastSeen   = dev.last_seen; // datetime ou null
+
+      // 1b) Se for DOSER, sobrescreve lastSeen com o da tabela de doser
+      if (deviceType === 'DOSER') {
+        const doserRows = await conn.query(
+          `SELECT last_seen
+             FROM dosing_devices
+            WHERE esp_uid = ?
+            LIMIT 1`,
+          [deviceId] // ou outro campo se você vincula diferente
+        );
+        if (doserRows.length) {
+          lastSeen = doserRows[0].last_seen;
+        }
+      }
 
       // 2) Buscar último health (wifi_rssi, uptime, etc.)
       const healthRows = await conn.query(
