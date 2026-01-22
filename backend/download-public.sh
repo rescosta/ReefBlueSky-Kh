@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================================
-# ReefBlueSky-Kh - Sync da pasta public (HTML + JS)
+# ReefBlueSky-Kh - Sync da pasta public (HTML + JS + CSS)
 # Uso: ./download-public.sh
 # ============================================================================
 
@@ -42,6 +42,12 @@ FILES_JS=(
   "dashboard-account.js"
 )
 
+# JS dentro de public/css (conforme pasta css do Git)
+FILES_CSS=(
+  "dashboard-base.css"
+
+)
+
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║ ReefBlueSky-Kh - Sync da pasta public                ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${NC}"
@@ -49,6 +55,8 @@ echo ""
 
 mkdir -p "${BACKUP_DIR}/${TIMESTAMP}"
 mkdir -p "public/js"
+mkdir -p "public/css"
+
 
 echo -e "${YELLOW}[INFO]${NC} Fazendo backup atual em ${BACKUP_DIR}/${TIMESTAMP}"
 
@@ -68,6 +76,18 @@ if [ -d "public/js" ]; then
     fi
   done
 fi
+
+
+# Backup CSS
+if [ -d "public/css" ]; then
+  mkdir -p "${BACKUP_DIR}/${TIMESTAMP}/css"
+  for f in "${FILES_CSS[@]}"; do
+    if [ -f "public/css/$f" ]; then
+      cp "public/css/$f" "${BACKUP_DIR}/${TIMESTAMP}/css/$f"
+    fi
+  done
+fi
+
 
 echo -e "${GREEN}[✓]${NC} Backup concluído"
 echo ""
@@ -100,6 +120,22 @@ for f in "${FILES_JS[@]}"; do
     echo -e "${GREEN}[✓]${NC} Atualizado: ${DEST}"
   else
     echo -e "${RED}[✗]${NC} Falha ao baixar js/${f}, verifique se existe em ${URL}"
+  fi
+  echo ""
+done
+
+# Baixar CSS (subpasta CSS)
+for f in "${FILES_CSS[@]}"; do
+  URL="${REPO_BASE}/css/${f}"
+  DEST="public/css/${f}"
+
+  echo -e "${BLUE}[DOWNLOAD]${NC} css/${f}"
+  echo -e "${BLUE}[URL]${NC} ${URL}"
+
+  if curl -f -o "${DEST}" "${URL}"; then
+    echo -e "${GREEN}[✓]${NC} Atualizado: ${DEST}"
+  else
+    echo -e "${RED}[✗]${NC} Falha ao baixar css/${f}, verifique se existe em ${URL}"
   fi
   echo ""
 done
