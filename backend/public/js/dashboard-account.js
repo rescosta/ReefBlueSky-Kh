@@ -240,12 +240,11 @@ async function autoCheckConnectionForDevice(device) {
     const url = `/api/v1/user/devices/${device.deviceId}/test-connection`;
     const res = await apiFetch(url, { method: 'GET' });
     const body = await res.json().catch(() => null);
-
     if (!res.ok || !body?.success) return;
 
     const d = body.data || {};
 
-    // Atualiza bolinha
+    // bolinha
     const dot = document.querySelector(
       `.device-status-dot[data-device-id="${device.deviceId}"]`
     );
@@ -254,23 +253,30 @@ async function autoCheckConnectionForDevice(device) {
       dot.classList.add(d.online ? 'online' : 'offline');
     }
 
-    // Ajusta botão de firmware
     const fwBtn = document.querySelector(
       `.btn-fw-update[data-device-id="${device.deviceId}"]`
     );
-    if (fwBtn) {
-      if (!d.online) {
-        fwBtn.disabled = true;
-        fwBtn.classList.add('btn-disabled');
-        fwBtn.textContent = 'Offline';
-      } else {
-        fwBtn.textContent = 'Atualizar';
-      }
+    if (!fwBtn) return;
+
+    // Regra 1: offline sempre vence
+    if (!d.online) {
+      fwBtn.disabled = true;
+      fwBtn.classList.add('btn-disabled');
+      fwBtn.textContent = 'Offline';
+      return;
+    }
+
+    // Se voltou a ficar online, só reabilita se NÃO estiver marcado como Atualizado
+    if (fwBtn.textContent === 'Offline') {
+      fwBtn.disabled = false;
+      fwBtn.classList.remove('btn-disabled');
+      // aqui NÃO força texto, deixa o que checkFirmwareStatus colocou
     }
   } catch (err) {
     console.error('Erro no autoCheckConnectionForDevice:', err);
   }
 }
+
 
 
 // ===== Modal de Teste de Conexão =====
@@ -367,12 +373,13 @@ async function openConnectionTestModal(device) {
         fwBtn.classList.add('btn-disabled');
         fwBtn.textContent = 'Offline';
       } else {
-        // volta ao texto normal se tiver update
-        fwBtn.textContent = 'Atualizar';
-        // não muda disabled aqui; quem decide é o checkFirmwareStatusForDevice
+        // se só estava Offline, reabilita; não mexe em "Atualizado"
+        if (fwBtn.textContent === 'Offline') {
+          fwBtn.disabled = false;
+          fwBtn.classList.remove('btn-disabled');
+        }
       }
     }
-
 
   } catch (err) {
     console.error('Erro ao testar conexão:', err);
