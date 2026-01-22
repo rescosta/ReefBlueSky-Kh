@@ -565,6 +565,43 @@
       font-size: 11px;
       color: #9ca3af;
     }
+
+    /* CARD PADRÃO DA DOSADORA (todas as abas) */
+    .dosing-card {
+      max-width: 900px;                 /* largura visual única */
+      margin: 0 auto;                   /* centraliza na container */
+      background: #020617;
+      border-radius: 10px;
+      padding: 20px 24px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    /* A aba já usa .tab-content com borda/sombra; podemos deixar ela só como wrapper leve */
+    .tab-content {
+      display: none;
+      background: transparent;          /* tira o card duplicado */
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Em telas menores, usar 100% */
+    @media (max-width: 960px) {
+      .dosing-card {
+        max-width: 100%;
+        padding: 16px 12px;
+      }
+    }
+
+
+
+
   </style>
 </head>
 <body>
@@ -605,114 +642,125 @@
 
     <!-- Dashboard Tab -->
     <div id="tab-dashboard" class="tab-content active">
-      <div id="dashboardPumpsCharts"></div>
+      <div class="dosing-card">
+        <div id="dashboardPumpsCharts"></div>
+      </div>
     </div>
+
 
     <!-- Agenda Tab -->
     <div id="agendaTab" class="tab-content">
-      <div class="clearfix">
-        <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
+      <div class="dosing-card">
+        <div class="clearfix">
+          <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
+        </div>
+        <h2 class="section-title">Agendas</h2>
+        <div id="agendaWarning"></div>
+        <div class="info-box">
+          <!-- 📅 Define os horários e frequência de dosagem.-->
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ATIVA</th>
+              <th>BOMBA</th>
+              <th>DIAS DA SEMANA</th>
+              <th>DOSES/DIA</th>
+              <th>JANELA HORÁRIA</th>
+              <th>VOL. DIÁRIO (ML)</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTableBody">
+            <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
+          </tbody>
+        </table>
       </div>
-      <h2 class="section-title">Agendas</h2>
-      <div id="agendaWarning"></div>
-      <div class="info-box">
-        <!-- 📅 Define os horários e frequência de dosagem.-->
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>ATIVA</th>
-            <th>BOMBA</th>
-            <th>DIAS DA SEMANA</th>
-            <th>DOSES/DIA</th>
-            <th>JANELA HORÁRIA</th>
-            <th>VOL. DIÁRIO (ML)</th>
-          </tr>
-        </thead>
-        <tbody id="scheduleTableBody">
-          <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
-        </tbody>
-      </table>
     </div>
 
     <!-- Manual Tab -->
     <div id="manualTab" class="tab-content">
-      <h2 class="section-title">Dose Manual</h2>
-      <div class="info-box">
-        💧 Aplicar uma dose manual imediatamente.
+      <div class="dosing-card">
+        <h2 class="section-title">Dose Manual</h2>
+        <div class="info-box">
+          💧 Aplicar uma dose manual imediatamente.
+        </div>
+        <div class="form-group">
+          <label for="pumpSelectManual">Selecionar Bomba:</label>
+          <select id="pumpSelectManual"></select>
+        </div>
+        <div class="form-group">
+          <label for="manualVolume">Volume (ml):</label>
+          <input type="number" id="manualVolume" min="0" value="0">
+        </div>
+        <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
       </div>
-      <div class="form-group">
-        <label for="pumpSelectManual">Selecionar Bomba:</label>
-        <select id="pumpSelectManual"></select>
-      </div>
-      <div class="form-group">
-        <label for="manualVolume">Volume (ml):</label>
-        <input type="number" id="manualVolume" min="0" value="0">
-      </div>
-      <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
     </div>
 
     <!-- Config Tab -->
     <div id="configTab" class="tab-content">
-      <h2 class="section-title">Configurar Bombas</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>BOMBA</th>
-            <th>NOME</th>
-            <th>STATUS</th>
-            <th>VOL. RECIPIENTE (ML)</th>
-            <th>VOL. ATUAL (ML)</th>
-            <th>ALARME %</th>
-          </tr>
-        </thead>
-        <tbody id="configTableBody">
-          <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
-        </tbody>
-      </table>
+      <div class="dosing-card">
+        <h2 class="section-title">Configurar Bombas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>BOMBA</th>
+              <th>NOME</th>
+              <th>STATUS</th>
+              <th>VOL. RECIPIENTE (ML)</th>
+              <th>VOL. ATUAL (ML)</th>
+              <th>ALARME %</th>
+            </tr>
+          </thead>
+          <tbody id="configTableBody">
+            <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Calibration Tab -->
     <div id="calibrationTab" class="tab-content">
-      <h2 class="section-title">Calibração</h2>
-      <div class="info-box">
-        ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
-      </div>
-      <div class="form-group">
-        <label for="pumpSelectCalibration">Selecionar Bomba:</label>
-        <select id="pumpSelectCalibration"></select>
-      </div>
-      <h3 style="margin-top: 20px;">Procedimento:</h3>
-      <ol class="help-text" style="margin-left: 20px; line-height: 1.6;">
-        <li>Coloque um recipiente graduado sob a bomba</li>
-        <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
-        <li>Após 60 segundos, meça o volume dispensado</li>
-        <li>Digite o volume medido e clique "Salvar Taxa"</li>
-      </ol>
-      <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
-      <div class="form-group" style="margin-top: 20px;">
-        <label for="measuredVolume">Volume Medido (ml):</label>
-        <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10,5">
-      </div>
-      <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
+      <div class="dosing-card">
+        <h2 class="section-title">Calibração</h2>
+        <div class="info-box">
+          ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
+        </div>
+        <div class="form-group">
+          <label for="pumpSelectCalibration">Selecionar Bomba:</label>
+          <select id="pumpSelectCalibration"></select>
+        </div>
+        <h3 style="margin-top: 20px;">Procedimento:</h3>
+        <ol class="help-text" style="margin-left: 20px; line-height: 1.6;">
+          <li>Coloque um recipiente graduado sob a bomba</li>
+          <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
+          <li>Após 60 segundos, meça o volume dispensado</li>
+          <li>Digite o volume medido e clique "Salvar Taxa"</li>
+        </ol>
+        <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
+        <div class="form-group" style="margin-top: 20px;">
+          <label for="measuredVolume">Volume Medido (ml):</label>
+          <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10,5">
+        </div>
+        <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
 
-      <div class="form-group" style="margin-top: 8px;">
-        <label style="display:block;" class="help-text">
-          Taxa de dosagem da bomba:
-        </label>
-        <div id="calibrationRateLabel" style="margin-top:4px;">
-          Taxa atual desta bomba: -- ml/s
-        </div>
-        <div style="margin-top:24px;">
-          <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
-          <div id="allPumpsRateList">
-            Carregando taxas...
+        <div class="form-group" style="margin-top: 8px;">
+          <label style="display:block;" class="help-text">
+            Taxa de dosagem da bomba:
+          </label>
+          <div id="calibrationRateLabel" style="margin-top:4px;">
+            Taxa atual desta bomba: -- ml/s
           </div>
+          <div style="margin-top:24px;">
+            <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
+            <div id="allPumpsRateList">
+              Carregando taxas...
+            </div>
+          </div>
+          <small class="small-text">
+            Usada nas doses manuais e nas agendas automáticas.
+          </small>
         </div>
-        <small class="small-text">
-          Usada nas doses manuais e nas agendas automáticas.
-        </small>
-      </div>
+      </div>  
     </div>
   </div>
 
