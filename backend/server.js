@@ -2507,6 +2507,105 @@ app.post('/api/v1/device/refresh-token', (req, res) => {
     });
 });
 
+app.post('/api/v1/account/change-password', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { currentPassword, newPassword } = req.body || {};
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Preencha todos os campos.' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const rows = await conn.query(
+      'SELECT passwordHash FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Usuário não encontrado.' });
+    }
+
+    const ok = await bcrypt.compare(currentPassword, rows[0].passwordHash);
+    if (!ok) {
+      return res.status(401).json({ success: false, message: 'Senha atual incorreta.' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await conn.query(
+      'UPDATE users SET passwordHash = ?, updatedAt = NOW() WHERE id = ?',
+      [newHash, userId]
+    );
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('API change-password error:', err.message);
+    return res.status(500).json({ success: false, message: 'Erro ao alterar senha.' });
+  } finally {
+    if (conn) try { conn.release(); } catch {}
+  }
+});
+
+app.get('/api/v1/account/export', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const user = (await conn.query(
+      'SELECT id, email, name, timezone, createdAt FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    ))[0];
+
+    const devices = await conn.query(
+      'SELECT deviceId, type, name, createdAt FROM devices WHERE userId = ?',
+      [userId]
+    );
+
+    const measurements = await conn.query(
+      'SELECT deviceId, kh, phref, phsample, temperature, timestamp FROM measurements WHERE userId = ? LIMIT 5000',
+      [userId]
+    );
+
+    const payload = { user, devices, measurements };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="reefbluesky-export.json"');
+    return res.status(200).send(JSON.stringify(payload));
+  } catch (err) {
+    console.error('API account/export error:', err.message);
+    return res.status(500).json({ success: false, message: 'Erro ao exportar dados.' });
+  } finally {
+    if (conn) try { conn.release(); } catch {}
+  }
+});
+
+app.delete('/api/v1/account/delete', authUserMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // apaga em ordem de FK
+    await conn.query('DELETE FROM measurements WHERE userId = ?', [userId]);
+    await conn.query('DELETE FROM devices WHERE userId = ?', [userId]);
+    await conn.query('DELETE FROM dosing_devices WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    await conn.commit();
+    return res.json({ success: true });
+  } catch (err) {
+    if (conn) try { await conn.rollback(); } catch {}
+    console.error('API account/delete error:', err.message);
+    return res.status(500).json({ success: false, message: 'Erro ao excluir conta.' });
+  } finally {
+    if (conn) try { conn.release(); } catch {}
+  }
+});
+
+
 // ============================================================================
 // [API] Endpoints de Sincronização (v1) - Protegidos
 // ============================================================================
