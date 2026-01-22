@@ -520,6 +520,22 @@ function setLcdStatus(status) {
     }
 }
 
+function getFooterHtml() {
+  return `
+    <div class="footer">
+      <div id="userInfo">Usuário --</div>
+      <div>ReefBlueSky KH Monitor — Dashboard web</div>
+    </div>
+  `;
+}
+
+function initFooter() {
+  const root = document.getElementById('footer-root');
+  if (!root) return;
+  root.innerHTML = getFooterHtml();
+}
+
+
 function setDosingStatus(status) {
   const el = document.getElementById('dosingStatusIcon');
   if (!el) return;
