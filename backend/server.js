@@ -1140,6 +1140,119 @@ app.get(
   }
 );
 
+
+app.get('/api/v1/user/devices/:deviceId/test-connection',
+  authUserMiddleware,
+  async (req, res) => {
+    const userId   = req.user.userId;
+    const deviceId = req.params.deviceId;
+
+    let conn;
+    try {
+      conn = await pool.getConnection();
+
+      // 1) Buscar device base (KH/LCD/DOSER integrado)
+      const devRows = await conn.query(
+        `SELECT deviceId, type, last_seen
+           FROM devices
+          WHERE deviceId = ? AND userId = ?
+          LIMIT 1`,
+        [deviceId, userId]
+      );
+
+      if (!devRows.length) {
+        return res.status(404).json({ success: false, message: 'Device not found' });
+      }
+
+      const dev = devRows[0];
+      const deviceType = dev.type; // 'KH' | 'LCD' | 'DOSER'
+      const lastSeen   = dev.last_seen; // datetime ou null
+
+      // 2) Buscar último health (wifi_rssi, uptime, etc.)
+      const healthRows = await conn.query(
+        `SELECT wifi_rssi, uptime_seconds, updatedAt
+           FROM device_health
+          WHERE deviceId = ? AND userId = ?
+          ORDER BY updatedAt DESC
+          LIMIT 1`,
+        [deviceId, userId]
+      );
+
+      const health = healthRows[0] || null;
+
+      // 3) Calcular online/ago
+      const now         = Date.now();
+      const lastSeenMs  = lastSeen ? new Date(lastSeen).getTime() : 0;
+      const ONLINE_MS   = 2 * 60 * 1000; // 2 minutos (ajustável)
+      const isOnline    = lastSeenMs && (now - lastSeenMs <= ONLINE_MS);
+
+      function formatAgo(msDiff) {
+        if (!msDiff) return null;
+        const sec = Math.floor(msDiff / 1000);
+        const min = Math.floor(sec / 60);
+        const hr  = Math.floor(min / 60);
+        if (hr > 0)  return `há ${hr}h`;
+        if (min > 0) return `há ${min}min`;
+        return `há ${sec}s`;
+      }
+
+      const ago = lastSeenMs ? formatAgo(now - lastSeenMs) : null;
+
+      // 4) Derivar status de WiFi
+      let wifiStatus = 'unknown';
+      let rssi       = null;
+
+      if (!isOnline) {
+        wifiStatus = 'offline';
+      } else if (health && health.wifi_rssi != null) {
+        rssi = health.wifi_rssi;
+        if (rssi <= -75) {
+          wifiStatus = 'weak';
+        } else {
+          wifiStatus = 'OK';
+        }
+      }
+
+      // 5) Derivar status de Cloud (simples por enquanto)
+      let cloudStatus = 'unknown';
+      if (isOnline) {
+        cloudStatus = 'OK';
+      } else {
+        cloudStatus = 'unknown'; // no futuro pode virar 'server_error' se detectar algo
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          deviceId: dev.deviceId,
+          deviceType,
+          online: isOnline,
+          wifi: {
+            status: wifiStatus,
+            rssi
+          },
+          cloud: {
+            status: cloudStatus,
+            details: null
+          },
+          lastSeen: {
+            iso: lastSeen ? new Date(lastSeen).toISOString() : null,
+            ago
+          },
+          source: 'devices'
+        }
+      });
+
+    } catch (err) {
+      console.error('Error in /test-connection (devices)', err);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    } finally {
+      if (conn) conn.release();
+    }
+  }
+);
+
+
 // Comando de console para o device (DEV/usuário logado)
 app.post(
   '/api/v1/dev/device-command/:deviceId',

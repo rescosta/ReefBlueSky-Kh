@@ -200,6 +200,93 @@ router.delete('/devices/:id', async (req, res) => {
     }
 });
 
+// Em dosing-user-routes.js
+
+// GET /api/v1/user/dosing/devices/:deviceId/test-connection
+router.get('/devices/:deviceId/test-connection', async (req, res) => {
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const userId   = req.user.userId;
+    const deviceId = req.params.deviceId; // id numérico (PK)
+
+    conn = await pool.getConnection();
+
+    // 1) Buscar device dosing
+    const devRows = await conn.query(
+      `SELECT id, name, esp_uid, online, last_seen
+         FROM dosing_devices
+        WHERE id = ? AND user_id = ?
+        LIMIT 1`,
+      [deviceId, userId]
+    );
+
+    if (!devRows.length) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const dev = devRows[0];
+
+    // 2) Calcular online/ago (reaproveitando lógica de /devices)
+    const now       = Date.now();
+    const lastMs    = dev.last_seen ? new Date(dev.last_seen).getTime() : 0;
+    const OFFLINE_MS = 5 * 60 * 1000; // 5 minutos como em /devices
+    const isRecent  = lastMs && (now - lastMs <= OFFLINE_MS);
+    const isOnline  = dev.online === 1 && isRecent;
+
+    function formatAgo(msDiff) {
+      if (!msDiff) return null;
+      const sec = Math.floor(msDiff / 1000);
+      const min = Math.floor(sec / 60);
+      const hr  = Math.floor(min / 60);
+      if (hr > 0)  return `há ${hr}h`;
+      if (min > 0) return `há ${min}min`;
+      return `há ${sec}s`;
+    }
+
+    const ago = lastMs ? formatAgo(now - lastMs) : null;
+
+    // 3) Derivar WiFi/Cloud (sem RSSI por enquanto)
+    const wifiStatus  = isOnline ? 'OK' : 'offline';
+    const cloudStatus = isOnline ? 'OK' : 'unknown';
+
+    return res.json({
+      success: true,
+      data: {
+        deviceId: dev.id,               // id numérico usado no front
+        deviceUid: dev.esp_uid,         // ID que o firmware usa
+        deviceType: 'DOSER',
+        name: dev.name,
+        online: isOnline,
+        wifi: {
+          status: wifiStatus,
+          rssi: null
+        },
+        cloud: {
+          status: cloudStatus,
+          details: null
+        },
+        lastSeen: {
+          iso: dev.last_seen ? new Date(dev.last_seen).toISOString() : null,
+          ago
+        },
+        source: 'dosing_devices'
+      }
+    });
+
+  } catch (err) {
+    console.error('Error in /dosing/devices/:deviceId/test-connection', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
+
 // ============================================
 // PUMPS
 // ============================================
