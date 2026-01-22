@@ -236,6 +236,80 @@ async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
 }
 
 
+// ===== Modal de Teste de Conexão =====
+let connectionModalEl = null;
+
+function ensureConnectionModal() {
+  if (connectionModalEl) return connectionModalEl;
+
+  connectionModalEl = document.createElement('div');
+  connectionModalEl.id = 'connectionTestModal';
+  connectionModalEl.className = 'modal-backdrop'; // use uma classe existente de overlay, se tiver
+
+  connectionModalEl.innerHTML = `
+    <div class="modal">
+      <h3>Teste de conexão</h3>
+      <div id="connectionTestContent">
+        Carregando informações de conexão...
+      </div>
+      <div class="modal-actions" style="margin-top: 16px; text-align: right;">
+        <button id="connectionTestCloseBtn" class="btn-small">OK</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(connectionModalEl);
+
+  const closeBtn = document.getElementById('connectionTestCloseBtn');
+  closeBtn.addEventListener('click', () => {
+    connectionModalEl.style.display = 'none';
+  });
+
+  return connectionModalEl;
+}
+
+async function openConnectionTestModal(device) {
+  const modal   = ensureConnectionModal();
+  const content = document.getElementById('connectionTestContent');
+
+  modal.style.display = 'flex'; // ou 'block', conforme seu CSS
+  content.textContent = 'Carregando informações de conexão...';
+
+  try {
+    const url = `/api/v1/user/devices/${device.deviceId}/test-connection`;
+
+    const res  = await apiFetch(url, { method: 'GET' });
+    const body = await res.json().catch(() => null);
+
+    if (!res.ok || !body?.success) {
+      content.textContent = body?.message || 'Falha ao testar conexão.';
+      return;
+    }
+
+    const d    = body.data || {};
+    const wifi = d.wifi || {};
+    const cloud = d.cloud || {};
+    const last = d.lastSeen || {};
+
+    content.innerHTML = `
+      <p><strong>Dispositivo:</strong> ${d.deviceId || device.deviceId}</p>
+      <p><strong>Tipo:</strong> ${d.deviceType || device.type}</p>
+      <p><strong>Online:</strong> ${d.online ? 'Sim' : 'Não'}</p>
+      <p><strong>Wi‑Fi:</strong> ${wifi.status || 'desconhecido'}${
+        wifi.rssi != null ? ` (RSSI ${wifi.rssi} dBm)` : ''
+      }</p>
+      <p><strong>Cloud:</strong> ${cloud.status || 'desconhecido'}</p>
+      <p><strong>Último contato:</strong> ${
+        last.ago || '-'
+      }${last.iso ? ` (${last.iso})` : ''}</p>
+    `;
+  } catch (err) {
+    console.error('Erro ao testar conexão:', err);
+    content.textContent = 'Erro ao testar conexão.';
+  }
+}
+
+
 // Carregar lista de dispositivos vinculados (KH/LCD/DOS)
 async function loadDevices() {
   const container = document.getElementById('deviceList');
@@ -262,7 +336,6 @@ async function loadDevices() {
 
     const frag = document.createDocumentFragment();
 
-
     devices.forEach((d) => {
       console.log('device item:', d);
       const div = document.createElement('div');
@@ -272,7 +345,6 @@ async function loadDevices() {
       const type = d.type || 'KH';
       const rawFw = d.firmwareVersion || 'N/A';
       const fw    = rawFw.replace(/\.bin$/i, '');
-      
 
       let iconHtml = '';
       if (type === 'KH') {
@@ -301,16 +373,29 @@ async function loadDevices() {
       statusSpan.textContent = 'Verificando...';
       right.appendChild(statusSpan);
 
-      const btn = document.createElement('button');
-      btn.className = 'btn-small';
-      btn.dataset.deviceId = d.deviceId;
-      btn.textContent = 'Atualizar';
-      btn.disabled = true;                 // começa desativado
-      btn.classList.add('btn-disabled');   // classe CSS para deixá-lo “apagado”
-      right.appendChild(btn);
+      const fwBtn = document.createElement('button');
+      fwBtn.className = 'btn-small btn-fw-update';
+      fwBtn.dataset.deviceId = d.deviceId;
+      fwBtn.textContent = 'Atualizar';
+      fwBtn.disabled = true;
+      fwBtn.classList.add('btn-disabled');
+      right.appendChild(fwBtn);
+
+      // 🔹 Botão Testar conexão
+      const testBtn = document.createElement('button');
+      testBtn.className = 'btn-small';
+      testBtn.textContent = 'Testar conexão';
+      testBtn.addEventListener('click', () => {
+        openConnectionTestModal({
+          deviceId: d.deviceId,
+          type: d.type,
+          name: d.name,
+        });
+      });
+      right.appendChild(testBtn);
 
       // dispara checagem automática ao carregar a lista
-      checkFirmwareStatusForDevice(d.deviceId, statusSpan, btn);
+      checkFirmwareStatusForDevice(d.deviceId, statusSpan, fwBtn);
 
       div.appendChild(left);
       div.appendChild(right);
@@ -318,12 +403,11 @@ async function loadDevices() {
     });
 
 
-
     container.innerHTML = '';
     container.appendChild(frag);
 
     // Botão de atualização OTA (mesmo código que você já tinha)
-    container.querySelectorAll('.btn-small[data-device-id]').forEach((btn) => {
+      container.querySelectorAll('.btn-fw-update[data-device-id]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const deviceId = btn.getAttribute('data-device-id');
         if (!deviceId) return;
