@@ -412,8 +412,23 @@ async function loadDevices() {
       const div = document.createElement('div');
       div.className = 'device-item';
 
-      const name = d.name || d.id || 'Device';
+      let name = d.name || d.deviceId || 'Device';
       const type = d.type || 'KH';
+
+      // Se não tiver name customizado, gera um nome curto a partir do deviceId
+      if (!d.name && d.deviceId) {
+        const parts = d.deviceId.split('-'); // ex.: ['RBS', 'LCD', 'CCBA97F3BD8C']
+
+        if (type === 'LCD' && parts.length >= 2) {
+          // Fica "LCD RBS-LCD"
+          name = `LCD RBS-${parts[1]}`;
+        } else if (type === 'KH') {
+          name = 'KH RBS-KH';
+        } else if (type === 'DOSER') {
+          name = 'DOS RBS-DOSER';
+        }
+      }
+
       const rawFw = d.firmwareVersion || 'N/A';
       const fw    = rawFw.replace(/\.bin$/i, '');
 
