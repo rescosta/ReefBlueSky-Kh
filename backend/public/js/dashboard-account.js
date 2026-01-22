@@ -244,29 +244,36 @@ function ensureConnectionModal() {
 
   connectionModalEl = document.createElement('div');
   connectionModalEl.id = 'connectionTestModal';
-  connectionModalEl.className = 'modal-backdrop'; // use uma classe existente de overlay, se tiver
+  
 
-  connectionModalEl.innerHTML = `
-    <div class="modal">
-      <h3>Teste de conexão</h3>
-      <div id="connectionTestContent">
-        Carregando informações de conexão...
-      </div>
-      <div class="modal-actions" style="margin-top: 16px; text-align: right;">
-        <button id="connectionTestCloseBtn" class="btn-small">OK</button>
-      </div>
-    </div>
-  `;
+  const content = document.createElement('div');
+  content.id = 'connectionTestContent';
+  content.style.background = 'white';
+  content.style.padding = '24px';
+  content.style.borderRadius = '12px';
+  content.style.maxWidth = '90%';
+  content.style.maxHeight = '80%';
+  content.style.overflow = 'auto';
+  content.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+  content.textContent = 'Carregando...';
 
-  document.body.appendChild(connectionModalEl);
+  const closeBtn = document.createElement('button');
+  closeBtn.id = 'connectionTestCloseBtn';
+  closeBtn.className = 'btn-small';
+  closeBtn.textContent = 'OK';
+  closeBtn.style.marginTop = '16px';
+  closeBtn.onclick = () => {
+    connectionModalEl.classList.remove('show');
+    setTimeout(() => connectionModalEl.style.display = 'none', 200);  // transição suave
+  };
 
-  const closeBtn = document.getElementById('connectionTestCloseBtn');
-  closeBtn.addEventListener('click', () => {
-    connectionModalEl.style.display = 'none';
-  });
+  connectionModalEl.appendChild(content);
+  connectionModalEl.appendChild(closeBtn);
+  document.body.appendChild(connectionModalEl);  // ← CRUCIAL: root level
 
   return connectionModalEl;
 }
+
 
 async function openConnectionTestModal(device) {
   const modal   = ensureConnectionModal();
