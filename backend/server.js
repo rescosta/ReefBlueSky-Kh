@@ -3420,6 +3420,34 @@ app.post('/api/v1/dev/device-firmware-update/:deviceId',
   }
 );
 
+app.post('/api/v1/dev/lcd-firmware-update/:deviceId',
+  authUserMiddleware,
+  async (req, res) => {
+    const deviceId = req.params.deviceId;
+    const userId = req.user.userId;
+
+    try {
+      const rows = await pool.query(
+        'SELECT id FROM devices WHERE deviceId = ? AND userId = ? AND type = "LCD" LIMIT 1',
+        [deviceId, userId]
+      );
+      if (!rows.length) {
+        return res.status(404).json({ success: false, message: 'LCD não encontrado' });
+      }
+
+      await cloudAuth.sendCommandToDevice(deviceId, {
+        action: 'otaupdate',
+        params: null,
+      });
+
+      res.json({ success: true, message: 'Comando OTA enviado para o LCD.' });
+    } catch (err) {
+      console.error('lcd-firmware-update error', err);
+      res.status(500).json({ success: false, message: 'Erro ao enviar comando OTA para LCD.' });
+    }
+  }
+);
+
 
 // ESP busca comandos pendentes
 app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
