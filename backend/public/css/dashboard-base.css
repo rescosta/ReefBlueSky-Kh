@@ -206,11 +206,25 @@ a {
 
 /* ===== FOOTER GLOBAL ===== */
 .footer {
+  margin-top: auto;
+  padding: 8px 12px;
+  background: #020617;
+  border-top: 1px solid #1f2937;
   font-size: 11px;
-  color: #6b7280;
-  padding: 6px 10px 10px;
+  color: #9ca3af;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.footer-user {
+  font-weight: 500;
+}
+
+.footer-copy {
+  opacity: 0.9;
 }
 
 /* ===== MOBILE (<=768px) ===== */
