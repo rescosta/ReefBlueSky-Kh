@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="css/dashboard-base.css">
-    <title>Dosadora Balling - ReefBlueSky</title>
-    
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/dashboard-base.css">
+  <title>Dosadora Balling - ReefBlueSky</title>
+
   <style>
     /* LAYOUT PRINCIPAL */
     .content {
@@ -277,6 +277,9 @@
       background: #020617;
       border-left: 4px solid #16a085;
       color: #e5e7eb;
+      padding: 10px 12px;
+      margin: 10px 0 16px;
+      font-size: 13px;
     }
 
     /* TABELAS / AGENDAS */
@@ -380,6 +383,10 @@
       background: #020617;
       border: 1px solid #1f2937;
       color: #e5e7eb;
+      padding: 20px 24px;
+      border-radius: 10px;
+      max-width: 600px;
+      width: 100%;
     }
 
     .modal-header {
@@ -395,6 +402,8 @@
 
     .modal-header .close {
       color: #9ca3af;
+      cursor: pointer;
+      font-size: 20px;
     }
 
     .modal-header .close:hover {
@@ -442,6 +451,7 @@
       font-weight: 500;
       float: right;
       margin-bottom: 15px;
+      font-size: 13px;
     }
 
     .btn-new-agenda:hover {
@@ -556,375 +566,364 @@
       color: #9ca3af;
     }
   </style>
-
 </head>
 <body>
+  <div id="topbar-root"></div>
 
-    <div id="topbar-root"></div>
+  <!-- painel lateral -->
+  <div id="sideMenu" class="side-menu">
+    <button id="closeMenu" class="side-close">×</button>
+    <a href="dashboard-main.html">Principal</a>
+    <a href="dashboard-graficos.html">Gráficos</a>
+    <a href="dashboard-config.html">Configurações</a>
+    <a href="dashboard-sistema.html">Sistema</a>
+    <a href="dashboard-dosing.html">Dosadora</a>
+    <a href="dashboard-logs.html">Dev</a>
+    <a href="dashboard-account.html">Minha Conta</a>
+    <a href="#" id="menuLogout">Sair</a>
+  </div>
 
-      <!-- painel lateral -->
-    <div id="sideMenu" class="side-menu">
-      <button id="closeMenu" class="side-close">×</button>
-      <a href="dashboard-main.html">Principal</a>
-      <a href="dashboard-graficos.html">Gráficos</a>
-      <a href="dashboard-config.html">Configurações</a>
-      <a href="dashboard-sistema.html">Sistema</a>
-      <a href="dashboard-dosing.html">Dosadora</a>
-      <a href="dashboard-logs.html">Dev</a>
-      <a href="dashboard-account.html">Minha Conta</a>
-      <a href="#" id="menuLogout">Sair</a>
+  <div class="container">
+    <!-- Alert Box -->
+    <div id="alertBox"></div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="control-group" id="deviceInfo">
+        Carregando...
+      </div>
     </div>
 
-    <div class="container">
-        <!-- Alert Box -->
-        <div id="alertBox"></div>
-
-        <!-- Controls -->
-        <div class="controls">
-            <div class="control-group" id="deviceInfo">
-                Carregando...
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('tab-dashboard', this)">Dashboard</button>
-            <button class="tab-btn" onclick="switchTab('agendaTab', this)">Agenda</button>
-            <button class="tab-btn" onclick="switchTab('manualTab', this)">Manual</button>
-            <button class="tab-btn" onclick="switchTab('configTab', this)">Configurações</button>
-            <button class="tab-btn" onclick="switchTab('calibrationTab', this)">Calibração</button>
-        </div>
-
-
-       <!-- Dashboard Tab -->
-        <div id="tab-dashboard" class="tab-content active">
-          <div id="dashboardPumpsCharts"></div>
-        </div>
-
-        <!-- Agenda Tab -->
-        <div id="agendaTab" class="tab-content">
-            <div class="clearfix">
-                <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
-            </div>
-            <h2>Agendas</h2>
-            <div id="agendaWarning"></div>
-            <div class="info-box">
-                 <!-- 📅 Define os horários e frequência de dosagem.-->
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ATIVA</th>
-                        <th>BOMBA</th>   
-                        <th>DIAS DA SEMANA</th>
-                        <th>DOSES/DIA</th>
-                        <th>JANELA HORÁRIA</th>
-                        <th>VOL. DIÁRIO (ML)</th>
-                         <!-- <th>AÇÃO</th> -->
-                    </tr>
-                </thead>
-                <tbody id="scheduleTableBody">
-                    <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Manual Tab -->
-        <div id="manualTab" class="tab-content">
-            <h2>Dose Manual</h2>
-            <div class="info-box">
-                💧 Aplicar uma dose manual imediatamente.
-            </div>
-            <div class="form-group">
-                <label for="pumpSelectManual">Selecionar Bomba:</label>
-                <select id="pumpSelectManual"></select>
-            </div>
-            <div class="form-group">
-                <label for="manualVolume">Volume (ml):</label>
-                <input type="number" id="manualVolume" min="0" value="0">
-            </div>
-            <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
-        </div>
-
-        <!-- Config Tab -->
-        <div id="configTab" class="tab-content">
-            <h2>Configurar Bombas</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>BOMBA</th>
-                        <th>NOME</th>
-                        <th>STATUS</th>
-                        <th>VOL. RECIPIENTE (ML)</th>
-                        <th>VOL. ATUAL (ML)</th>
-                        <th>ALARME %</th>
-                       <!-- <th>MÁX. DIÁRIO (ML)</th> -->
-                         <!-- <th>AÇÃO</th>-->
-                    </tr>
-                </thead>
-                <tbody id="configTableBody">
-                    <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Calibration Tab -->
-        <div id="calibrationTab" class="tab-content">
-            <h2>Calibração</h2>
-            <div class="info-box">
-                ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
-            </div>
-            <div class="form-group">
-                <label for="pumpSelectCalibration">Selecionar Bomba:</label>
-                <select id="pumpSelectCalibration"></select>
-            </div>
-            <h3 style="margin-top: 20px;">Procedimento:</h3>
-            <ol style="margin-left: 20px; font-size: 13px; line-height: 1.6;">
-              <li>Coloque um recipiente graduado sob a bomba</li>
-              <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
-              <li>Após 60 segundos, meça o volume dispensado</li>
-              <li>Digite o volume medido e clique "Salvar Taxa"</li>    
-            </ol>
-            <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
-            <div class="form-group" style="margin-top: 20px;">
-                <label for="measuredVolume">Volume Medido (ml):</label>
-                <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10,5">
-            </div>
-            <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
-
-            <div class="form-group" style="margin-top: 8px;">
-              <label style="display:block; font-size:13px; color:#9ca3af;">
-                Taxa de dosagem da bomba:
-              </label>
-              <div id="calibrationRateLabel" style="font-size:13px; color:#e5e7eb; margin-top:4px;">
-                Taxa atual desta bomba: -- ml/s
-              </div>
-              <div style="margin-top:24px;">
-                <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
-                <div id="allPumpsRateList" style="font-size:13px; color:#e5e7eb;">
-                  Carregando taxas...
-                </div>
-              </div>
-              <small style="font-size:11px; color:#9ca3af;">
-                Usada nas doses manuais e nas agendas automáticas.
-              </small>
-            </div>
-        </div>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-dashboard', this)">Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('agendaTab', this)">Agenda</button>
+      <button class="tab-btn" onclick="switchTab('manualTab', this)">Manual</button>
+      <button class="tab-btn" onclick="switchTab('configTab', this)">Configurações</button>
+      <button class="tab-btn" onclick="switchTab('calibrationTab', this)">Calibração</button>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Editar Configuração</h2>
-                <span class="close" onclick="closeEditModal()">×</span>
-            </div>
-            <input type="hidden" id="editPumpIndex">
-            <div class="form-group">
-                <label for="editName">Nome da Bomba:</label>
-                <input type="text" id="editName">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="editContainerSize">Recipiente (ml):</label>
-                    <input type="number" id="editContainerSize" min="0">
-                </div>
-                <div class="form-group">
-                    <label for="editCurrentVolume">Volume Atual (ml):</label>
-                    <input type="number" id="editCurrentVolume" min="0">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="editAlarmPercent">Alarme (%):</label>
-                    <input type="number" id="editAlarmPercent" min="0" max="100">
-                </div>
-                <!-- <div class="form-group">-->
-                    <!-- <label for="editDailyMax">Máx. Diário (ml):</label>-->
-                    <!-- <input type="number" id="editDailyMax" min="0">-->
-                <!-- </div>-->
-            </div>
-            <div class="button-group">
-                <button class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
-                <button class="btn-primary" onclick="saveEditModal()">💾 Salvar</button>
-            </div>
-        </div>
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div id="dashboardPumpsCharts"></div>
     </div>
 
-    <!-- Agenda Modal -->
-    <div id="agendaModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Nova Agenda</h2>
-                <span class="close" onclick="closeAgendaModal()">×</span>
-            </div>
-            <div class="form-group">
-              <label>Intervalo mín. entre bombas:</label>
-              <input type="number" id="minGapMinutes" min="5" max="120" value="30" style="width:80px;">
-              <small>minutos (padrão 30)</small>
-            </div>
-            <div class="form-group">
-                <label for="pumpSelectAgenda">Selecionar Bomba:</label>
-                <select id="pumpSelectAgenda"></select>
-            </div>
-            <div class="form-group">
-                <label>Dias da Semana:</label>
-                <div class="checkbox-group">
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Dom</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Seg</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Ter</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Qua</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Qui</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Sex</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="day-checkbox" checked> <label>Sab</label>
-                    </div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="dosesPerDay">Doses por Dia:</label>
-                    <input type="number" id="dosesPerDay" min="1" value="2">
-                </div>
-                <div class="form-group">
-                    <label for="volumePerDay">Volume Diário (ml):</label>
-                    <input type="number" id="volumePerDay" min="0" value="36">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="startTime">Horário Inicial:</label>
-                    <input type="time" id="startTime" value="08:00">
-                </div>
-                <div class="form-group">
-                    <label for="endTime">Horário Final:</label>
-                    <input type="time" id="endTime" value="20:00">
-                </div>
-            </div>
-            <div class="button-group">
-                <button class="btn-secondary" onclick="closeAgendaModal()">Cancelar</button>
-                <button class="btn-primary" onclick="createSchedule()">+ Criar Agenda</button>
-            </div>
-        </div>
+    <!-- Agenda Tab -->
+    <div id="agendaTab" class="tab-content">
+      <div class="clearfix">
+        <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
+      </div>
+      <h2 class="section-title">Agendas</h2>
+      <div id="agendaWarning"></div>
+      <div class="info-box">
+        <!-- 📅 Define os horários e frequência de dosagem.-->
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>ATIVA</th>
+            <th>BOMBA</th>
+            <th>DIAS DA SEMANA</th>
+            <th>DOSES/DIA</th>
+            <th>JANELA HORÁRIA</th>
+            <th>VOL. DIÁRIO (ML)</th>
+          </tr>
+        </thead>
+        <tbody id="scheduleTableBody">
+          <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Edit Schedule Modal -->
-    <div id="editScheduleModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Editar Agenda</h2>
-                <span class="close" onclick="closeEditScheduleModal()">×</span>
-            </div>
-              <div class="form-group">
-                <label>Bomba:</label>
-                <div id="editPumpName" style="font-weight:600; margin-top:4px;">--</div>
-                <input type="hidden" id="editPumpIndex">
-              </div>
-            <div class="form-group">
-                <label>Dias da Semana:</label>
-                <div class="checkbox-group">
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="0"> <label>Dom</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="1"> <label>Seg</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="2"> <label>Ter</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="3"> <label>Qua</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="4"> <label>Qui</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="5"> <label>Sex</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" class="edit-day-checkbox" data-day="6"> <label>Sab</label>
-                    </div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="editDosesPerDay">Doses por Dia:</label>
-                    <input type="number" id="editDosesPerDay" min="1" value="2">
-                </div>
-                <div class="form-group">
-                    <label for="editVolumePerDay">Volume Diário (ml):</label>
-                    <input type="number" id="editVolumePerDay" min="0" step="0.1" value="36">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="editStartTime">Horário Inicial:</label>
-                    <input type="time" id="editStartTime" value="08:00">
-                </div>
-                <div class="form-group">
-                    <label for="editEndTime">Horário Final:</label>
-                    <input type="time" id="editEndTime" value="20:00">
-                </div>
-            </div>
-            <div class="form-group">
-              <label for="editMinGapMinutes">Intervalo mín. entre bombas:</label>
-              <input type="number" id="editMinGapMinutes" min="5" max="120" value="30" style="width:80px;">
-              <small>minutos (padrão 30)</small>
-            </div>
-
-            <div class="button-group">
-                <button class="btn-secondary" onclick="closeEditScheduleModal()">Cancelar</button>
-                <button class="btn-primary" onclick="saveEditScheduleModal()">💾 Salvar Alterações</button>
-            </div>
-        </div>
+    <!-- Manual Tab -->
+    <div id="manualTab" class="tab-content">
+      <h2 class="section-title">Dose Manual</h2>
+      <div class="info-box">
+        💧 Aplicar uma dose manual imediatamente.
+      </div>
+      <div class="form-group">
+        <label for="pumpSelectManual">Selecionar Bomba:</label>
+        <select id="pumpSelectManual"></select>
+      </div>
+      <div class="form-group">
+        <label for="manualVolume">Volume (ml):</label>
+        <input type="number" id="manualVolume" min="0" value="0">
+      </div>
+      <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
     </div>
 
-    <div id="calibrationOverlay" class="modal">
-      <div class="modal-content" style="max-width:420px; padding:20px;">
-        <h2>Calibração em andamento</h2>
-        <p id="calibrationCountdownText" style="margin-top:10px; font-size:13px;">
-          Restam 60 segundos...
-        </p>
+    <!-- Config Tab -->
+    <div id="configTab" class="tab-content">
+      <h2 class="section-title">Configurar Bombas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>BOMBA</th>
+            <th>NOME</th>
+            <th>STATUS</th>
+            <th>VOL. RECIPIENTE (ML)</th>
+            <th>VOL. ATUAL (ML)</th>
+            <th>ALARME %</th>
+          </tr>
+        </thead>
+        <tbody id="configTableBody">
+          <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-        <div style="margin-top:12px; margin-bottom:16px;">
-          <div style="font-size:12px; color:#9ca3af; margin-bottom:4px;">
-            Progresso
-          </div>
-          <div class="progress-bar">
-            <div id="calibrationProgressFill" class="progress-fill"></div>
+    <!-- Calibration Tab -->
+    <div id="calibrationTab" class="tab-content">
+      <h2 class="section-title">Calibração</h2>
+      <div class="info-box">
+        ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
+      </div>
+      <div class="form-group">
+        <label for="pumpSelectCalibration">Selecionar Bomba:</label>
+        <select id="pumpSelectCalibration"></select>
+      </div>
+      <h3 style="margin-top: 20px;">Procedimento:</h3>
+      <ol class="help-text" style="margin-left: 20px; line-height: 1.6;">
+        <li>Coloque um recipiente graduado sob a bomba</li>
+        <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
+        <li>Após 60 segundos, meça o volume dispensado</li>
+        <li>Digite o volume medido e clique "Salvar Taxa"</li>
+      </ol>
+      <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
+      <div class="form-group" style="margin-top: 20px;">
+        <label for="measuredVolume">Volume Medido (ml):</label>
+        <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10,5">
+      </div>
+      <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
+
+      <div class="form-group" style="margin-top: 8px;">
+        <label style="display:block;" class="help-text">
+          Taxa de dosagem da bomba:
+        </label>
+        <div id="calibrationRateLabel" style="margin-top:4px;">
+          Taxa atual desta bomba: -- ml/s
+        </div>
+        <div style="margin-top:24px;">
+          <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
+          <div id="allPumpsRateList">
+            Carregando taxas...
           </div>
         </div>
+        <small class="small-text">
+          Usada nas doses manuais e nas agendas automáticas.
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Editar Configuração</h2>
+        <span class="close" onclick="closeEditModal()">×</span>
+      </div>
+      <input type="hidden" id="editPumpIndex">
+      <div class="form-group">
+        <label for="editName">Nome da Bomba:</label>
+        <input type="text" id="editName">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editContainerSize">Recipiente (ml):</label>
+          <input type="number" id="editContainerSize" min="0">
+        </div>
+        <div class="form-group">
+          <label for="editCurrentVolume">Volume Atual (ml):</label>
+          <input type="number" id="editCurrentVolume" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editAlarmPercent">Alarme (%):</label>
+          <input type="number" id="editAlarmPercent" min="0" max="100">
+        </div>
+      </div>
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
+        <button class="btn-primary" onclick="saveEditModal()">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agenda Modal -->
+  <div id="agendaModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Nova Agenda</h2>
+        <span class="close" onclick="closeAgendaModal()">×</span>
+      </div>
+      <div class="form-group">
+        <label>Intervalo mín. entre bombas:</label>
+        <input type="number" id="minGapMinutes" min="5" max="120" value="30" style="width:80px;">
+        <small class="small-text">minutos (padrão 30)</small>
+      </div>
+      <div class="form-group">
+        <label for="pumpSelectAgenda">Selecionar Bomba:</label>
+        <select id="pumpSelectAgenda"></select>
+      </div>
+      <div class="form-group">
+        <label>Dias da Semana:</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Dom</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Seg</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Ter</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Qua</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Qui</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Sex</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Sab</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dosesPerDay">Doses por Dia:</label>
+          <input type="number" id="dosesPerDay" min="1" value="2">
+        </div>
+        <div class="form-group">
+          <label for="volumePerDay">Volume Diário (ml):</label>
+          <input type="number" id="volumePerDay" min="0" value="36">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="startTime">Horário Inicial:</label>
+          <input type="time" id="startTime" value="08:00">
+        </div>
+        <div class="form-group">
+          <label for="endTime">Horário Final:</label>
+          <input type="time" id="endTime" value="20:00">
+        </div>
+      </div>
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeAgendaModal()">Cancelar</button>
+        <button class="btn-primary" onclick="createSchedule()">+ Criar Agenda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Schedule Modal -->
+  <div id="editScheduleModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Editar Agenda</h2>
+        <span class="close" onclick="closeEditScheduleModal()">×</span>
+      </div>
+      <div class="form-group">
+        <label>Bomba:</label>
+        <div id="editPumpName" style="font-weight:600; margin-top:4px;">--</div>
+        <input type="hidden" id="editPumpIndex">
+      </div>
+      <div class="form-group">
+        <label>Dias da Semana:</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="0"> <label>Dom</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="1"> <label>Seg</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="2"> <label>Ter</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="3"> <label>Qua</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="4"> <label>Qui</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="5"> <label>Sex</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="6"> <label>Sab</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editDosesPerDay">Doses por Dia:</label>
+          <input type="number" id="editDosesPerDay" min="1" value="2">
+        </div>
+        <div class="form-group">
+          <label for="editVolumePerDay">Volume Diário (ml):</label>
+          <input type="number" id="editVolumePerDay" min="0" step="0.1" value="36">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editStartTime">Horário Inicial:</label>
+          <input type="time" id="editStartTime" value="08:00">
+        </div>
+        <div class="form-group">
+          <label for="editEndTime">Horário Final:</label>
+          <input type="time" id="editEndTime" value="20:00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="editMinGapMinutes">Intervalo mín. entre bombas:</label>
+        <input type="number" id="editMinGapMinutes" min="5" max="120" value="30" style="width:80px;">
+        <small class="small-text">minutos (padrão 30)</small>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeEditScheduleModal()">Cancelar</button>
+        <button class="btn-primary" onclick="saveEditScheduleModal()">💾 Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="calibrationOverlay" class="modal">
+    <div class="modal-content" style="max-width:420px; padding:20px;">
+      <h2>Calibração em andamento</h2>
+      <p id="calibrationCountdownText" class="help-text" style="margin-top:10px;">
+        Restam 60 segundos...
+      </p>
+
+      <div style="margin-top:12px; margin-bottom:16px;">
+        <div class="small-text" style="margin-bottom:4px;">
+          Progresso
+        </div>
+        <div class="progress-bar">
+          <div id="calibrationProgressFill" class="progress-fill"></div>
+        </div>
+      </div>
 
       <button class="btn-secondary" id="abortCalibrationBtn" onclick="abortCalibration()">
         ✖ Abortar teste
       </button>
-      </div>
     </div>
+  </div>
 
-    <div id="footer-root"></div>
+  <div id="footer-root"></div>
 
-    <!-- Scripts -->
-    <script src="js/dashboard-common.js"></script>
-    <script src="js/dashboard-dosing.js"></script>
-      <!-- Inicialização do topbar -->
-      <script>
-        window.addEventListener("DOMContentLoaded", () => {
-          if (window.DashboardCommon) {
-            DashboardCommon.initTopbar();
-          }
-        });
-      </script>
+  <!-- Scripts -->
+  <script src="js/dashboard-common.js"></script>
+  <script src="js/dashboard-dosing.js"></script>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      if (window.DashboardCommon) {
+        DashboardCommon.initTopbar();
+      }
+    });
+  </script>
 </body>
 </html>
