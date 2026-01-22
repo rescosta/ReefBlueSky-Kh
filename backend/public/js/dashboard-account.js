@@ -235,6 +235,43 @@ async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
   }
 }
 
+async function autoCheckConnectionForDevice(device) {
+  try {
+    const url = `/api/v1/user/devices/${device.deviceId}/test-connection`;
+    const res = await apiFetch(url, { method: 'GET' });
+    const body = await res.json().catch(() => null);
+
+    if (!res.ok || !body?.success) return;
+
+    const d = body.data || {};
+
+    // Atualiza bolinha
+    const dot = document.querySelector(
+      `.device-status-dot[data-device-id="${device.deviceId}"]`
+    );
+    if (dot) {
+      dot.classList.remove('online', 'offline');
+      dot.classList.add(d.online ? 'online' : 'offline');
+    }
+
+    // Ajusta botão de firmware
+    const fwBtn = document.querySelector(
+      `.btn-fw-update[data-device-id="${device.deviceId}"]`
+    );
+    if (fwBtn) {
+      if (!d.online) {
+        fwBtn.disabled = true;
+        fwBtn.classList.add('btn-disabled');
+        fwBtn.textContent = 'Offline';
+      } else {
+        fwBtn.textContent = 'Atualizar';
+      }
+    }
+  } catch (err) {
+    console.error('Erro no autoCheckConnectionForDevice:', err);
+  }
+}
+
 
 // ===== Modal de Teste de Conexão =====
 let connectionModalEl = null;
@@ -435,6 +472,8 @@ async function loadDevices() {
 
       // dispara checagem automática ao carregar a lista
       checkFirmwareStatusForDevice(d.deviceId, statusSpan, fwBtn);
+      autoCheckConnectionForDevice(d);
+
 
       div.appendChild(left);
       div.appendChild(right);
