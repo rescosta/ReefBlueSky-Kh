@@ -217,6 +217,23 @@
       box-shadow: 0 20px 40px rgba(0,0,0,0.3);
     }
 
+    .device-status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 6px;
+    }
+
+    .device-status-dot.online {
+      background: #22c55e;   /* verde */
+    }
+
+    .device-status-dot.offline {
+      background: #ef4444;   /* vermelho */
+    }
+
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
