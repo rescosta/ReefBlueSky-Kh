@@ -139,7 +139,7 @@ function getTopbarHtml() {
                 <a href="dashboard-dosing.html?tab=dashboard">Dashboard</a>
                 <a href="dashboard-dosing.html?tab=agenda">Agenda</a>
                 <a href="dashboard-dosing.html?tab=manual">Manual</a>
-                <a href="dashboard-dosing.html?tab=config">Config</a>
+                <a href="dashboard-dosing.html?tab=config">Configuração</a>
                 <a href="dashboard-dosing.html?tab=calibration">Calibrar</a>
               </div>
             </div>            
