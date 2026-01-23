@@ -128,51 +128,30 @@ function getTopbarHtml() {
     <div class="topbar">
       <div class="topbar-left">
         <div class="logo">ReefBlueSky</div>
-          <nav class="nav">
-            <a href="dashboard" id="nav-main">Principal</a>
-            <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
-            <a href="dashboard-config.html" id="nav-config">Configurações</a>
-            <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
-            <div class="nav-dropdown">
-              <button type="button" class="nav-dropbtn">Dosadora ▾</button>
-              <div class="nav-dropdown-content">
-                <a href="dashboard-dosing.html?tab=dashboard">Dashboard</a>
-                <a href="dashboard-dosing.html?tab=agenda">Agenda</a>
-                <a href="dashboard-dosing.html?tab=manual">Manual</a>
-                <a href="dashboard-dosing.html?tab=config">Configuração</a>
-                <a href="dashboard-dosing.html?tab=calibration">Calibrar</a>
-              </div>
-            </div>            
-            <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
-            <a href="dashboard-account.html" id="menu-account">Minha conta</a>
-          </nav>
+        <nav class="nav">
+          <a href="dashboard" id="nav-main">Dashboard</a>
+          <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
+          <a href="dashboard-config.html" id="nav-config">Configurações</a>
+          <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
+          <div class="nav-dropdown">
+            <button type="button" class="nav-dropbtn">Dosadora ▾</button>
+            <div class="nav-dropdown-content">
+              <a href="dashboard-dosing.html?tab=dashboard">Dashboard</a>
+              <a href="dashboard-dosing.html?tab=agenda">Agenda</a>
+              <a href="dashboard-dosing.html?tab=manual">Manual</a>
+              <a href="dashboard-dosing.html?tab=config">Configuração</a>
+              <a href="dashboard-dosing.html?tab=calibration">Calibrar</a>
+            </div>
+          </div>
+          <a href="dashboard-logs.html" id="nav-dev" class="dev-link hidden">Dev</a>
+          <a href="dashboard-account.html" id="menu-account">Minha conta</a>
+        </nav>
       </div>
-      <div class="topbar-right">
-        <div class="device-selector">
-          <span>Device:</span>
-          <select id="deviceSelect"></select>
-          <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
-        </div>
-
-        <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
-          LCD OFF
-        </span>
-
-        <span id="dosingStatusIcon" class="badge-off" style="display:none; font-size:12px;">
-          DOS OFF
-        </span>
-
-        <div id="currentTime" class="topbar-clock">--:--</div>
-
-        <button id="logoutBtn" class="btn-small">Sair</button>
-
-        <button id="menuToggle" class="menu-toggle" aria-label="Menu">
-          <span></span><span></span><span></span>
-        </button>
-      </div>
+      ...
     </div>
   `;
 }
+
 
 
 
@@ -342,23 +321,18 @@ async function applyRoleMenuVisibility() {
   const role =
     (window.DashboardCommon && DashboardCommon.currentUserRole) || 'user';
 
-  const navLogs   = document.getElementById('nav-logs');
-  const navDev    = document.getElementById('nav-dev');
-  //const navDosing = document.getElementById('nav-dosing');
+  const navLogs = document.getElementById('nav-logs');
+  const navDev  = document.getElementById('nav-dev');
 
-  // Logs some sempre
   if (navLogs) navLogs.style.display = 'none';
 
-  // Dev só aparece para role=dev
   if (navDev) {
-    navDev.style.display = role === 'dev' ? 'inline-block' : 'none';
+    if (role === 'dev') {
+      navDev.classList.remove('hidden'); // mostra Dev
+    } else {
+      navDev.classList.add('hidden');    // mantém escondido
+    }
   }
-
-  // Dosadora só aparece se o usuário tiver pelo menos um dosing_device
-  /*if (navDosing) {
-    const hasDoser = await hasDosingDevices();
-    navDosing.style.display = hasDoser ? 'inline-block' : 'none';
-  }*/
 }
 
 
