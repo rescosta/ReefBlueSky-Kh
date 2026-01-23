@@ -1,4 +1,4 @@
-// Dashboard Dosadora
+// Dashboard Dosadora .js
 // ================================================
 
 
@@ -13,6 +13,43 @@ let editingScheduleData = {};
 let calibrationTimer = null;
 let calibrationSecondsTotal = 60;
 let calibrationSecondsLeft = 0;
+
+
+function showTabFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab') || 'dashboard';
+
+  let targetId;
+  switch (tab) {
+    case 'dashboard':
+      targetId = 'tab-dashboard';
+      break;
+    case 'agenda':
+      targetId = 'agendaTab';
+      break;
+    case 'manual':
+      targetId = 'manualTab';
+      break;
+    case 'config':
+      targetId = 'configTab';
+      break;
+    case 'calibration':
+      targetId = 'calibrationTab';
+      break;
+    default:
+      targetId = 'tab-dashboard';
+  }
+
+  // Desativa todas
+  document.querySelectorAll('.tab-content').forEach(el => {
+    el.classList.remove('active');
+  });
+
+  const target = document.getElementById(targetId);
+  if (target) {
+    target.classList.add('active');
+  }
+}
 
 
 function parseMl(valueStr) {
@@ -1134,4 +1171,8 @@ function showError(msg) {
 
 
 // ===== INIT =====
-window.addEventListener('load', initDashboard);
+// ===== INIT =====
+window.addEventListener('load', async () => {
+  await initDashboard();    // carrega device, bombas, agendas, etc.
+  showTabFromQuery();       // ativa a aba certa baseada em ?tab=
+});
