@@ -367,7 +367,7 @@ function renderDashboard() {
     const current = pump.current_volume_ml || pump.current_volume || 0;
     const pct = total > 0 ? Math.max(0, Math.min(100, (current * 100) / total)) : 0;
 
-    const daily = pump.max_daily_ml || pump.daily_max || 0;
+    const daily = getDailyVolumeForPump(idx)
     const on = pump.enabled;
     const statusClass = on ? 'btn-on' : 'btn-off';
     const statusText = on ? 'ON' : 'OFF';
@@ -577,6 +577,13 @@ async function loadAllSchedules(deviceId) {
   renderScheduleTableAll();
 }
 
+function getDailyVolumeForPump(index) {
+  if (!Array.isArray(schedules)) return 0;
+  return schedules
+    .filter(s => s.pump_index === index && s.enabled)
+    .reduce((sum, s) => sum + (s.volume_per_day_ml || 0), 0);
+}
+
 
 async function togglePump(index) {
   const pump = pumps[index];
@@ -590,7 +597,6 @@ async function togglePump(index) {
     container_size: pump.container_volume_ml,
     current_volume: pump.current_volume_ml,
     alarm_percent: pump.alarm_threshold_pct,
-    daily_max: pump.max_daily_ml
   };
 
   console.log('🔁 Toggling pump:', index, data);
