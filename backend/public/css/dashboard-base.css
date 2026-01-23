@@ -310,44 +310,62 @@ table {
 
 
 /* ===== DROPDOWN NAV (DOSADORA) ===== */
+/* Container do dropdown na topbar */
 .nav-dropdown {
   position: relative;
-  display: inline-block;
 }
 
+/* Botão "Dosadora ▾" */
 .nav-dropbtn {
   background: transparent;
   border: none;
-  color: inherit;
-  font: inherit;
+  color: #f9fafb;
+  font-size: 14px;
+  padding: 0 10px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
-  padding: 0 8px;
 }
 
+/* Caixa suspensa */
 .nav-dropdown-content {
-  display: none;
   position: absolute;
-  background-color: #ffffff;
+  top: 100%;
+  left: 0;
   min-width: 180px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-  z-index: 1000;
+  background: #020617;               /* fundo igual aos cards */
+  border: 1px solid #1f2937;
+  border-radius: 10px;                /* borda arredondada */
+  box-shadow: 0 12px 30px rgba(0,0,0,0.7);
+  padding: 6px 0;
+  z-index: 50;
+  display: none;                      /* começa escondido */
 }
 
+/* Links internos */
 .nav-dropdown-content a {
   display: block;
-  padding: 8px 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #e5e7eb;
   text-decoration: none;
-  color: #333;
+  white-space: nowrap;
 }
 
+/* Hover */
 .nav-dropdown-content a:hover {
-  background-color: #f0f0f0;
+  background: #111827;
+  color: #f9fafb;
 }
 
-/* abre no hover (desktop) */
-.nav-dropdown:hover .nav-dropdown-content {
+/* Mostrar o menu ao passar o mouse ou focar (desktop) */
+.nav-dropdown:hover .nav-dropdown-content,
+.nav-dropdown:focus-within .nav-dropdown-content {
   display: block;
 }
+
 
 
 /* ===== MOBILE (<=768px) ===== */
