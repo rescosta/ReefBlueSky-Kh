@@ -396,6 +396,20 @@ async function initTopbar() {
     });
   }
 
+
+  //submenu da Dosadora dentro do sideMenu 
+
+  const sideSubToggle = document.querySelector('.side-submenu-toggle');
+  const sideSubmenu   = document.querySelector('.side-submenu');
+
+  if (sideSubToggle && sideSubmenu) {
+    sideSubToggle.addEventListener('click', () => {
+      sideSubmenu.classList.toggle('open');
+    });
+  }
+
+  // fim submenu
+
   const menuLogout = document.getElementById('menuLogout');
   if (menuLogout) {
     menuLogout.addEventListener('click', (e) => {
