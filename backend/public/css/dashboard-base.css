@@ -48,12 +48,12 @@
   opacity: 0.8;           /* igual a .nav a */
   
   height: 32px;
-  padding: 0 8px 2px 8px; /* exatamente igual a .nav a */
+  padding: 0 8px 1px 8px; /* exatamente igual a .nav a */
   line-height: 1;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
-  transform: translateY(0px);
+  transform: translateY(-1px);
 }
 
 /* hover igual aos outros (só clareia) */
