@@ -183,6 +183,30 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .password-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .password-wrapper input {
+          padding-right: 40px; /* espaço pro botão */
+        }
+
+        .toggle-password-btn {
+          position: absolute;
+          right: 10px;
+          background: none;
+          border: none;
+          color: #667eea;
+          cursor: pointer;
+          font-size: 14px;
+          padding: 0;
+          width: auto;
+        }
+
+
     </style>
 </head>
 <body>
@@ -213,22 +237,33 @@
                 >
             </div>
 
-             <div class="form-group">
-                <label for="password">🔐 Senha:</label>
+            <div class="form-group">
+              <label for="password">🔐 Senha:</label>
+
+              <div class="password-wrapper">
                 <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="Sua senha"
-                    required
-                    autocomplete=""
+                  type="password" 
+                  id="password" 
+                  name="password" 
+                  placeholder="Sua senha"
+                  required
+                  autocomplete=""
                 >
-                <div style="text-align:right; margin-top: 5px;">
-                    <button type="button" style="background:none;border:none;color:#667eea;font-size:12px;padding:0;width:auto;cursor:pointer;"
-                            onclick="startForgotPassword()">
-                        Esqueci minha senha
-                    </button>
-                </div>
+                <button 
+                  type="button" 
+                  class="toggle-password-btn" 
+                  data-target="password"
+                >
+                  👁
+                </button>
+              </div>
+
+              <div style="text-align:right; margin-top: 5px;">
+                <button type="button" style="background:none;border:none;color:#667eea;font-size:12px;padding:0;width:auto;cursor:pointer;"
+                        onclick="startForgotPassword()">
+                  Esqueci minha senha
+                </button>
+              </div>
             </div>
 
             <div class="buttons-row">
@@ -576,6 +611,21 @@
         }
       }
 
+        function initLoginPasswordToggle() {
+          document
+            .querySelectorAll('.toggle-password-btn[data-target]')
+            .forEach(btn => {
+              btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                if (!input) return;
+
+                const showing = input.type === 'text';
+                input.type = showing ? 'password' : 'text';
+                btn.textContent = showing ? '👁' : '🙈';
+              });
+            });
+        }
 
       async function confirmCode() {
         const code = document.getElementById('verificationCodeStep2').value.trim();
@@ -645,6 +695,8 @@
       document.addEventListener('DOMContentLoaded', () => {
         console.log('Dica: pagins de teste');
         showStep(1);
+        initLoginPasswordToggle();   
+
 
         const tzSelect = document.getElementById('timezoneStep2');
         if (tzSelect) {
@@ -657,6 +709,8 @@
           }
         }
       });
+
+
 
     </script>
   </body>
