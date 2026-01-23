@@ -433,11 +433,13 @@ table {
     gap: 4px;
   }
 
+  /* linha com título + hambúrguer */
   .topbar-left {
-    justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;  /* título à esquerda, menu à direita */
     order: 1;
   }
-
   .logo {
     font-size: 20px;
   }
@@ -457,7 +459,7 @@ table {
     justify-content: center;
     align-items: center;
     padding: 8px;
-    width: 36px;
+    width: 32px;
   }
 
   .menu-toggle span {
@@ -466,5 +468,13 @@ table {
     background: #e5e7eb;
     border-radius: 1px;
     margin: 2px 0;
+  }
+
+    .topbar-right {
+    order: 2;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
   }
 }
