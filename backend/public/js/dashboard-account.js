@@ -451,11 +451,11 @@ async function loadDevices() {
 
       let iconHtml = '';
       if (type === 'KH') {
-        iconHtml = '<span class="icon-kh">KH</span>';
+        iconHtml = '<span class="icon-kh"></span>';
       } else if (type === 'DOSER') {
-        iconHtml = '<span class="icon-doser">DOS</span>';
+        iconHtml = '<span class="icon-doser"></span>';
       } else if (type === 'LCD') {
-        iconHtml = '<span class="icon-lcd">LCD</span>';
+        iconHtml = '<span class="icon-lcd"></span>';
       }
 
       const left = document.createElement('div');
