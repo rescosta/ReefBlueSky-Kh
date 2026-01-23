@@ -600,6 +600,24 @@
       text-align: left;
     }
 
+    /* Garantir largura e evitar variações entre abas */
+    .dosing-card {
+      max-width: 900px;
+      width: 100%;          /* ocupa sempre 100% até 900px */
+      margin: 0 auto;
+      overflow-x: auto;     /* evita que conteúdo mais largo quebre o layout */
+    }
+
+    /* Deixar as tabelas mais previsíveis em largura */
+    #agendaTab table,
+    #configTab table {
+      table-layout: fixed;
+    }
+    #agendaTab th, #agendaTab td,
+    #configTab th, #configTab td {
+      word-wrap: break-word;
+    }
+
 
     /* Em telas menores, usar 100% */
     @media (max-width: 960px) {
