@@ -377,7 +377,12 @@ function renderDashboard() {
         <div>${idx + 1}</div>
         <div>${name}</div>
         <div>
-          <span class="btn-status ${statusClass}">${statusText}</span>
+          <button
+            class="btn-status ${statusClass}"
+            onclick="togglePump(${idx})"
+          >
+            ${statusText}
+          </button>
         </div>
         <div class="dashboard-reservoir">
           <div class="dashboard-reservoir-bar">
@@ -610,9 +615,8 @@ async function togglePump(index) {
 
   if (result) {
     pump.enabled = newActive;
-    renderConfigTable();       // atualiza texto Ativa/Inativa
-    // opcional: também recarregar agendas se quiser refletir visualmente
-    // await loadSchedules(currentDevice.id, currentPumpIndex);
+    renderConfigTable();     
+    renderDashboard();
   }
 }
 
