@@ -500,6 +500,20 @@
       min-width: 60px;
     }
 
+    /* Config: larguras aproximadas ao layout da dashboard */
+    #configTab table th:nth-child(2),
+    #configTab table td:nth-child(2) {   /* NOME */
+      width: 80px;
+      min-width: 80px;
+      text-align: left;                  /* para ficar mais próximo da dashboard */
+    }
+
+    #configTab table th:nth-child(3),
+    #configTab table td:nth-child(3) {   /* STATUS */
+      width: 90px;                       /* em vez de 110px */
+      min-width: 90px;
+    }
+
 
     /* centralizar o botão dentro da célula */
     #configTab table td:nth-child(3) .btn-status,
