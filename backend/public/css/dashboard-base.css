@@ -16,8 +16,8 @@
 .nav a {
   display: inline-flex;
   align-items: center;
-  height: 32px;          /* um pouco menor que 36px para ficar mais “justo” */
-  padding: 0 8px;        /* aproxima os itens */
+  height: 39px;          /* um pouco menor que 36px para ficar mais “justo” */
+  padding: 0 6px;        /* aproxima os itens */
   opacity: 0.8;
   padding-bottom: 2px;
   border-bottom: 2px solid transparent;
@@ -143,29 +143,6 @@ table {
   font-weight: 700;
   letter-spacing: 0.05em;
 }
-
-.nav {
-  display: flex;
-  align-items: center;   /* garante alinhamento vertical */
-  gap: 16px;
-  font-size: 14px;
-}
-
-.nav a {
-  display: inline-flex;
-  align-items: center;
-  height: 36px;
-  padding: 0 10px;
-  opacity: 0.8;
-  padding-bottom: 2px;
-  border-bottom: 2px solid transparent;
-}
-
-.nav a.active {
-  opacity: 1;
-  border-color: #facc15;
-}
-
 
 .topbar-right {
   display: flex;
