@@ -37,29 +37,37 @@
   padding: 0 8px;        /* igual aos <a> */
 }
 
-/* botão interno só cuida do texto/setinha */
-.nav-dropbtn {
-  background: transparent;
-  border: none;
-  color: inherit;
-  font: inherit;
-  padding: 0;
-  padding-bottom: 2px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  opacity: 0.8; 
-
-  /* tapinha pra cima só na Dosadora */
-  transform: none; 
-}
 
 /* quando hover ou dropdown aberto, se quiser destacar */
 .nav-dropdown:hover .nav-dropbtn,
 .nav-dropdown:focus-within .nav-dropbtn {
   opacity: 1;
 }
+
+/* botão que abre o menu suspenso */
+.topbar .nav > .nav-dropdown > .nav-dropbtn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: #e5e7eb;
+  opacity: 0.8;
+
+  height: 32px;
+  padding: 0 8px 2px 8px;  /* igual aos .nav a */
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transform: none;
+}
+
+/* hover/foco do botão (não muda itens internos) */
+.topbar .nav > .nav-dropdown:hover > .nav-dropbtn,
+.topbar .nav > .nav-dropdown:focus-within > .nav-dropbtn {
+  opacity: 1;
+}
+
+
 
 .hidden {
   display: none;
