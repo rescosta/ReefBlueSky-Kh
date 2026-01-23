@@ -261,8 +261,9 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 16px;
-      font-size: 12px;
+      font-size: 13px;
     }
+
 
     th {
       background: #020617;
@@ -521,6 +522,31 @@
       margin: 0 auto;
     }
 
+    /* Agenda: colunas Editar e Deletar bem justas */
+    #agendaTab table th:nth-child(7),
+    #agendaTab table td:nth-child(7),
+    #agendaTab table th:nth-child(8),
+    #agendaTab table td:nth-child(8) {
+      width: 1%;           /* força a coluna a encolher ao conteúdo */
+      white-space: nowrap; /* impede quebra de linha no botão */
+      padding: 4px 4px;
+      text-align: center;
+    }
+
+    /* Centralizar o botão em cada célula */
+    #agendaTab table td:nth-child(7),
+    #agendaTab table td:nth-child(8) {
+      vertical-align: middle;
+    }
+
+    /* Botões compactos */
+    #agendaTab .btn-edit,
+    #agendaTab .btn-delete {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+
+
 
     .dashboard-header,
     .dashboard-row {
@@ -642,6 +668,75 @@
     }
 
 
+    /* Agenda: deixar tabela mais compacta e alinhada à dashboard */
+    #agendaTab table {
+      width: auto;          /* encolhe até o conteúdo */
+      max-width: 100%;      /* não passa do card */
+      margin: 16px auto 0;  /* centraliza dentro da dosing-card */
+      font-size: 13px;      /* mesmo corpo da dashboard */
+    }
+
+    /* Colunas mais próximas do layout da dashboard */
+    #agendaTab table th:nth-child(1),   /* STATUS */
+    #agendaTab table td:nth-child(1) {
+      width: 90px;
+      min-width: 90px;
+    }
+
+    #agendaTab table th:nth-child(2),   /* BOMBA */
+    #agendaTab table td:nth-child(2) {
+      width: 60px;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    #agendaTab table th:nth-child(3),   /* DIAS DA SEMANA */
+    #agendaTab table td:nth-child(3) {
+      width: 180px;
+      min-width: 180px;
+      text-align: left;
+    }
+
+    #agendaTab table th:nth-child(4),   /* DOSES/DIA */
+    #agendaTab table td:nth-child(4) {
+      width: 80px;
+      min-width: 80px;
+    }
+
+    #agendaTab table th:nth-child(5),   /* JANELA HORÁRIA */
+    #agendaTab table td:nth-child(5) {
+      width: 130px;
+      min-width: 130px;
+    }
+
+    /* Vol. diário continua com largura fixa */
+    #agendaTab table th:nth-child(6),
+    #agendaTab table td:nth-child(6) {
+      width: 110px;
+      min-width: 110px;
+    }
+
+    /* Colunas Editar e Deletar bem justas */
+    #agendaTab table th:nth-child(7),
+    #agendaTab table td:nth-child(7),
+    #agendaTab table th:nth-child(8),
+    #agendaTab table td:nth-child(8) {
+      width: 1%;           /* encolhe ao conteúdo */
+      white-space: nowrap; /* impede quebra do texto do botão */
+      padding: 4px 4px;
+      text-align: center;
+    }
+
+    /* Botões compactos nas duas colunas */
+    #agendaTab .btn-edit,
+    #agendaTab .btn-delete {
+      padding: 4px 8px;
+      font-size: 11px;
+      margin: 0 2px;
+    }
+
+
+
     /* Em telas menores, usar 100% */
     @media (max-width: 960px) {
       .dosing-card {
@@ -720,6 +815,7 @@
               <th>DOSES/DIA</th>
               <th>JANELA HORÁRIA</th>
               <th>VOL. DIÁRIO (ML)</th>
+              <th>AÇÕES</th>
             </tr>
           </thead>
           <tbody id="scheduleTableBody">
