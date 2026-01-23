@@ -258,10 +258,31 @@ table {
   font-size: 16px;
 }
 
+/* ajustes visuais do submenu */
+.side-submenu-toggle {
+  margin-top: 8px;           /* afasta de Sistema */
+}
+
+.side-submenu {
+  margin-top: 4px;           /* afasta do botão Dosadora */
+}
+
+/* setinha que gira */
+.side-submenu-toggle::after {
+  content: '▾';
+  float: right;
+  transition: transform 0.2s;
+}
+
+.side-submenu-toggle.open::after {
+  transform: rotate(180deg);
+}
+
 /* estado aberto */
 .side-submenu.open {
   display: block;
 }
+
 
 
 /* ===== FOOTER GLOBAL ===== */
