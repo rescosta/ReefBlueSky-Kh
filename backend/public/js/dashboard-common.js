@@ -147,11 +147,33 @@ function getTopbarHtml() {
           <a href="dashboard-account.html" id="menu-account">Minha conta</a>
         </nav>
       </div>
-      ...
+
+      <div class="topbar-right">
+        <div class="device-selector">
+          <span>Device:</span>
+          <select id="deviceSelect"></select>
+          <span id="deviceStatusBadge" class="badge badge-off">Desconhecido</span>
+        </div>
+
+        <span id="lcdStatusIcon" class="badge-off" style="display:none; font-size:12px;">
+          LCD OFF
+        </span>
+
+        <span id="dosingStatusIcon" class="badge-off" style="display:none; font-size:12px;">
+          DOS OFF
+        </span>
+
+        <div id="currentTime" class="topbar-clock">--:--</div>
+
+        <button id="logoutBtn" class="btn-small">Sair</button>
+
+        <button id="menuToggle" class="menu-toggle" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
     </div>
   `;
 }
-
 
 
 
