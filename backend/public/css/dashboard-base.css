@@ -51,7 +51,7 @@
   cursor: pointer;
 
   /* tapinha pra cima só na Dosadora */
-  transform: translateY(-1px); 
+  transform: translateY(-4px); 
 }
 
 
