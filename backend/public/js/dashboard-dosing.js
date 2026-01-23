@@ -692,7 +692,7 @@ async function createSchedule() {
     doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10) || 0,
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day_ml: parseMl(document.getElementById('volumePerDay').value) || 0 // <-- nome novo
+    volume_per_day: parseMl(document.getElementById('volumePerDay').value) || 0 // <-- nome novo
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
