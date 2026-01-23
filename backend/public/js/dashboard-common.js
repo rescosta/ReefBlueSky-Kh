@@ -397,19 +397,19 @@ async function initTopbar() {
   }
 
 
-  //submenu da Dosadora dentro do sideMenu 
+  // Submenus colapsáveis dentro do sideMenu (RBS KH, Dosadora, etc.)
+  const subToggles = document.querySelectorAll('.side-submenu-toggle');
 
-  const sideSubToggle = document.querySelector('.side-submenu-toggle');
-  const sideSubmenu   = document.querySelector('.side-submenu');
+  subToggles.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const submenu = btn.nextElementSibling;
+      if (!submenu || !submenu.classList.contains('side-submenu')) return;
 
-  if (sideSubToggle && sideSubmenu) {
-    sideSubToggle.addEventListener('click', () => {
-      sideSubmenu.classList.toggle('open');
-      sideSubToggle.classList.toggle('open');
+      submenu.classList.toggle('open');
+      btn.classList.toggle('open');
     });
-  }
+  });
 
-  // fim submenu
 
   const menuLogout = document.getElementById('menuLogout');
   if (menuLogout) {
