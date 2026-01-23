@@ -744,7 +744,7 @@
     #agendaTab h2.section-title,
     #agendaTab .info-box {
       margin-left: 0;
-      
+
     }
 
         /* Linha com texto à esquerda e botão à direita */
@@ -802,7 +802,19 @@
     <a href="dashboard-graficos.html">Gráficos</a>
     <a href="dashboard-config.html">Configurações</a>
     <a href="dashboard-sistema.html">Sistema</a>
-    <a href="dashboard-dosing.html">Dosadora</a>
+
+    <!-- GRUPO DOSADORA: título + submenu colapsável -->
+    <button class="side-submenu-toggle" type="button">
+      Dosadora ▾
+    </button>
+    <div class="side-submenu">
+      <a href="dashboard-dosing.html?tab=dashboard">Dashboard</a>
+      <a href="dashboard-dosing.html?tab=agenda">Agenda</a>
+      <a href="dashboard-dosing.html?tab=manual">Manual</a>
+      <a href="dashboard-dosing.html?tab=config">Configuração</a>
+      <a href="dashboard-dosing.html?tab=calibration">Calibrar</a>
+    </div>
+    
     <a href="dashboard-logs.html">Dev</a>
     <a href="dashboard-account.html">Minha Conta</a>
     <a href="#" id="menuLogout">Sair</a>
