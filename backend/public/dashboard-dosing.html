@@ -487,14 +487,15 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 4px 12px;      /* altura / largura */
+      padding: 4px 12px;
       border-radius: 999px;
       border: 1px solid transparent;
-      font-size: 12px;        /* mesmo tamanho de fonte em todos */
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      min-width: 80px;        /* largura mínima igual para todos */
+      min-width: 80px;
       line-height: 1;
+      margin: 0 auto;  
     }
 
     .btn-status.btn-on {
@@ -509,12 +510,21 @@
       border-color: #dc2626;
     }
 
-
+    #configTab table th:nth-child(3),
+    #configTab table td:nth-child(3),
     #agendaTab table th:nth-child(1),
     #agendaTab table td:nth-child(1) {
-      width: 120px;
-      min-width: 120px;
+      width: 110px;
+      min-width: 110px;
+      text-align: center;
     }
+
+    /* centralizar o botão dentro da célula */
+    #configTab table td:nth-child(3) .btn-status,
+    #agendaTab table td:nth-child(1) .btn-status {
+      margin: 0 auto;
+    }
+
 
     .dashboard-header,
     .dashboard-row {
