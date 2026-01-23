@@ -557,19 +557,21 @@
 
     /* CARD PADRÃO DA DOSADORA (todas as abas) */
     .dosing-card {
-      max-width: 900px;                 /* largura visual única */
-      margin: 0 auto;                   /* centraliza na container */
+      max-width: 900px;   /* mesma largura em todas as abas */
+      width: 100%;        /* sempre ocupar 100% até 900px */
+      margin: 0 auto;
       background: #020617;
       border-radius: 10px;
       padding: 20px 24px;
       border: 1px solid #1f2937;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+      overflow-x: auto;   /* se algo passar, cria scroll interno */
     }
 
-    /* A aba já usa .tab-content com borda/sombra; podemos deixar ela só como wrapper leve */
+
     .tab-content {
       display: none;
-      background: transparent;          /* tira o card duplicado */
+      background: transparent;         
       border: none;
       border-radius: 0;
       padding: 0;
@@ -598,14 +600,6 @@
     #agendaTab table th:nth-child(2),
     #agendaTab table td:nth-child(2) {
       text-align: left;
-    }
-
-    /* Garantir largura e evitar variações entre abas */
-    .dosing-card {
-      max-width: 900px;
-      width: 100%;          /* ocupa sempre 100% até 900px */
-      margin: 0 auto;
-      overflow-x: auto;     /* evita que conteúdo mais largo quebre o layout */
     }
 
     /* Deixar as tabelas mais previsíveis em largura */
@@ -639,8 +633,6 @@
         font-size: 11px;
       }
     }
-
-
 
   </style>
 </head>
