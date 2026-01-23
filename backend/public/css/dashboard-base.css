@@ -33,28 +33,22 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 32px;          /* igual aos <a> */
-  padding: 0 8px;        /* igual aos <a> */
+  height: 32px;      /* igual aos <a> */
+  padding: 0;        /* deixa o padding só no botão */
 }
 
-
-/* quando hover ou dropdown aberto, se quiser destacar */
-.nav-dropdown:hover .nav-dropbtn,
-.nav-dropdown:focus-within .nav-dropbtn {
-  opacity: 1;
-}
-
-/* botão que abre o menu suspenso */
+/* botão que abre o menu suspenso (Dosadora ▾) */
 .topbar .nav > .nav-dropdown > .nav-dropbtn {
   background: transparent;
   border: none;
   font-family: inherit;
   font-size: 14px;
   font-weight: 400;
-  color: #e5e7eb;
-  opacity: 0.8;
+  color: inherit;         /* igual aos outros links */
+  opacity: 0.8;           /* igual a .nav a */
+  
   height: 32px;
-  padding: 0 8px 2px 8px;
+  padding: 0 8px 2px 8px; /* exatamente igual a .nav a */
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -62,8 +56,7 @@
   transform: none;
 }
 
-
-/* hover/foco do botão (não muda itens internos) */
+/* hover igual aos outros (só clareia) */
 .topbar .nav > .nav-dropdown:hover > .nav-dropbtn,
 .topbar .nav > .nav-dropdown:focus-within > .nav-dropbtn {
   opacity: 1;
