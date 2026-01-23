@@ -401,7 +401,9 @@ async function initTopbar() {
   const subToggles = document.querySelectorAll('.side-submenu-toggle');
 
   subToggles.forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();  // impede que o clique suba pro sideMenu
+
       const submenu = btn.nextElementSibling;
       if (!submenu || !submenu.classList.contains('side-submenu')) return;
 
@@ -409,6 +411,7 @@ async function initTopbar() {
       btn.classList.toggle('open');
     });
   });
+
 
 
   const menuLogout = document.getElementById('menuLogout');
