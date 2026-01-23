@@ -493,6 +493,14 @@
       text-align: center;
     }
 
+    /* Config: coluna BOMBA mais estreita */
+    #configTab table th:nth-child(1),
+    #configTab table td:nth-child(1) {
+      width: 60px;      /* 50–60px funciona bem para “1”, “2”, etc. */
+      min-width: 60px;
+    }
+
+
     /* centralizar o botão dentro da célula */
     #configTab table td:nth-child(3) .btn-status,
     #agendaTab table td:nth-child(1) .btn-status {
@@ -610,6 +618,13 @@
     #agendaTab th, #agendaTab td,
     #configTab th, #configTab td {
       word-wrap: break-word;
+    }
+
+    /* Deixar a tabela da Config um pouco mais estreita dentro do card */
+    #configTab table {
+      width: auto;           /* encolhe até o conteúdo */
+      max-width: 100%;       /* não passa do card */
+      margin: 16px auto 0;   /* centraliza dentro da dosing-card */
     }
 
 
