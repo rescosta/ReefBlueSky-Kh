@@ -166,10 +166,6 @@ async function refreshDevicesUI() {
   updateOnlineUI(dev);
 }
 
-setInterval(refreshDevicesUI, 30 * 1000);
-document.addEventListener('DOMContentLoaded', refreshDevicesUI);
-
-
 
 // Stubs de API para saúde e comandos
 
@@ -259,7 +255,7 @@ function renderHealth(health) {
   const wifiRaw = health.wifiRssi ?? health.rssi ?? null;
   const wifi = Number.isFinite(wifiRaw) ? wifiRaw : Number(wifiRaw);
   healthWifiEl.textContent =
-    Number.isFinite(wifi) ? `${wifi.toFixed(0)}%` : '--';
+    Number.isFinite(wifi) ? `${wifi.toFixed(0)}dBm` : '--';
   healthWifiEl.className = `health-value ${classifyWifi(wifi)}`;
 
 
@@ -280,10 +276,6 @@ function renderHealth(health) {
   healthStorageEl.textContent =
     Number.isFinite(storage) ? `${storage.toFixed(0)}%` : '--';
   healthStorageEl.className = `health-value ${classifyPercent(storage)}`;
-
-  healthWifiEl.textContent =
-    Number.isFinite(wifi) ? `${wifi.toFixed(0)}%` : '--';
-  healthWifiEl.className = `health-value ${classifyWifi(wifi)}`;
 
 
   healthUptimeEl.textContent = formatUptime(uptime);
@@ -415,8 +407,10 @@ cmdFactoryResetBtn.addEventListener('click', async () => {
 });
 
 async function initDashboardSistema() {
+  // monta topbar, side-menu, footer, carrega usuário, devices, etc.
   await DashboardCommon.initTopbar();
 
+  // botão de atalho da Dosadora (se existir na página)
   const dosingBtn = document.getElementById('dosingBtn');
   if (dosingBtn) {
     dosingBtn.addEventListener('click', () => {
@@ -424,19 +418,31 @@ async function initDashboardSistema() {
     });
   }
 
+  // primeira carga da lista de devices + UI
   const devs = await DashboardCommon.loadDevicesCommon();
-  if (!devs.length) {
+  if (!devs || !devs.length) {
     infoDeviceIdEl.textContent = '--';
     infoDeviceNameEl.textContent = 'Nenhum dispositivo associado.';
     infoLocalIpEl.textContent = '--';
     infoLastSeenEl.textContent = '--';
     renderHealth(null);
     renderEvents([]);
+    updateOnlineUI(null);
     return;
   }
 
   await loadSystemForSelected();
+
+  // primeira atualização do card de online + agendar refresh periódico
+  await refreshDevicesUI();
+  setInterval(refreshDevicesUI, 30 * 1000);
+
+  // reagir à troca de device disparada pelo select global
+  window.addEventListener('deviceChanged', () => {
+    loadSystemForSelected();
+  });
 }
+
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -445,8 +451,5 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-window.addEventListener('deviceChanged', () => {
-  loadSystemForSelected();
-});
 
 
