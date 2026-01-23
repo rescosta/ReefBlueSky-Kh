@@ -944,7 +944,7 @@ async function toggleSchedule(scheduleId) {
     doses_per_day: sched.doses_per_day || 0,
     start_time: sched.start_time || '',
     end_time: sched.end_time || '',
-    volume_per_day: sched.volume_per_day_ml || 0
+    volume_per_day_ml: sched.volume_per_day_ml || 0
   };
 
   const result = await apiCall(
