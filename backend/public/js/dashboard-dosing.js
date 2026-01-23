@@ -525,14 +525,14 @@ async function saveEditScheduleModal() {
       if (cb.checked) activeDays.push(day);
     });
 
-    const data = {
-      enabled: true, 
-      days_of_week: activeDays,
-      doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10) || 0,
-      start_time: document.getElementById('startTime').value,
-      end_time: document.getElementById('endTime').value,
-      volume_per_day: parseMl(document.getElementById('volumePerDay').value) || 0
-    };
+   const data = {
+    enabled: true,
+    days_of_week: activeDays,
+    doses_per_day: parseInt(document.getElementById('editDosesPerDay').value, 10) || 0,
+    start_time: document.getElementById('editStartTime').value,
+    end_time: document.getElementById('editEndTime').value,
+    volume_per_day_ml: parseMl(document.getElementById('editVolumePerDay').value) || 0
+  };
 
 
     console.log('PUT data =>', data);
@@ -944,7 +944,7 @@ async function toggleSchedule(scheduleId) {
     doses_per_day: sched.doses_per_day || 0,
     start_time: sched.start_time || '',
     end_time: sched.end_time || '',
-    volume_per_day_ml: sched.volume_per_day_ml || 0
+    volume_per_day: sched.volume_per_day_ml || 0
   };
 
   const result = await apiCall(
