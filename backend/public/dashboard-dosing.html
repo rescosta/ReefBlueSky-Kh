@@ -744,7 +744,29 @@
     #agendaTab h2.section-title,
     #agendaTab .info-box {
       margin-left: 0;
+      
     }
+
+        /* Linha com texto à esquerda e botão à direita */
+    #agendaTab .agenda-header {
+      display: flex;
+      align-items: center;       /* alinha verticalmente no centro */
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    /* Reaproveita o estilo atual da info-box, só tirando a margem de cima */
+    #agendaTab .agenda-header .info-box {
+      margin: 0;
+      padding: 8px 10px;
+    }
+
+    /* Mantém o botão com mesmo visual, só sem float */
+    #agendaTab .btn-new-agenda {
+      float: none;
+    }
+
 
 
     /* Em telas menores, usar 100% */
@@ -808,14 +830,16 @@
     <!-- Agenda Tab -->
     <div id="agendaTab" class="tab-content">
       <div class="dosing-card">
-        <div class="clearfix">
-          <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
-        </div>
         <h2 class="section-title">Agendas</h2>
         <div id="agendaWarning"></div>
-        <div class="info-box">
-          📅 Define os horários e frequência de dosagem
+
+        <div class="agenda-header">
+          <div class="info-box">
+            📅 Define os horários e frequência de dosagem
+          </div>
+          <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
         </div>
+
         <table>
           <thead>
             <tr>
@@ -829,11 +853,12 @@
             </tr>
           </thead>
           <tbody id="scheduleTableBody">
-            <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
+            <tr><td colspan="7" style="text-align: center;">Carregando...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
+
 
     <!-- Manual Tab -->
     <div id="manualTab" class="tab-content">
