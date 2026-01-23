@@ -46,20 +46,22 @@
 
 /* botão que abre o menu suspenso */
 .topbar .nav > .nav-dropdown > .nav-dropbtn {
+  background: transparent;
+  border: none;
   font-family: inherit;
   font-size: 14px;
   font-weight: 400;
   color: #e5e7eb;
   opacity: 0.8;
-
   height: 32px;
-  padding: 0 8px 2px 8px;  /* igual aos .nav a */
+  padding: 0 8px 2px 8px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
   transform: none;
 }
+
 
 /* hover/foco do botão (não muda itens internos) */
 .topbar .nav > .nav-dropdown:hover > .nav-dropbtn,
