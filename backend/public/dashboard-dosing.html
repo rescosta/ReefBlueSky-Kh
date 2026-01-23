@@ -547,7 +547,6 @@
     }
 
 
-
     .dashboard-header,
     .dashboard-row {
       display: grid;
@@ -668,13 +667,14 @@
     }
 
 
-    /* Agenda: deixar tabela mais compacta e alinhada à dashboard */
+    /* Agenda: tabela encostada à esquerda do card, não centralizada */
     #agendaTab table {
-      width: auto;          /* encolhe até o conteúdo */
-      max-width: 100%;      /* não passa do card */
-      margin: 16px auto 0;  /* centraliza dentro da dosing-card */
-      font-size: 13px;      /* mesmo corpo da dashboard */
+      width: auto;
+      max-width: 100%;
+      margin: 16px 0 0 0;  /* tira o auto, mantém só margem-top */
+      font-size: 13px;
     }
+
 
     /* Colunas mais próximas do layout da dashboard */
     #agendaTab table th:nth-child(1),   /* STATUS */
@@ -735,6 +735,16 @@
       margin: 0 2px;
     }
 
+
+    /* Título e descrição da seção Agendas alinhados com a tabela */
+    #agendaTab .dosing-card {
+      text-align: left;
+    }
+
+    #agendaTab h2.section-title,
+    #agendaTab .info-box {
+      margin-left: 0;
+    }
 
 
     /* Em telas menores, usar 100% */
