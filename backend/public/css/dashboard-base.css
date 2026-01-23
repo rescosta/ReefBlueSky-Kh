@@ -1,3 +1,39 @@
+/* ===== NAVBAR BASE ===== */
+.topbar .nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+/* Links principais */
+.topbar .nav a {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+}
+
+/* Item com dropdown (Dosadora) */
+.nav-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Botão do dropdown */
+.nav-dropbtn {
+  background: transparent;
+  border: none;
+  color: #f9fafb;
+  font-size: 14px;
+  padding: 0 10px;   /* igual aos links */
+  height: 36px;      /* igual aos links */
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+
 /* ===== RESET / BASE ===== */
 * {
   margin: 0;
