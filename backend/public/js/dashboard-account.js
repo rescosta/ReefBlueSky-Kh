@@ -436,19 +436,15 @@ async function loadDevices() {
       if (d.deviceId) {
         const parts = d.deviceId.split('-'); // ['RBS','LCD','7C2C...']
 
-        if (type === 'LCD' && parts.length >= 2) {
-          name = `LCD ${parts[0]}-${parts[1]}`;      // "LCD RBS-LCD"
-        } else if (type === 'KH' && parts.length >= 2) {
-          name = `${parts[0]}-${parts[1]}`;          // "RBS-KH"
-        } else if (type === 'DOSER' && parts.length >= 2) {
-          name = `${parts[0]}-${parts[1]}`;          // "RBS-DOSER"
+        if (parts.length >= 2) {
+          // KH → "RBS-KH", LCD → "RBS-LCD", DOSER → "RBS-DOSER"
+          name = `${parts[0]}-${parts[1]}`;
         } else {
           name = d.deviceId;
         }
       } else {
         name = d.name || 'Device';
       }
-
 
       const rawFw = d.firmwareVersion || 'N/A';
       const fw    = rawFw.replace(/\.bin$/i, '');
