@@ -16,8 +16,8 @@
 .nav a {
   display: inline-flex;
   align-items: center;
-  height: 39px;          /* um pouco menor que 36px para ficar mais “justo” */
-  padding: 0 6px;        /* aproxima os itens */
+  height: 32px;          /* um pouco menor que 36px para ficar mais “justo” */
+  padding: 0 8px;        /* aproxima os itens */
   opacity: 0.8;
   padding-bottom: 2px;
   border-bottom: 2px solid transparent;
@@ -44,6 +44,7 @@
   color: inherit;
   font: inherit;
   padding: 0;
+  padding-bottom: 2px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
