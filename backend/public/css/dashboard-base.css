@@ -44,11 +44,14 @@
   color: inherit;
   font: inherit;
   padding: 0;
-  padding-bottom: -5px;
+  padding-bottom: 0px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
+
+  /* tapinha pra cima só na Dosadora */
+  transform: translateY(-1px); 
 }
 
 
