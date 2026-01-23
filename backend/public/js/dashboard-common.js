@@ -405,6 +405,7 @@ async function initTopbar() {
   if (sideSubToggle && sideSubmenu) {
     sideSubToggle.addEventListener('click', () => {
       sideSubmenu.classList.toggle('open');
+      sideSubToggle.classList.toggle('open');
     });
   }
 
