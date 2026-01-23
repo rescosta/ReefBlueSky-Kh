@@ -234,6 +234,36 @@ table {
   cursor: pointer;
 }
 
+
+.side-submenu {
+  display: none;
+  margin-left: 12px;
+  border-left: 1px solid #1f2937;
+  padding-left: 8px;
+}
+
+.side-submenu a {
+  font-size: 14px;
+  padding: 6px 0;
+}
+
+.side-submenu-toggle {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 10px 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* estado aberto */
+.side-submenu.open {
+  display: block;
+}
+
+
 /* ===== FOOTER GLOBAL ===== */
 .footer {
   margin-top: auto;
