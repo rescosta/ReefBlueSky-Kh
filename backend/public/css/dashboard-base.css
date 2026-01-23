@@ -53,7 +53,7 @@
   display: inline-flex;
   align-items: center;
   cursor: pointer;
-  transform: none;
+  transform: translateY(-2px);
 }
 
 /* hover igual aos outros (só clareia) */
