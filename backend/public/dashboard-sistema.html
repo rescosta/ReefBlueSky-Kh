@@ -185,11 +185,29 @@
   <!-- painel lateral -->
   <div id="sideMenu" class="side-menu">
     <button id="closeMenu" class="side-close">×</button>
-    <a href="dashboard-main.html">Principal</a>
-    <a href="dashboard-graficos.html">Gráficos</a>
-    <a href="dashboard-config.html">Configurações</a>
-    <a href="dashboard-sistema.html">Sistema</a>
-    <a href="dashboard-dosing.html">Dosadora</a>
+
+    <!-- Submenu RBS KH -->
+    <button class="side-submenu-toggle side-submenu-toggle-kh" type="button">
+      RBS KH ▾
+    </button>
+    <div class="side-submenu side-submenu-kh">
+      <a href="dashboard-main.html">Dashboard</a>
+      <a href="dashboard-config.html">Configurações</a>
+      <a href="dashboard-sistema.html">Sistema</a>
+    </div>
+
+    <!-- GRUPO DOSADORA: título + submenu colapsável -->
+    <button class="side-submenu-toggle" type="button">
+      Dosadora ▾
+    </button>
+    <div class="side-submenu">
+      <a href="dashboard-dosing.html?tab=dashboard">Dashboard</a>
+      <a href="dashboard-dosing.html?tab=agenda">Agenda</a>
+      <a href="dashboard-dosing.html?tab=manual">Manual</a>
+      <a href="dashboard-dosing.html?tab=config">Configuração</a>
+      <a href="dashboard-dosing.html?tab=calibration">Calibrar</a>
+    </div>
+    
     <a href="dashboard-logs.html">Dev</a>
     <a href="#" id="menuLogout">Sair</a>
   </div>
