@@ -1029,42 +1029,53 @@ router.post('/pumps/:id/manual/abort', async (req, res) => {
 // HELPERS
 // ============================================
 
-
 async function validateAndAdjustSchedule(conn, deviceId, scheduleData) {
-    const minGap = scheduleData.min_gap_minutes || 30;
-    
-    // Buscar agendas ativas EXCLUINDO esta (se update)
-    const allSchedules = await conn.query(`
-        SELECT s.*, p.name as pump_name, p.index_on_device
-        FROM dosing_schedules s 
-        JOIN dosing_pumps p ON s.pump_id = p.id 
-        WHERE p.device_id = ? AND s.enabled = 1 
-        ${scheduleData.id ? 'AND s.id != ?' : ''}
-        ORDER BY p.index_on_device, s.start_time
-    `, scheduleData.id ? [deviceId, scheduleData.id] : [deviceId]);
-    
-    // Calcular horários originais
-    const originalTimes = calculateDoseTimes(scheduleData);
-    let adjustedTimes = [...originalTimes];
-    
-    // Eventos existentes
-    const existingEvents = [];
-    allSchedules.forEach(s => {
-        const times = JSON.parse(s.adjusted_times || '[]').length ? 
-            JSON.parse(s.adjusted_times) : calculateDoseTimes(s);
-        times.forEach(timeStr => {
-            const minutes = parseTime(timeStr);
-            existingEvents.push({ time: minutes, pump: s.pump_name });
-        });
-    });
-    
-    // Tentar ajustar
-    if (tryAdjustIntermediateTimes(existingEvents, adjustedTimes, minGap)) {
-        scheduleData.adjusted_times = adjustedTimes;
-        return scheduleData;
-    } else {
-        throw new Error(`Impossível agendar sem intervalo ≥${minGap}min entre bombas. Sugestões: reduza doses, expanda horário ou aumente intervalo.`);
+  const minGap = scheduleData.min_gap_minutes || 30;
+
+  const allSchedules = await conn.query(`
+      SELECT s.*, p.name as pump_name, p.index_on_device
+      FROM dosing_schedules s 
+      JOIN dosing_pumps p ON s.pump_id = p.id 
+      WHERE p.device_id = ? AND s.enabled = 1 
+      ${scheduleData.id ? 'AND s.id != ?' : ''}
+      ORDER BY p.index_on_device, s.start_time
+  `, scheduleData.id ? [deviceId, scheduleData.id] : [deviceId]);
+
+  const originalTimes = calculateDoseTimes(scheduleData);
+  let adjustedTimes = [...originalTimes];
+
+  const existingEvents = [];
+  allSchedules.forEach(s => {
+    let parsedTimes = [];
+
+    if (s.adjusted_times) {
+      try {
+        const tmp = JSON.parse(s.adjusted_times);
+        if (Array.isArray(tmp) && tmp.length) {
+          parsedTimes = tmp;
+        }
+      } catch (e) {
+        // se tiver lixo, ignora e recalcula
+        parsedTimes = [];
+      }
     }
+
+    const times = parsedTimes.length ? parsedTimes : calculateDoseTimes(s);
+    times.forEach(timeStr => {
+      const minutes = parseTime(timeStr);
+      existingEvents.push({ time: minutes, pump: s.pump_name });
+    });
+  });
+
+  if (tryAdjustIntermediateTimes(existingEvents, adjustedTimes, minGap)) {
+    scheduleData.adjusted_times = adjustedTimes;
+    return scheduleData;
+  } else {
+    throw new Error(
+      `Impossível agendar sem intervalo ≥${minGap}min entre bombas. ` +
+      `Sugestões: reduza doses, expanda horário ou aumente intervalo.`
+    );
+  }
 }
 
 //ok
