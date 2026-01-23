@@ -105,7 +105,6 @@ router.post('/devices', async (req, res) => {
                 500,                    // current_volume_ml
                 10,                     // alarm_threshold_pct
                 1.0,                    // calibration_rate_ml_s
-                100                     // max_daily_ml
             ]);
         }
 
@@ -113,8 +112,8 @@ router.post('/devices', async (req, res) => {
             `INSERT INTO dosing_pumps
             (device_id, name, index_on_device,
             container_volume_ml, current_volume_ml,
-            alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            alarm_threshold_pct, calibration_rate_ml_s)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
             pumps
         );
 
@@ -320,7 +319,7 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
             `SELECT
                 id, device_id, name, index_on_device, enabled,
                 container_volume_ml, current_volume_ml,
-                alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml,
+                alarm_threshold_pct, calibration_rate_ml_s,
                 created_at
             FROM dosing_pumps
             WHERE device_id = ?
@@ -339,8 +338,8 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
                         `INSERT INTO dosing_pumps
                         (device_id, name, index_on_device,
                         container_volume_ml, current_volume_ml,
-                        alarm_threshold_pct, calibration_rate_ml_s, max_daily_ml)
-                        VALUES (?, ?, ?, 500, 500, 10, 1.0, 100)`,
+                        alarm_threshold_pct, calibration_rate_ml_s)
+                        VALUES (?, ?, ?, 500, 500, 10, 1.0)`,
                         [deviceId, pumpNames[i], i]
                     );
 
@@ -354,7 +353,6 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
                         current_volume_ml: 500,
                         alarm_threshold_pct: 10,
                         calibration_rate_ml_s: 1.0,
-                        max_daily_ml: 100,
                         created_at: new Date().toISOString()
                     });
 
@@ -377,60 +375,59 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
 // PUT /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex
 // Atualizar configuração de bomba pelo index (0-5)
 router.put('/devices/:deviceId/pumps/:pumpIndex', async (req, res) => {
-    let conn;
-    try {
-        if (!req.user || !req.user.userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.user.userId;
-        const { deviceId, pumpIndex } = req.params;
-        const {
-            name, active, container_size, current_volume,
-            alarm_percent, daily_max
-        } = req.body;
-
-        conn = await pool.getConnection();
-
-        // Verificar device
-        const dev = await conn.query(
-            `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
-            [deviceId, userId]
-        );
-
-        if (!dev || dev.length === 0) {
-            return res.status(404).json({ error: 'Device not found' });
-        }
-
-        // Buscar pump pelo index
-        const pump = await conn.query(
-            `SELECT id FROM dosing_pumps WHERE device_id = ? AND index_on_device = ? LIMIT 1`,
-            [deviceId, pumpIndex]
-        );
-
-        if (!pump || pump.length === 0) {
-            return res.status(404).json({ error: 'Pump not found' });
-        }
-
-        const pumpId = pump[0].id;
-
-        // Atualizar
-        await conn.query(
-            `UPDATE dosing_pumps
-            SET name = ?, enabled = ?, container_volume_ml = ?,
-                current_volume_ml = ?, alarm_threshold_pct = ?, max_daily_ml = ?
-            WHERE id = ?`,
-            [name, active ? 1 : 0, container_size, current_volume, alarm_percent, daily_max, pumpId]
-        );
-
-        res.json({ data: { id: pumpId, name, active } });
-    } catch (err) {
-        console.error('Error updating pump:', err);
-        res.status(500).json({ error: 'Database error' });
-    } finally {
-        if (conn) conn.release();
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    const userId = req.user.userId;
+    const { deviceId, pumpIndex } = req.params;
+    const {
+      name, active, container_size, current_volume,
+      alarm_percent
+    } = req.body;
+
+    conn = await pool.getConnection();
+
+    // Verificar device
+    const dev = await conn.query(
+      `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
+      [deviceId, userId]
+    );
+    if (!dev || dev.length === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Buscar pump pelo index
+    const pump = await conn.query(
+      `SELECT id FROM dosing_pumps WHERE device_id = ? AND index_on_device = ? LIMIT 1`,
+      [deviceId, pumpIndex]
+    );
+    if (!pump || pump.length === 0) {
+      return res.status(404).json({ error: 'Pump not found' });
+    }
+
+    const pumpId = pump[0].id;
+
+    // Atualizar (sem daily_max)
+    await conn.query(
+      `UPDATE dosing_pumps
+         SET name = ?, enabled = ?, container_volume_ml = ?,
+             current_volume_ml = ?, alarm_threshold_pct = ?
+       WHERE id = ?`,
+      [name, active ? 1 : 0, container_size, current_volume, alarm_percent, pumpId]
+    );
+
+    res.json({ data: { id: pumpId, name, active } });
+  } catch (err) {
+    console.error('Error updating pump:', err);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
 
 // ============================================
 // SCHEDULES
