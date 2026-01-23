@@ -148,7 +148,6 @@ async function initDashboard() {
           currentDevice = devices[0];        // sempre primeiro device do usuário
           console.log('✅ Device inicial selecionado:', currentDevice);
           updateDeviceInfo();
-          updateNavbarDeviceInfo();
           await loadPumps(currentDevice.id);
           await loadAllSchedules(currentDevice.id);
       } else {
