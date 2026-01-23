@@ -212,6 +212,13 @@
       color: #e5e7eb;
     }
 
+    /* só o card de título da dosadora */
+    .device-header-card {
+      border: none;
+      box-shadow: none;
+    }
+
+
     .control-group label {
       color: #9ca3af;
     }
@@ -830,11 +837,12 @@
     <div id="alertBox"></div>
 
     <!-- Controls -->
-    <div class="controls">
-      <div class="control-group" id="deviceInfo">
-        Carregando...
-      </div>
+  <div class="controls">
+    <div class="control-group device-header-card" id="deviceInfo">
+      Carregando...
     </div>
+  </div>
+
 
     <!-- Dashboard Tab -->
     <div id="tab-dashboard" class="tab-content active">
