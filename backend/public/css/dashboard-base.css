@@ -49,11 +49,17 @@
   display: inline-flex;
   align-items: center;
   cursor: pointer;
+  opacity: 0.8; 
 
   /* tapinha pra cima só na Dosadora */
   transform: none; 
 }
 
+/* quando hover ou dropdown aberto, se quiser destacar */
+.nav-dropdown:hover .nav-dropbtn,
+.nav-dropdown:focus-within .nav-dropbtn {
+  opacity: 1;
+}
 
 .hidden {
   display: none;
