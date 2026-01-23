@@ -1,35 +1,31 @@
 /* ===== NAVBAR BASE ===== */
-.topbar .nav {
+.topbar-left {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
 }
 
-/* Links principais */
-.topbar .nav a {
+
+/* item com dropdown se comporta como link */
+.topbar .nav > .nav-dropdown {
+  position: relative;
   display: inline-flex;
   align-items: center;
   height: 36px;
   padding: 0 10px;
 }
 
-/* Item com dropdown (Dosadora) */
-.nav-dropdown {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-/* Botão do dropdown */
+/* botão interno NÃO adiciona altura/padding extra */
 .nav-dropbtn {
   background: transparent;
   border: none;
   color: #f9fafb;
   font-size: 14px;
-  padding: 0 10px;   /* igual aos links */
-  height: 36px;      /* igual aos links */
+  padding: 0;             /* importante */
+  line-height: 1;         /* evita empurrar para baixo */
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   cursor: pointer;
 }
 
@@ -124,11 +120,16 @@ table {
 
 .nav {
   display: flex;
+  align-items: center;   /* garante alinhamento vertical */
   gap: 16px;
   font-size: 14px;
 }
 
 .nav a {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
   opacity: 0.8;
   padding-bottom: 2px;
   border-bottom: 2px solid transparent;
@@ -138,6 +139,7 @@ table {
   opacity: 1;
   border-color: #facc15;
 }
+
 
 .topbar-right {
   display: flex;
@@ -344,26 +346,6 @@ table {
   opacity: 0.9;
 }
 
-
-/* ===== DROPDOWN NAV (DOSADORA) ===== */
-/* Container do dropdown na topbar */
-.nav-dropdown {
-  position: relative;
-}
-
-/* Botão "Dosadora ▾" */
-.nav-dropbtn {
-  background: transparent;
-  border: none;
-  color: #f9fafb;
-  font-size: 14px;
-  padding: 0 10px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
 
 /* Caixa suspensa */
 .nav-dropdown-content {
