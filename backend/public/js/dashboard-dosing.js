@@ -162,56 +162,6 @@ async function initDashboard() {
     }
 }
 
-/*
-// ===== DEVICES =====
-function renderDeviceSelector() {
-    const select = document.getElementById('deviceSelect');
-    if (!select) {
-        console.error('❌ deviceSelect não encontrado');
-        return;
-    }
-
-    select.innerHTML = '';
-
-    if (devices.length === 0) {
-        select.innerHTML = '<option value="">Nenhum device encontrado</option>';
-        
-        // zera o estado visual se não tiver device
-        currentDevice = null;
-        updateDeviceInfo();
-        updateNavbarDeviceInfo();
-        return;
-    }
-
-
-    devices.forEach(device => {
-        const option = document.createElement('option');
-        option.value = device.id;
-        option.textContent = device.name || `Device ${device.id}`;
-        select.appendChild(option);
-    });
-
-    select.addEventListener('change', onDeviceChange);
-}
-
-async function onDeviceChange() {
-    const deviceId = parseInt(document.getElementById('deviceSelect').value);
-    currentDevice = devices.find(d => d.id === deviceId);
-    currentPumpIndex = 0;
-
-    if (!currentDevice) {
-        console.error('❌ Device não encontrado');
-        showError('Device não encontrado');
-        return;
-    }
-
-    console.log('✅ Device selecionado:', currentDevice.name);
-    updateDeviceInfo();
-    updateNavbarDeviceInfo();
-    await loadPumps(currentDevice.id);
-    await loadAllSchedules(currentDevice.id);
-}
-*/
 
 function formatLastSeenText(lastSeenIso) {
   if (!lastSeenIso) return 'Nunca conectado';
@@ -248,21 +198,6 @@ function updateDeviceInfo() {
       </div>
     </div>
   `;
-}
-
-
-function updateNavbarDeviceInfo() {
-    if (!currentDevice) return;
-
-    const status = currentDevice.online ? '🟢 Online' : '🔴 Offline';
-    const info = document.getElementById('navDeviceInfo');
-    const dot = document.getElementById('navDeviceStatus');
-    
-    if (info) info.textContent = `${currentDevice.name} • ${status}`;
-    if (dot) {
-        dot.classList.remove('offline');
-        if (!currentDevice.online) dot.classList.add('offline');
-    }
 }
 
 // ===== PUMPS =====
@@ -347,7 +282,6 @@ function renderConfigTable() {
         const containerSize = pump.container_volume_ml || pump.container_size || 0;
         const currentVolume = pump.current_volume_ml || pump.current_volume || 0;
         const alarmPercent = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-        const maxDaily = pump.max_daily_ml || pump.daily_max || 0;
         
           row.innerHTML = `
             <td>${index + 1}</td>
@@ -501,7 +435,6 @@ async function saveEditModal() {
     container_size: parseInt(document.getElementById('editContainerSize').value) || 0,
     current_volume: parseInt(document.getElementById('editCurrentVolume').value) || 0,
     alarm_percent: parseInt(document.getElementById('editAlarmPercent').value) || 0,
-    daily_max: parseMl(document.getElementById('editDailyMax').value) || 0
   };
 
   console.log('💾 Salvando bomba:', index, data);
@@ -682,7 +615,7 @@ function renderScheduleTableAll() {
   if (!tbody) return;
 
   if (schedules.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Nenhuma agenda</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">Nenhuma agenda</td></tr>';
     return;
   }
 
@@ -704,12 +637,12 @@ function renderScheduleTableAll() {
     const startTime = schedule.start_time || '--';
     const endTime   = schedule.end_time   || '--';
 
-    const statusClass = schedule.enabled ? 'btn-on' : 'btn-off';
 
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>
-        <button class="btn-status ${statusClass}" onclick="toggleSchedule(${schedule.id})">
+        <button class="btn-status ${schedule.enabled ? 'btn-on' : 'btn-off'}"
+                onclick="toggleSchedule(${schedule.id})">
           ${schedule.enabled ? 'ON' : 'OFF'}
         </button>
       </td>
@@ -727,118 +660,6 @@ function renderScheduleTableAll() {
     `;
     tbody.appendChild(row);
   });
-}
-
-
-// ===== SCHEDULES =====
-async function loadSchedules(deviceId, pumpIndex) {
-  if (!deviceId) return;
-
-  console.log('📅 Carregando agendas para:', deviceId, 'pump:', pumpIndex);
-
-  const token = getToken();
-  try {
-    const res = await fetch(
-      `/api/v1/user/dosing/devices/${deviceId}/pumps/${pumpIndex}/schedules`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    const json = await res.json();
-
-    if (!res.ok || !json || !json.data) {
-      schedules = [];
-      console.warn('⚠️ Nenhuma agenda encontrada ou erro ao carregar');
-    } else {
-      schedules = json.data;
-    }
-  } catch (err) {
-    console.error('❌ Erro ao carregar agendas:', err);
-    schedules = [];
-  }
-
-  console.log('✅ Agendas carregadas:', schedules.length);
-  renderScheduleTable();
-}
-
-
-function renderScheduleTable() {
-    const tbody = document.getElementById('scheduleTableBody');
-    const warningBox = document.getElementById('agendaWarning');
-    if (!tbody) return;
-
-      // aviso de bomba inativa
-      const currentPump = pumps[currentPumpIndex];
-      if (warningBox) {
-        if (currentPump && !currentPump.enabled) {
-          warningBox.innerHTML = `
-            <div class="info-box" style="background:#fee;border-left-color:#c33;color:#822;">
-              ⚠️ Bomba inativa: os agendamentos desta bomba estão pausados e não serão executados até que ela seja ativada.
-            </div>
-          `;
-        } else {
-          warningBox.innerHTML = '';
-        }
-      }
-
-    if (schedules.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">Nenhuma agenda para esta bomba</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = '';
-
-    schedules.forEach(schedule => {
-        const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-        
-        // Converter days_of_week (array booleano) ou days_mask (número bitmask)
-        let activeDaysArray = [];
-        if (schedule.days_of_week && Array.isArray(schedule.days_of_week)) {
-          // schedule.days_of_week é algo como [0,2,4]
-          activeDaysArray = Array(7).fill(false);
-          schedule.days_of_week.forEach(i => {
-            if (i >= 0 && i < 7) activeDaysArray[i] = true;
-          });
-        } else if (schedule.days_mask !== undefined) {
-          activeDaysArray = Array(7).fill(false);
-          for (let i = 0; i < 7; i++) {
-            activeDaysArray[i] = (schedule.days_mask & (1 << i)) !== 0;
-          }
-        }
-
-        const daysText = activeDaysArray
-          .map((active, i) => active ? days[i] : '')
-          .filter(d => d)
-          .join(', ');
-
-        const row = document.createElement('tr');
-        const startTime = schedule.start_time || '--';
-        const endTime = schedule.end_time || '--';
-        
-        row.innerHTML = `
-          <td>
-            <button class="btn-secondary" onclick="toggleSchedule(${schedule.id})">
-              ${schedule.enabled ? 'ON' : 'OFF'}
-            </button>
-          </td>
-          <td>${schedule.pump_name || `Bomba ${currentPumpIndex + 1}`}</td>
-          <td>${daysText || '---'}</td>
-          <td>${schedule.doses_per_day || 0}</td>
-          <td>${startTime} - ${endTime}</td>
-          <td>${formatMl(schedule.volume_per_day_ml || 0)}</td>
-          <td>
-            <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
-          </td>
-          <td>
-            <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
-          </td>
-
-        `;
-        tbody.appendChild(row);
-    });
 }
 
 function openAgendaModal() {
@@ -1133,21 +954,6 @@ async function toggleSchedule(scheduleId) {
 }
 
 
-// ===== TABS =====
-function switchTab(tabName, btnElement) {
-    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-
-    const tab = document.getElementById(tabName);
-    if (tab) {
-        tab.classList.add('active');
-    }
-
-    if (btnElement) {
-        btnElement.classList.add('active');
-    }
-}
-
 // ===== MODAL CLOSE =====
 window.addEventListener('click', (e) => {
     const editModal = document.getElementById('editModal');
@@ -1174,5 +980,5 @@ function showError(msg) {
 // ===== INIT =====
 window.addEventListener('load', async () => {
   await initDashboard();    // carrega device, bombas, agendas, etc.
-  showTabFromQuery();       // ativa a aba certa baseada em ?tab=
+  showTabFromQuery();       
 });
