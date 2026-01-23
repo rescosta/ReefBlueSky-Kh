@@ -687,12 +687,12 @@ async function createSchedule() {
   });
 
   const data = {
-    active: true,
-    days_of_week: activeDays, // <-- nome e formato que o backend usa
-    doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10),
+    enabled: true, 
+    days_of_week: activeDays,
+    doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10) || 0,
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day: parseMl(document.getElementById('volumePerDay').value) || 0
+    volume_per_day_ml: parseMl(document.getElementById('volumePerDay').value) || 0 // <-- nome novo
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
@@ -703,13 +703,13 @@ async function createSchedule() {
     data
   );
 
-   if (result) {
+  if (result) {
     showSuccess('Agenda criada com sucesso!');
     closeAgendaModal();
     await loadAllSchedules(currentDevice.id);
   }
-
 }
+
 
 async function deleteSchedule(scheduleId) {
   if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
