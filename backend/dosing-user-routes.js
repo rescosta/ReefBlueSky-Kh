@@ -506,6 +506,12 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
       min_gap_minutes = 30
     } = req.body;
 
+    // ✅ valida e normaliza volume
+    const rawVolume = Number(volume_per_day);
+    if (!Number.isFinite(rawVolume) || rawVolume <= 0) {
+      return res.status(400).json({ error: 'Invalid volume_per_day' });
+    }
+
     conn = await pool.getConnection();
 
     // Verificar device
@@ -528,13 +534,12 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
 
     const pumpRow = pump[0];
 
-    // Montar dados para validação/ajuste
     const scheduleData = {
       pump_name: pumpRow.name,
       doses_per_day,
       start_time,
       end_time,
-      volume_per_day_ml: volume_per_day,
+      volume_per_day_ml: rawVolume,   // ✅ aqui usa rawVolume
       days_of_week,
       min_gap_minutes: parseInt(min_gap_minutes) || 30
     };
@@ -1055,7 +1060,6 @@ async function validateAndAdjustSchedule(conn, deviceId, scheduleData) {
           parsedTimes = tmp;
         }
       } catch (e) {
-        // se tiver lixo, ignora e recalcula
         parsedTimes = [];
       }
     }
@@ -1067,18 +1071,12 @@ async function validateAndAdjustSchedule(conn, deviceId, scheduleData) {
     });
   });
 
-  if (tryAdjustIntermediateTimes(existingEvents, adjustedTimes, minGap)) {
-    scheduleData.adjusted_times = adjustedTimes;
-    return scheduleData;
-  } else {
-    throw new Error(
-      `Impossível agendar sem intervalo ≥${minGap}min entre bombas. ` +
-      `Sugestões: reduza doses, expanda horário ou aumente intervalo.`
-    );
-  }
+  // só calcula, sem bloquear por conflito
+  tryAdjustIntermediateTimes(existingEvents, adjustedTimes, minGap);
+  scheduleData.adjusted_times = adjustedTimes;
+  return scheduleData;
 }
 
-//ok
 
 function calculateDoseTimes(schedule) {
     const startMin = parseTime(schedule.start_time);
