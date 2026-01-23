@@ -128,6 +128,13 @@ function getTopbarHtml() {
     <div class="topbar">
       <div class="topbar-left">
         <div class="logo">ReefBlueSky</div>
+
+          <!-- botão hambúrguer vem logo após o título -->
+
+          <button id="menuToggle" class="menu-toggle" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
+    
         <nav class="nav">
           <a href="dashboard" id="nav-main">Dashboard</a>
           <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
@@ -167,9 +174,6 @@ function getTopbarHtml() {
 
         <button id="logoutBtn" class="btn-small">Sair</button>
 
-        <button id="menuToggle" class="menu-toggle" aria-label="Menu">
-          <span></span><span></span><span></span>
-        </button>
       </div>
     </div>
   `;
