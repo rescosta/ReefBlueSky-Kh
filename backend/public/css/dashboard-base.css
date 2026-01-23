@@ -5,8 +5,29 @@
   gap: 16px;
 }
 
+.nav {
+  display: flex;
+  align-items: center;   /* alinha todos na mesma linha */
+  gap: 16px;
+  font-size: 14px;
+}
 
-/* item com dropdown se comporta como link */
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  opacity: 0.8;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.nav a.active {
+  opacity: 1;
+  border-color: #facc15;
+}
+
+/* Dosadora se comporta como um link normal */
 .topbar .nav > .nav-dropdown {
   position: relative;
   display: inline-flex;
@@ -15,17 +36,16 @@
   padding: 0 10px;
 }
 
-/* botão interno NÃO adiciona altura/padding extra */
+/* Botão interno sem altura/padding extra */
 .nav-dropbtn {
   background: transparent;
   border: none;
-  color: #f9fafb;
-  font-size: 14px;
-  padding: 0;             /* importante */
-  line-height: 1;         /* evita empurrar para baixo */
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   cursor: pointer;
 }
 
@@ -353,37 +373,32 @@ table {
   top: 100%;
   left: 0;
   min-width: 180px;
-  background: #020617;               /* fundo igual aos cards */
+  background: #020617;
   border: 1px solid #1f2937;
-  border-radius: 10px;                /* borda arredondada */
+  border-radius: 10px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.7);
   padding: 6px 0;
   z-index: 50;
-  display: none;                      /* começa escondido */
+  display: none;
 }
 
-/* Links internos */
 .nav-dropdown-content a {
   display: block;
   padding: 8px 14px;
   font-size: 13px;
   color: #e5e7eb;
-  text-decoration: none;
   white-space: nowrap;
 }
 
-/* Hover */
 .nav-dropdown-content a:hover {
   background: #111827;
   color: #f9fafb;
 }
 
-/* Mostrar o menu ao passar o mouse ou focar (desktop) */
 .nav-dropdown:hover .nav-dropdown-content,
 .nav-dropdown:focus-within .nav-dropdown-content {
   display: block;
 }
-
 
 
 /* ===== MOBILE (<=768px) ===== */
