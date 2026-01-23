@@ -51,6 +51,10 @@
 }
 
 
+.hidden {
+  display: none;
+}
+
 
 /* ===== RESET / BASE ===== */
 * {
