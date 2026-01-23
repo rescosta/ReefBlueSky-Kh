@@ -7,16 +7,17 @@
 
 .nav {
   display: flex;
-  align-items: center;   /* alinha todos na mesma linha */
-  gap: 16px;
+  align-items: center;   /* todos alinhados verticalmente */
+  gap: 10px;             /* diminui o espaçamento horizontal */
   font-size: 14px;
 }
 
+/* link normal (Principal, Gráficos, Configurações, Sistema, Dev, Minha conta) */
 .nav a {
   display: inline-flex;
   align-items: center;
-  height: 36px;
-  padding: 0 10px;
+  height: 32px;          /* um pouco menor que 36px para ficar mais “justo” */
+  padding: 0 8px;        /* aproxima os itens */
   opacity: 0.8;
   padding-bottom: 2px;
   border-bottom: 2px solid transparent;
@@ -27,16 +28,16 @@
   border-color: #facc15;
 }
 
-/* Dosadora se comporta como um link normal */
+/* Dosadora como link */
 .topbar .nav > .nav-dropdown {
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 36px;
-  padding: 0 10px;
+  height: 32px;          /* igual aos <a> */
+  padding: 0 8px;        /* igual aos <a> */
 }
 
-/* Botão interno sem altura/padding extra */
+/* botão interno só cuida do texto/setinha */
 .nav-dropbtn {
   background: transparent;
   border: none;
@@ -48,6 +49,7 @@
   align-items: center;
   cursor: pointer;
 }
+
 
 
 /* ===== RESET / BASE ===== */
