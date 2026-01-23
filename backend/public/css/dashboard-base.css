@@ -257,6 +257,48 @@ table {
   opacity: 0.9;
 }
 
+
+/* ===== DROPDOWN NAV (DOSADORA) ===== */
+.nav-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.nav-dropbtn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.nav-dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #ffffff;
+  min-width: 180px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+  z-index: 1000;
+}
+
+.nav-dropdown-content a {
+  display: block;
+  padding: 8px 12px;
+  text-decoration: none;
+  color: #333;
+}
+
+.nav-dropdown-content a:hover {
+  background-color: #f0f0f0;
+}
+
+/* abre no hover (desktop) */
+.nav-dropdown:hover .nav-dropdown-content {
+  display: block;
+}
+
+
 /* ===== MOBILE (<=768px) ===== */
 @media (max-width: 768px) {
   /* esconder menu textual e rótulos que ocupam espaço */
