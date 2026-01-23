@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="css/dashboard-base.css">
+  <title>Dosadora Balling - ReefBlueSky</title>
+
+  <style>
+    /* LAYOUT PRINCIPAL */
+    .content {
+      flex: 1;
+      padding: 12px 10px 16px;
+      display: grid;
+      grid-template-columns: 2fr 1.5fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 960px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .left-col,
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: #020617;
+      border-radius: 10px;
+      padding: 14px 16px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+    }
+
+    .card-subtitle {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    /* CARD STATUS */
+    .status-circles {
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }
+
+    .status-circle {
+      flex: 1;
+      text-align: center;
+    }
+
+    .status-label {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 6px;
+    }
+
+    .status-badge {
+      font-size: 22px;
+      font-weight: 600;
+      padding: 18px 0;
+      border-radius: 999px;
+      background: #022c22;
+      border: 1px solid #16a34a;
+      color: #bbf7d0;
+    }
+
+    .status-badge.off {
+      background: #111827;
+      border-color: #4b5563;
+      color: #9ca3af;
+    }
+
+    .status-badge.good {
+      background: #022c22;
+      border-color: #16a34a;
+      color: #bbf7d0;
+    }
+
+    .status-badge.warn {
+      background: #451a03;
+      border-color: #f59e0b;
+      color: #fed7aa;
+    }
+
+    .status-badge.bad {
+      background: #450a0a;
+      border-color: #ef4444;
+      color: #fecaca;
+    }
+
+    /* CARD MEDIÇÃO / PROGRESSO */
+    .measure-info {
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .measure-info span.label {
+      color: #9ca3af;
+    }
+
+    .measure-info span.value {
+      color: #e5e7eb;
+    }
+
+    .table-small {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .table-small th,
+    .table-small td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .table-small th {
+      text-align: left;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .table-small tbody tr:hover {
+      background: #030712;
+    }
+
+    .progress-wrapper {
+      font-size: 12px;
+    }
+
+    .progress-label {
+      margin-bottom: 4px;
+      color: #9ca3af;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #020617;
+      border: 1px solid #1f2937;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #eab308);
+      transition: width 0.3s linear;
+    }
+
+    /* PAGE HEADER / CONTAINER */
+    .page-header {
+      background: #020617;
+      color: #e5e7eb;
+      padding: 16px 24px;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .page-header h1 {
+      font-size: 26px;
+      margin-bottom: 5px;
+    }
+
+    .page-header p {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 10px 24px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .control-group,
+    #deviceInfo {
+      background: #020617;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+      color: #e5e7eb;
+    }
+
+    .control-group label {
+      color: #9ca3af;
+    }
+
+    .control-group select,
+    .control-group input {
+      background: #020617;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+    }
+
+    .device-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .device-status-dot.offline {
+      background: #ef4444;
+    }
+
+    .tab-content {
+      display: none;
+      background: #020617;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .info-box {
+      background: #020617;
+      border-left: 4px solid #16a085;
+      color: #e5e7eb;
+      padding: 10px 12px;
+      margin: 10px 0 16px;
+      font-size: 13px;
+    }
+
+    /* TABELAS / AGENDAS */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 12px;
+    }
+
+    th {
+      background: #020617;
+      color: #9ca3af;
+      border-bottom: 1px solid #1f2937;
+      padding: 6px;
+      text-align: center;
+    }
+
+    td {
+      border-bottom: 1px solid #111827;
+      padding: 8px;
+      text-align: center;
+    }
+
+    tr:hover {
+      background: #030712;
+    }
+
+    .btn-edit,
+    .btn-delete,
+    .btn-primary,
+    .btn-secondary {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 11px;
+      transition: all 0.3s;
+    }
+
+    .btn-edit,
+    .btn-primary {
+      background: #16a085;
+      color: white;
+    }
+
+    .btn-edit:hover,
+    .btn-primary:hover {
+      background: #138073;
+    }
+
+    .btn-delete,
+    .btn-secondary {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+    }
+
+    .btn-delete:hover,
+    .btn-secondary:hover {
+      background: #1f2937;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      color: #9ca3af;
+    }
+
+    .form-group input,
+    .form-group select {
+      background: #020617;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    /* MODAIS */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: #020617;
+      border: 1px solid #1f2937;
+      color: #e5e7eb;
+      padding: 20px 24px;
+      border-radius: 10px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-header h2 {
+      color: #e5e7eb;
+    }
+
+    .modal-header .close {
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .modal-header .close:hover {
+      color: #333;
+    }
+
+    .checkbox-group {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .checkbox-item input {
+      width: auto;
+      margin: 0;
+    }
+
+    .checkbox-item label {
+      margin: 0;
+      font-weight: normal;
+      font-size: 12px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    .btn-new-agenda {
+      background: #16a085;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      float: right;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .btn-new-agenda:hover {
+      background: #138073;
+    }
+
+    .clearfix::after {
+      content: '';
+      display: table;
+      clear: both;
+    }
+
+    .alert {
+      padding: 12px 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .alert-error {
+      background: #450a0a;
+      color: #fecaca;
+      border-left: 4px solid #ef4444;
+    }
+
+    .alert-success {
+      background: #022c22;
+      color: #bbf7d0;
+      border-left: 4px solid #16a34a;
+    }
+
+    .btn-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 52px;
+      line-height: 1;
+      margin: 0 auto;  
+    }
+
+    .btn-status.btn-on {
+      background: #dcfce7;
+      color: #166534;
+      border-color: #16a34a;
+    }
+
+    .btn-status.btn-off {
+      background: #fee2e2;
+      color: #991b1b;
+      border-color: #dc2626;
+    }
+
+    #configTab table th:nth-child(3),
+    #configTab table td:nth-child(3),
+    #agendaTab table th:nth-child(1),
+    #agendaTab table td:nth-child(1) {
+      width: 110px;
+      min-width: 110px;
+      text-align: center;
+    }
+
+    /* Config: coluna BOMBA mais estreita */
+    #configTab table th:nth-child(1),
+    #configTab table td:nth-child(1) {
+      width: 60px;      /* 50–60px funciona bem para “1”, “2”, etc. */
+      min-width: 60px;
+    }
+
+
+    /* centralizar o botão dentro da célula */
+    #configTab table td:nth-child(3) .btn-status,
+    #agendaTab table td:nth-child(1) .btn-status {
+      margin: 0 auto;
+    }
+
+
+    .dashboard-header,
+    .dashboard-row {
+      display: grid;
+      /* Bomba | Nome | Status | % Reservatório | Vol. agendado */
+      grid-template-columns: 50px 50px 70px 3.1fr 1.4fr;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+
+    .dashboard-header {
+      color: #9ca3af;
+      border-bottom: 1px solid #1f2937;
+      font-weight: 500;
+    }
+
+    .dashboard-row {
+      font-size: 13px;
+    }
+
+    .dashboard-header > div:nth-child(1),
+    .dashboard-row   > div:nth-child(1),
+    .dashboard-header > div:nth-child(2),
+    .dashboard-row   > div:nth-child(2),
+    .dashboard-header > div:nth-child(5),
+    .dashboard-row   > div:nth-child(5) {
+      text-align: center;
+    }
+
+    .dashboard-reservoir {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .dashboard-reservoir-bar {
+      width: 100%;
+      height: 8px;
+      background: #020617;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      overflow: hidden;
+    }
+
+    .dashboard-reservoir-fill {
+      height: 100%;
+      background: #10b981;
+    }
+
+    .dashboard-reservoir-text {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    /* CARD PADRÃO DA DOSADORA (todas as abas) */
+    .dosing-card {
+      max-width: 900px;   /* mesma largura em todas as abas */
+      width: 100%;        /* sempre ocupar 100% até 900px */
+      margin: 0 auto;
+      background: #020617;
+      border-radius: 10px;
+      padding: 20px 24px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+      overflow-x: auto;   /* se algo passar, cria scroll interno */
+    }
+
+
+    .tab-content {
+      display: none;
+      background: transparent;         
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Config: alinhar colunas */
+    #configTab table th:nth-child(1),
+    #configTab table td:nth-child(1),
+    #configTab table th:nth-child(3),
+    #configTab table td:nth-child(3),
+    #configTab table th:nth-child(4),
+    #configTab table td:nth-child(4),
+    #configTab table th:nth-child(5),
+    #configTab table td:nth-child(5),
+    #configTab table th:nth-child(6),
+    #configTab table td:nth-child(6) {
+      text-align: center;
+    }
+
+    /* Agenda: nome da bomba alinhado à esquerda */
+    #agendaTab table th:nth-child(2),
+    #agendaTab table td:nth-child(2) {
+      text-align: left;
+    }
+
+    /* Deixar as tabelas mais previsíveis em largura */
+    #agendaTab table,
+    #configTab table {
+      table-layout: fixed;
+    }
+    #agendaTab th, #agendaTab td,
+    #configTab th, #configTab td {
+      word-wrap: break-word;
+    }
+
+
+    /* Em telas menores, usar 100% */
+    @media (max-width: 960px) {
+      .dosing-card {
+        max-width: 100%;
+        padding: 16px 12px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      #agendaTab table,
+      #configTab table {
+        font-size: 11px;
+      }
+
+      .btn-status {
+        padding: 3px 10px;
+        min-width: 70px;
+        font-size: 11px;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div id="topbar-root"></div>
+
+  <!-- painel lateral -->
+  <div id="sideMenu" class="side-menu">
+    <button id="closeMenu" class="side-close">×</button>
+    <a href="dashboard-main.html">Principal</a>
+    <a href="dashboard-graficos.html">Gráficos</a>
+    <a href="dashboard-config.html">Configurações</a>
+    <a href="dashboard-sistema.html">Sistema</a>
+    <a href="dashboard-dosing.html">Dosadora</a>
+    <a href="dashboard-logs.html">Dev</a>
+    <a href="dashboard-account.html">Minha Conta</a>
+    <a href="#" id="menuLogout">Sair</a>
+  </div>
+
+  <div class="container">
+    <!-- Alert Box -->
+    <div id="alertBox"></div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="control-group" id="deviceInfo">
+        Carregando...
+      </div>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="dosing-card">
+        <div id="dashboardPumpsCharts"></div>
+      </div>
+    </div>
+
+
+    <!-- Agenda Tab -->
+    <div id="agendaTab" class="tab-content">
+      <div class="dosing-card">
+        <div class="clearfix">
+          <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
+        </div>
+        <h2 class="section-title">Agendas</h2>
+        <div id="agendaWarning"></div>
+        <div class="info-box">
+          📅 Define os horários e frequência de dosagem
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>STATUS</th>
+              <th>BOMBA</th>
+              <th>DIAS DA SEMANA</th>
+              <th>DOSES/DIA</th>
+              <th>JANELA HORÁRIA</th>
+              <th>VOL. DIÁRIO (ML)</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTableBody">
+            <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Manual Tab -->
+    <div id="manualTab" class="tab-content">
+      <div class="dosing-card">
+        <h2 class="section-title">Dose Manual</h2>
+        <div class="info-box">
+          💧 Aplicar uma dose manual imediatamente.
+        </div>
+        <div class="form-group">
+          <label for="pumpSelectManual">Selecionar Bomba:</label>
+          <select id="pumpSelectManual"></select>
+        </div>
+        <div class="form-group">
+          <label for="manualVolume">Volume (ml):</label>
+          <input type="number" id="manualVolume" min="0" value="0">
+        </div>
+        <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
+      </div>
+    </div>
+
+    <!-- Config Tab -->
+    <div id="configTab" class="tab-content">
+      <div class="dosing-card">
+        <h2 class="section-title">Configurar Bombas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>BOMBA</th>
+              <th>NOME</th>
+              <th>STATUS</th>
+              <th>VOL. RECIPIENTE (ML)</th>
+              <th>VOL. ATUAL (ML)</th>
+              <th>ALARME %</th>
+            </tr>
+          </thead>
+          <tbody id="configTableBody">
+            <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Calibration Tab -->
+    <div id="calibrationTab" class="tab-content">
+      <div class="dosing-card">
+        <h2 class="section-title">Calibração</h2>
+        <div class="info-box">
+          ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
+        </div>
+        <div class="form-group">
+          <label for="pumpSelectCalibration">Selecionar Bomba:</label>
+          <select id="pumpSelectCalibration"></select>
+        </div>
+        <h3 style="margin-top: 20px;">Procedimento:</h3>
+        <ol class="help-text" style="margin-left: 20px; line-height: 1.6;">
+          <li>Coloque um recipiente graduado sob a bomba</li>
+          <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
+          <li>Após 60 segundos, meça o volume dispensado</li>
+          <li>Digite o volume medido e clique "Salvar Taxa"</li>
+        </ol>
+        <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
+        <div class="form-group" style="margin-top: 20px;">
+          <label for="measuredVolume">Volume Medido (ml):</label>
+          <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10,5">
+        </div>
+        <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
+
+        <div class="form-group" style="margin-top: 8px;">
+          <label style="display:block;" class="help-text">
+            Taxa de dosagem da bomba:
+          </label>
+          <div id="calibrationRateLabel" style="margin-top:4px;">
+            Taxa atual desta bomba: -- ml/s
+          </div>
+          <div style="margin-top:24px;">
+            <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
+            <div id="allPumpsRateList">
+              Carregando taxas...
+            </div>
+          </div>
+          <small class="small-text">
+            Usada nas doses manuais e nas agendas automáticas.
+          </small>
+        </div>
+      </div>  
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Editar Configuração</h2>
+        <span class="close" onclick="closeEditModal()">×</span>
+      </div>
+      <input type="hidden" id="editPumpIndex">
+      <div class="form-group">
+        <label for="editName">Nome da Bomba:</label>
+        <input type="text" id="editName">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editContainerSize">Recipiente (ml):</label>
+          <input type="number" id="editContainerSize" min="0">
+        </div>
+        <div class="form-group">
+          <label for="editCurrentVolume">Volume Atual (ml):</label>
+          <input type="number" id="editCurrentVolume" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editAlarmPercent">Alarme (%):</label>
+          <input type="number" id="editAlarmPercent" min="0" max="100">
+        </div>
+      </div>
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
+        <button class="btn-primary" onclick="saveEditModal()">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agenda Modal -->
+  <div id="agendaModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Nova Agenda</h2>
+        <span class="close" onclick="closeAgendaModal()">×</span>
+      </div>
+      <div class="form-group">
+        <label>Intervalo mín. entre bombas:</label>
+        <input type="number" id="minGapMinutes" min="5" max="120" value="30" style="width:80px;">
+        <small class="small-text">minutos (padrão 30)</small>
+      </div>
+      <div class="form-group">
+        <label for="pumpSelectAgenda">Selecionar Bomba:</label>
+        <select id="pumpSelectAgenda"></select>
+      </div>
+      <div class="form-group">
+        <label>Dias da Semana:</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Dom</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Seg</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Ter</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Qua</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Qui</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Sex</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Sab</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dosesPerDay">Doses por Dia:</label>
+          <input type="number" id="dosesPerDay" min="1" value="2">
+        </div>
+        <div class="form-group">
+          <label for="volumePerDay">Volume Diário (ml):</label>
+          <input type="number" id="volumePerDay" min="0" value="36">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="startTime">Horário Inicial:</label>
+          <input type="time" id="startTime" value="08:00">
+        </div>
+        <div class="form-group">
+          <label for="endTime">Horário Final:</label>
+          <input type="time" id="endTime" value="20:00">
+        </div>
+      </div>
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeAgendaModal()">Cancelar</button>
+        <button class="btn-primary" onclick="createSchedule()">+ Criar Agenda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Schedule Modal -->
+  <div id="editScheduleModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Editar Agenda</h2>
+        <span class="close" onclick="closeEditScheduleModal()">×</span>
+      </div>
+      <div class="form-group">
+        <label>Bomba:</label>
+        <div id="editPumpName" style="font-weight:600; margin-top:4px;">--</div>
+        <input type="hidden" id="editPumpIndex">
+      </div>
+      <div class="form-group">
+        <label>Dias da Semana:</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="0"> <label>Dom</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="1"> <label>Seg</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="2"> <label>Ter</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="3"> <label>Qua</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="4"> <label>Qui</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="5"> <label>Sex</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="edit-day-checkbox" data-day="6"> <label>Sab</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editDosesPerDay">Doses por Dia:</label>
+          <input type="number" id="editDosesPerDay" min="1" value="2">
+        </div>
+        <div class="form-group">
+          <label for="editVolumePerDay">Volume Diário (ml):</label>
+          <input type="number" id="editVolumePerDay" min="0" step="0.1" value="36">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editStartTime">Horário Inicial:</label>
+          <input type="time" id="editStartTime" value="08:00">
+        </div>
+        <div class="form-group">
+          <label for="editEndTime">Horário Final:</label>
+          <input type="time" id="editEndTime" value="20:00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="editMinGapMinutes">Intervalo mín. entre bombas:</label>
+        <input type="number" id="editMinGapMinutes" min="5" max="120" value="30" style="width:80px;">
+        <small class="small-text">minutos (padrão 30)</small>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeEditScheduleModal()">Cancelar</button>
+        <button class="btn-primary" onclick="saveEditScheduleModal()">💾 Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="calibrationOverlay" class="modal">
+    <div class="modal-content" style="max-width:420px; padding:20px;">
+      <h2>Calibração em andamento</h2>
+      <p id="calibrationCountdownText" class="help-text" style="margin-top:10px;">
+        Restam 60 segundos...
+      </p>
+
+      <div style="margin-top:12px; margin-bottom:16px;">
+        <div class="small-text" style="margin-bottom:4px;">
+          Progresso
+        </div>
+        <div class="progress-bar">
+          <div id="calibrationProgressFill" class="progress-fill"></div>
+        </div>
+      </div>
+
+      <button class="btn-secondary" id="abortCalibrationBtn" onclick="abortCalibration()">
+        ✖ Abortar teste
+      </button>
+    </div>
+  </div>
+
+  <div id="footer-root"></div>
+
+  <!-- Scripts -->
+  <script src="js/dashboard-common.js"></script>
+  <script src="js/dashboard-dosing.js"></script>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      if (window.DashboardCommon) {
+        DashboardCommon.initTopbar();
+      }
+    });
+  </script>
+</body>
+</html>
