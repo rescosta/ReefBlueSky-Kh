@@ -526,14 +526,14 @@ async function saveEditScheduleModal() {
     });
 
     const data = {
-      enabled: editingScheduleData.enabled,
+      enabled: true, 
       days_of_week: activeDays,
-      doses_per_day: parseInt(document.getElementById('editDosesPerDay').value) || 0,
-      start_time: document.getElementById('editStartTime').value,
-      end_time: document.getElementById('editEndTime').value,
-      volume_per_day_ml: parseMl(document.getElementById('editVolumePerDay').value) || 0,
-      min_gap_minutes: parseInt(document.getElementById('editMinGapMinutes').value) || 30
+      doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10) || 0,
+      start_time: document.getElementById('startTime').value,
+      end_time: document.getElementById('endTime').value,
+      volume_per_day: parseMl(document.getElementById('volumePerDay').value) || 0
     };
+
 
     console.log('PUT data =>', data);
 
