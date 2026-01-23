@@ -133,7 +133,16 @@ function getTopbarHtml() {
             <a href="dashboard-graficos.html" id="nav-graficos">Gráficos</a>
             <a href="dashboard-config.html" id="nav-config">Configurações</a>
             <a href="dashboard-sistema.html" id="nav-sistema">Sistema</a>
-            <a href="dashboard-dosing.html" id="nav-dosing">Dosadora</a>
+            <div class="nav-dropdown">
+              <button type="button" class="nav-dropbtn">Dosadora ▾</button>
+              <div class="nav-dropdown-content">
+                <a href="dashboard-dosing.html?tab=dashboard">Dashboard</a>
+                <a href="dashboard-dosing.html?tab=agenda">Agenda</a>
+                <a href="dashboard-dosing.html?tab=manual">Manual</a>
+                <a href="dashboard-dosing.html?tab=config">Config</a>
+                <a href="dashboard-dosing.html?tab=calibration">Calibrar</a>
+              </div>
+            </div>            
             <a href="dashboard-logs.html" id="nav-dev" style="display:none;">Dev</a>
             <a href="dashboard-account.html" id="menu-account">Minha conta</a>
           </nav>
