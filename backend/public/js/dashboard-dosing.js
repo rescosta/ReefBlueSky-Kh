@@ -575,6 +575,7 @@ async function loadAllSchedules(deviceId) {
     schedules = [];
   }
   renderScheduleTableAll();
+  renderDashboard();  
 }
 
 function getDailyVolumeForPump(index) {
