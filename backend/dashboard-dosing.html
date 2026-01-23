@@ -261,8 +261,9 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 16px;
-      font-size: 12px;
+      font-size: 13px;
     }
+
 
     th {
       background: #020617;
@@ -500,6 +501,20 @@
       min-width: 60px;
     }
 
+    /* Config: larguras aproximadas ao layout da dashboard */
+    #configTab table th:nth-child(2),
+    #configTab table td:nth-child(2) {   /* NOME */
+      width: 80px;
+      min-width: 80px;
+      text-align: left;                  /* para ficar mais próximo da dashboard */
+    }
+
+    #configTab table th:nth-child(3),
+    #configTab table td:nth-child(3) {   /* STATUS */
+      width: 90px;                       /* em vez de 110px */
+      min-width: 90px;
+    }
+
 
     /* centralizar o botão dentro da célula */
     #configTab table td:nth-child(3) .btn-status,
@@ -618,6 +633,61 @@
     #agendaTab th, #agendaTab td,
     #configTab th, #configTab td {
       word-wrap: break-word;
+    }
+
+    /* Deixar a tabela da Config um pouco mais estreita dentro do card */
+    #configTab table {
+      width: auto;           /* encolhe até o conteúdo */
+      max-width: 100%;       /* não passa do card */
+      margin: 16px auto 0;   /* centraliza dentro da dosing-card */
+    }
+
+
+    /* Agenda: deixar tabela mais compacta e alinhada à dashboard */
+    #agendaTab table {
+      width: auto;          /* encolhe até o conteúdo */
+      max-width: 100%;      /* não passa do card */
+      margin: 16px auto 0;  /* centraliza dentro da dosing-card */
+      font-size: 13px;      /* mesmo corpo da dashboard */
+    }
+
+    /* Colunas mais próximas do layout da dashboard */
+    #agendaTab table th:nth-child(1),   /* STATUS */
+    #agendaTab table td:nth-child(1) {
+      width: 90px;
+      min-width: 90px;
+    }
+
+    #agendaTab table th:nth-child(2),   /* BOMBA */
+    #agendaTab table td:nth-child(2) {
+      width: 60px;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    #agendaTab table th:nth-child(3),   /* DIAS DA SEMANA */
+    #agendaTab table td:nth-child(3) {
+      width: 180px;
+      min-width: 180px;
+      text-align: left;
+    }
+
+    #agendaTab table th:nth-child(4),   /* DOSES/DIA */
+    #agendaTab table td:nth-child(4) {
+      width: 80px;
+      min-width: 80px;
+    }
+
+    #agendaTab table th:nth-child(5),   /* JANELA HORÁRIA */
+    #agendaTab table td:nth-child(5) {
+      width: 130px;
+      min-width: 130px;
+    }
+
+    #agendaTab table th:nth-child(6),   /* VOL. DIÁRIO */
+    #agendaTab table td:nth-child(6) {
+      width: 110px;
+      min-width: 110px;
     }
 
 
