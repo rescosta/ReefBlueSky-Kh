@@ -16,16 +16,19 @@ REPO_BASE="https://raw.githubusercontent.com/rescosta/ReefBlueSky-Kh/main/backen
 BACKUP_DIR="backups_backend"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# HTML na raiz de backend (conforme pasta do Git)
+
+# JS dentro de backend (conforme pasta js do Git)
 FILES_JS=(
+  "alerts-helpers.js"
   "db-pool.js"
   "display-endpoints.js"
   "dosing-device-routes.js"
   "dosing-iot-routes.js"
   "dosing-user-routes.js"
   "server.js"
-  "user-timezone.js"
   "iot-ota.js"
+  "user-timezone.js"
+
 )
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
@@ -34,7 +37,6 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 
 mkdir -p "${BACKUP_DIR}/${TIMESTAMP}"
-mkdir -p "backend"
 
 echo -e "${YELLOW}[INFO]${NC} Fazendo backup atual em ${BACKUP_DIR}/${TIMESTAMP}"
 
@@ -68,3 +70,4 @@ echo -e "${BLUE}[INFO]${NC} Conteúdo final de backend/:"
 ls -Rlh backend
 echo ""
 echo -e "${GREEN}[✓]${NC} Sync da pasta backend concluído. Backups em: ${BACKUP_DIR}/${TIMESTAMP}"
+
