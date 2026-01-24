@@ -141,20 +141,23 @@ router.post('/v1/iot/dosing/handshake', async (req, res) => {
     );
     const deviceId = devResult.insertId;
 
-    // cria 5 bombas P01..P05
+    // cria 6 bombas padrão
     const pumps = [];
-    for (let i = 0; i < 5; i++) {
+    const pumpNames = ['KH', 'Cálcio', 'Magnésio', 'Iodo', 'Reserva 1', 'Reserva 2'];
+
+    for (let i = 0; i < 6; i++) {
       pumps.push([
         deviceId,
-        `P0${i + 1}`,
-        i,
-        500,
-        500,
-        10,
-        1.0,
-        100
+        pumpNames[i],
+        i,      // index_on_device 0..5
+        500,    // container_volume_ml
+        500,    // current_volume_ml
+        10,     // alarm_threshold_pct
+        1.0,    // calibration_rate_ml_s
+        100     // max_daily_ml
       ]);
     }
+
 
     await conn.batch(
       `INSERT INTO dosing_pumps
@@ -311,38 +314,54 @@ router.post('/v1/iot/dosing/status', async (req, res) => {
     if (conn) conn.release();
   }
 });
-
 // POST /v1/iot/dosing/execution
 // ESP reporta execução de dose
 router.post('/v1/iot/dosing/execution', async (req, res) => {
   let conn;
   try {
-    const { esp_uid, pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code } = req.body;
+    const {
+      esp_uid,
+      pump_id,
+      scheduled_at,  // epoch em segundos
+      executed_at,   // epoch em segundos (ou null)
+      volume_ml,
+      status,
+      origin,
+      error_code
+    } = req.body;
 
     if (!esp_uid || !pump_id) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
     conn = await pool.getConnection();
-    
+
     const device = await verifyIoTToken(esp_uid);
     if (!device) {
       return res.status(404).json({ success: false, error: 'Device not found' });
     }
 
-    // Registrar execução
+    const schedEpoch    = Number.isFinite(scheduled_at) ? scheduled_at : null;
+    const executedEpoch = Number.isFinite(executed_at)  ? executed_at  : null;
+
+    // Registrar execução (epoch direto → FROM_UNIXTIME)
     await conn.query(
       `INSERT INTO dosing_executions 
-        (pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
-       VALUES (?, FROM_UNIXTIME(?), FROM_UNIXTIME(?), ?, ?, ?, ?)`,
+         (pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
+       VALUES (
+         ?, 
+         ${schedEpoch    != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
+         ${executedEpoch != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
+         ?, ?, ?, ?
+       )`,
       [
         pump_id,
-        Math.floor(new Date(scheduled_at).getTime() / 1000),
-        executed_at ? Math.floor(new Date(executed_at).getTime() / 1000) : null,
+        ...(schedEpoch    != null ? [schedEpoch]    : []),
+        ...(executedEpoch != null ? [executedEpoch] : []),
         volume_ml,
         status,
         origin,
-        error_code
+        error_code || null
       ]
     );
 
@@ -381,6 +400,7 @@ router.post('/v1/iot/dosing/execution', async (req, res) => {
     if (conn) conn.release();
   }
 });
+
 
 
 module.exports = router;
