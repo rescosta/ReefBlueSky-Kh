@@ -1150,4 +1150,121 @@ function convertDaysArrayToMask(days) {
     return mask;
 }
 
+/*
+// GET /api/v1/user/dosing/devices/:deviceId/alarm-check
+router.get('/devices/:deviceId/alarm-check', async (req, res) => {
+  const { deviceId } = req.params;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    const [pumps] = await conn.query(
+      `SELECT id, name, container_volume_ml, current_volume_ml,
+              alarm_threshold_pct, low_level_alarm_active
+         FROM dosing_pumps
+        WHERE device_id = ?`,
+      [deviceId]
+    );
+
+    const triggered = [];
+
+    for (const p of pumps) {
+      const total = p.container_volume_ml || 0;
+      const current = p.current_volume_ml || 0;
+      const thr = p.alarm_threshold_pct || 0;
+
+      if (total <= 0 || thr <= 0) continue;
+
+      const limit = total * (thr / 100);
+      const isLow = current <= limit;
+
+      if (isLow && !p.low_level_alarm_active) {
+        await fireReservoirAlarm(deviceId, p); // email + Telegram
+        await conn.query(
+          'UPDATE dosing_pumps SET low_level_alarm_active = 1 WHERE id = ?',
+          [p.id]
+        );
+        triggered.push({
+          pump_id: p.id,
+          name: p.name,
+          current_volume_ml: current,
+          container_volume_ml: total,
+          alarm_threshold_pct: thr
+        });
+      }
+
+      if (!isLow && p.low_level_alarm_active) {
+        await conn.query(
+          'UPDATE dosing_pumps SET low_level_alarm_active = 0 WHERE id = ?',
+          [p.id]
+        );
+      }
+    }
+
+    res.json({
+      ok: true,
+      device_id: deviceId,
+      triggered_alarms: triggered
+    });
+  } catch (err) {
+    console.error('Alarm check error:', err);
+    res.status(500).json({
+      ok: false,
+      error: 'Erro ao checar alarmes de reservatório'
+    });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
+async function checkAndFireReservoirAlarms(conn, deviceId) {
+  const [pumps] = await conn.query(
+    `SELECT id, name, container_volume_ml, current_volume_ml, alarm_threshold_pct, low_level_alarm_active
+       FROM dosing_pumps
+      WHERE device_id = ?`,
+    [deviceId]
+  );
+
+  for (const p of pumps) {
+    const total = p.container_volume_ml || 0;
+    const current = p.current_volume_ml || 0;
+    const thr = p.alarm_threshold_pct || 0;
+
+    if (total <= 0 || thr <= 0) continue;
+
+    const limit = total * (thr / 100);
+    const isLow = current <= limit;
+
+    if (isLow && !p.low_level_alarm_active) {
+      await fireReservoirAlarm(deviceId, p);      // email + Telegram
+      await conn.query(
+        'UPDATE dosing_pumps SET low_level_alarm_active = 1 WHERE id = ?',
+        [p.id]
+      );
+    }
+
+    if (!isLow && p.low_level_alarm_active) {
+      await conn.query(
+        'UPDATE dosing_pumps SET low_level_alarm_active = 0 WHERE id = ?',
+        [p.id]
+      );
+    }
+  }
+}
+
+async function fireReservoirAlarm(deviceId, pump) {
+  const subject = `RBS – Reservatório baixo na bomba ${pump.name || pump.id}`;
+  const message =
+    `Device ${deviceId} – bomba ${pump.name || pump.id}\n` +
+    `Volume atual: ${pump.current_volume_ml} ml\n` +
+    `Capacidade: ${pump.container_volume_ml} ml\n` +
+    `Alarme em: ${pump.alarm_threshold_pct}%`;
+
+  await sendEmailToUser(deviceId, subject, message);
+  await sendTelegramToUser(deviceId, message);
+}
+*/
+
 module.exports = router;

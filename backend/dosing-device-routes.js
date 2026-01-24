@@ -51,7 +51,8 @@ router.get('/commands', async (req, res) => {
   if (commands.length) {
     await conn.query(
       `UPDATE device_commands
-         SET status = 'processed'
+         SET status = 'done',
+             processed = 1
        WHERE deviceId = ? AND status = 'pending'`,
       [esp_uid]
     );

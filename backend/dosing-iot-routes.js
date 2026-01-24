@@ -1,3 +1,11 @@
+
+//dosing-iot-routes.js
+
+const { mailTransporter, ALERT_FROM, sendTelegramForUser } =
+  require('./alerts-helpers');
+
+
+
 // dosing-iot-routes.js
 const express = require('express');
 const router = express.Router();
@@ -54,7 +62,7 @@ async function updateDosingDeviceStatus(deviceId, online, lastIp = null) {
 }
 
 // ===== HELPER: Enviar notificações de alerta =====
-/*async function notifyDosingAlert(userId, alertType, message) {
+async function notifyDosingAlert(userId, alertType, message) {
   // Email
   try {
     const userRes = await pool.query(
@@ -66,21 +74,25 @@ async function updateDosingDeviceStatus(deviceId, online, lastIp = null) {
         from: ALERT_FROM,
         to: userRes[0].email,
         subject: `[ReefBlueSky Dosadora] Alerta: ${alertType}`,
-        html: `<p>${message}</p><p><a href="https://${process.env.DOMAIN}/dashboard?module=dosing">Ver detalhes</a></p>`,
+        text: message,
       });
     }
   } catch (err) {
     console.error('Error sending dosing alert email:', err);
   }
 
-  // Telegram (se configurado)
+  // Telegram
   try {
-    await sendTelegramForUser(userId, `🚨 *Dosadora* - ${alertType}\n${message}`);
+    await sendTelegramForUser(
+      userId,
+      `🚨 *Dosadora* - ${alertType}\n${message}`
+    );
   } catch (err) {
     console.error('Error sending Telegram dosing alert:', err);
   }
 }
-*/
+
+
 
 
 // ============================================
@@ -265,19 +277,27 @@ router.post('/v1/iot/dosing/status', async (req, res) => {
             const recent = await conn.query(
               `SELECT id FROM dosing_alerts 
                WHERE pump_id = ? AND type = 'CONTAINER_LOW' AND resolved_at IS NULL
-               AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR) LIMIT 1`,
+               AND created_at > DATE_SUB(NOW(), INTERVAL 4 HOUR) LIMIT 1`,
               [p.id]
             );
             if (!recent || recent.length === 0) {
+              const msg = `Bomba ${p.name}: nível do recipiente abaixo de ${pump[0].alarm_threshold_pct}%`;
+
               await logDosingAlert(
                 pump[0].user_id,
                 device.id,
                 p.id,
                 'CONTAINER_LOW',
-                `Bomba ${p.name}: nível do recipiente abaixo de ${pump[0].alarm_threshold_pct}%`
+                msg
               );
-              /*await notifyDosingAlert(pump[0].user_id, 'Container Low', `Bomba ${p.name} está com pouco volume.`);*/
+
+              await notifyDosingAlert(
+                pump[0].user_id,
+                'Container Low',
+                msg
+              );
             }
+
           }
         }
       }
@@ -315,10 +335,26 @@ router.post('/v1/iot/dosing/execution', async (req, res) => {
       `INSERT INTO dosing_executions 
         (pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
        VALUES (?, FROM_UNIXTIME(?), FROM_UNIXTIME(?), ?, ?, ?, ?)`,
-      [pump_id, Math.floor(new Date(scheduled_at).getTime() / 1000), 
-       executed_at ? Math.floor(new Date(executed_at).getTime() / 1000) : null,
-       volume_ml, status, origin, error_code]
+      [
+        pump_id,
+        Math.floor(new Date(scheduled_at).getTime() / 1000),
+        executed_at ? Math.floor(new Date(executed_at).getTime() / 1000) : null,
+        volume_ml,
+        status,
+        origin,
+        error_code
+      ]
     );
+
+    // Se executou com sucesso, descontar do reservatório
+    if (status === 'OK') {
+      await conn.query(
+        `UPDATE dosing_pumps
+            SET current_volume_ml = GREATEST(0, current_volume_ml - ?)
+          WHERE id = ?`,
+        [volume_ml, pump_id]
+      );
+    }
 
     // Se falhou, log de erro
     if (status === 'FAILED') {
@@ -345,5 +381,6 @@ router.post('/v1/iot/dosing/execution', async (req, res) => {
     if (conn) conn.release();
   }
 });
+
 
 module.exports = router;
