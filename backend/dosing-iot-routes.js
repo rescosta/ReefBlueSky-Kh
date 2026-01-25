@@ -318,7 +318,7 @@ router.post('/v1/iot/dosing/status', async (req, res) => {
 
 // POST /v1/iot/dosing/commands
 // ESP busca comandos pendentes (fila device_commands, device_id = esp_uid)
-router.post('/v1/iot/dosing/commands', async (req, res) => {
+router.post('/iot/dosing/commands', async (req, res) => {
   let conn;
   try {
     const body = req.body || {};
@@ -398,7 +398,7 @@ router.post('/v1/iot/dosing/commands', async (req, res) => {
 
 // POST /v1/iot/dosing/commands/complete
 // ESP confirma conclusão de um comando
-router.post('/v1/iot/dosing/commands/complete', async (req, res) => {
+router.post('/iot/dosing/commands/complete', async (req, res) => {
   let conn;
   try {
     const body = req.body || {};
