@@ -101,7 +101,7 @@ async function notifyDosingAlert(userId, alertType, message) {
 
 // POST /v1/iot/dosing/handshake
 // ESP contacta servidor pela primeira vez
-router.post('/v1/iot/dosing/handshake', async (req, res) => {
+router.post('/handshake', async (req, res) => {
   let conn;
   try {
     const body = req.body || {};
@@ -230,7 +230,7 @@ router.post('/v1/iot/dosing/handshake', async (req, res) => {
 
 // POST /v1/iot/dosing/status
 // ESP reporta status
-router.post('/v1/iot/dosing/status', async (req, res) => {
+router.post('/status', async (req, res) => {
   let conn;
   try {
     const body = req.body || {};
