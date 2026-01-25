@@ -144,9 +144,10 @@ router.put('/devices/:id', async (req, res) => {
 
         // Verificar propriedade
         const dev = await conn.query(
-            `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
-            [id, userId]
+          `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
+          [id, userId]
         );
+
 
         if (!dev || dev.length === 0) {
             return res.status(404).json({ error: 'Device not found' });
@@ -390,11 +391,12 @@ router.put('/devices/:deviceId/pumps/:pumpIndex', async (req, res) => {
 
     conn = await pool.getConnection();
 
-    // Verificar device
+    // Verificar device e pegar esp_uid
     const dev = await conn.query(
       `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
       [deviceId, userId]
     );
+
     if (!dev || dev.length === 0) {
       return res.status(404).json({ error: 'Device not found' });
     }
@@ -766,15 +768,18 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/manual', async (req, res) => {
 
         conn = await pool.getConnection();
 
-        // Verificar device
+       // Verificar device e pegar esp_uid
         const dev = await conn.query(
-            `SELECT id FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
-            [deviceId, userId]
+          `SELECT id, esp_uid FROM dosing_devices WHERE id = ? AND user_id = ? LIMIT 1`,
+          [deviceId, userId]
         );
 
         if (!dev || dev.length === 0) {
-            return res.status(404).json({ error: 'Device not found' });
+          return res.status(404).json({ error: 'Device not found' });
         }
+
+        const espUid = dev[0].esp_uid;
+
 
         // Buscar pump
         const pump = await conn.query(
@@ -788,20 +793,41 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/manual', async (req, res) => {
 
         // Criar execução pendente
         const exec = await conn.query(
-            `INSERT INTO dosing_executions
-            (pump_id, scheduled_at, volume_ml, status, origin)
-            VALUES (?, NOW(), ?, 'PENDING', 'MANUAL')`,
-            [pump[0].id, volume]
+          `INSERT INTO dosing_executions
+           (pump_id, scheduled_at, volume_ml, status, origin)
+           VALUES (?, NOW(), ?, 'PENDING', 'MANUAL')`,
+          [pump[0].id, volume]
+        );
+
+        const executionId = exec.insertId;
+
+        const payload = {
+          pump_id: pump[0].id,
+          pump_index: Number(pumpIndex),
+          volume_ml: Number(volume),
+          execution_id: executionId,
+          origin: 'MANUAL'
+        };
+
+        await conn.query(
+          `INSERT INTO devicecommands (deviceId, type, payload, status)
+           VALUES (?, ?, ?, 'pending')`,
+          [
+            espUid,
+            'MANUAL_DOSE',
+            JSON.stringify(payload)
+          ]
         );
 
         res.json({
-            data: {
-                id: exec.insertId,
-                pump_name: pump[0].name,
-                volume,
-                status: 'PENDING'
-            }
+          data: {
+            id: executionId,
+            pump_name: pump[0].name,
+            volume,
+            status: 'PENDING'
+          }
         });
+
     } catch (err) {
         console.error('Error creating manual dose:', err);
         res.status(500).json({ error: 'Database error' });
@@ -958,7 +984,7 @@ router.post('/pumps/:id/calibrate/abort', async (req, res) => {
 
     // Enfileira comando de abortar calibração
     await conn.query(
-      `INSERT INTO device_commands (deviceId, type, payload, status)
+      `INSERT INTO devicecommands (deviceId, type, payload, status)
        VALUES (?, ?, ?, 'pending')`,
       [
         pump.esp_uid,
@@ -966,6 +992,7 @@ router.post('/pumps/:id/calibrate/abort', async (req, res) => {
         JSON.stringify({ pump_id: pump.id })
       ]
     );
+
 
     res.json({ success: true });
   } catch (err) {
@@ -1010,7 +1037,7 @@ router.post('/pumps/:id/manual/abort', async (req, res) => {
 
     // Enfileira comando para o firmware parar dose manual
     await conn.query(
-      `INSERT INTO device_commands (deviceId, type, payload, status)
+      `INSERT INTO devicecommands (deviceId, type, payload, status)
        VALUES (?, ?, ?, 'pending')`,
       [
         pump.esp_uid,
@@ -1018,6 +1045,7 @@ router.post('/pumps/:id/manual/abort', async (req, res) => {
         JSON.stringify({ pump_id: pump.id })
       ]
     );
+
 
     res.json({ success: true });
   } catch (err) {
@@ -1150,121 +1178,5 @@ function convertDaysArrayToMask(days) {
     return mask;
 }
 
-/*
-// GET /api/v1/user/dosing/devices/:deviceId/alarm-check
-router.get('/devices/:deviceId/alarm-check', async (req, res) => {
-  const { deviceId } = req.params;
-
-  let conn;
-  try {
-    conn = await pool.getConnection();
-
-    const [pumps] = await conn.query(
-      `SELECT id, name, container_volume_ml, current_volume_ml,
-              alarm_threshold_pct, low_level_alarm_active
-         FROM dosing_pumps
-        WHERE device_id = ?`,
-      [deviceId]
-    );
-
-    const triggered = [];
-
-    for (const p of pumps) {
-      const total = p.container_volume_ml || 0;
-      const current = p.current_volume_ml || 0;
-      const thr = p.alarm_threshold_pct || 0;
-
-      if (total <= 0 || thr <= 0) continue;
-
-      const limit = total * (thr / 100);
-      const isLow = current <= limit;
-
-      if (isLow && !p.low_level_alarm_active) {
-        await fireReservoirAlarm(deviceId, p); // email + Telegram
-        await conn.query(
-          'UPDATE dosing_pumps SET low_level_alarm_active = 1 WHERE id = ?',
-          [p.id]
-        );
-        triggered.push({
-          pump_id: p.id,
-          name: p.name,
-          current_volume_ml: current,
-          container_volume_ml: total,
-          alarm_threshold_pct: thr
-        });
-      }
-
-      if (!isLow && p.low_level_alarm_active) {
-        await conn.query(
-          'UPDATE dosing_pumps SET low_level_alarm_active = 0 WHERE id = ?',
-          [p.id]
-        );
-      }
-    }
-
-    res.json({
-      ok: true,
-      device_id: deviceId,
-      triggered_alarms: triggered
-    });
-  } catch (err) {
-    console.error('Alarm check error:', err);
-    res.status(500).json({
-      ok: false,
-      error: 'Erro ao checar alarmes de reservatório'
-    });
-  } finally {
-    if (conn) conn.release();
-  }
-});
-
-
-async function checkAndFireReservoirAlarms(conn, deviceId) {
-  const [pumps] = await conn.query(
-    `SELECT id, name, container_volume_ml, current_volume_ml, alarm_threshold_pct, low_level_alarm_active
-       FROM dosing_pumps
-      WHERE device_id = ?`,
-    [deviceId]
-  );
-
-  for (const p of pumps) {
-    const total = p.container_volume_ml || 0;
-    const current = p.current_volume_ml || 0;
-    const thr = p.alarm_threshold_pct || 0;
-
-    if (total <= 0 || thr <= 0) continue;
-
-    const limit = total * (thr / 100);
-    const isLow = current <= limit;
-
-    if (isLow && !p.low_level_alarm_active) {
-      await fireReservoirAlarm(deviceId, p);      // email + Telegram
-      await conn.query(
-        'UPDATE dosing_pumps SET low_level_alarm_active = 1 WHERE id = ?',
-        [p.id]
-      );
-    }
-
-    if (!isLow && p.low_level_alarm_active) {
-      await conn.query(
-        'UPDATE dosing_pumps SET low_level_alarm_active = 0 WHERE id = ?',
-        [p.id]
-      );
-    }
-  }
-}
-
-async function fireReservoirAlarm(deviceId, pump) {
-  const subject = `RBS – Reservatório baixo na bomba ${pump.name || pump.id}`;
-  const message =
-    `Device ${deviceId} – bomba ${pump.name || pump.id}\n` +
-    `Volume atual: ${pump.current_volume_ml} ml\n` +
-    `Capacidade: ${pump.container_volume_ml} ml\n` +
-    `Alarme em: ${pump.alarm_threshold_pct}%`;
-
-  await sendEmailToUser(deviceId, subject, message);
-  await sendTelegramToUser(deviceId, message);
-}
-*/
 
 module.exports = router;

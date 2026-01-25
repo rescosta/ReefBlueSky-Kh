@@ -314,6 +314,139 @@ router.post('/v1/iot/dosing/status', async (req, res) => {
     if (conn) conn.release();
   }
 });
+
+
+// POST /v1/iot/dosing/commands
+// ESP busca comandos pendentes (fila device_commands, device_id = esp_uid)
+router.post('/v1/iot/dosing/commands', async (req, res) => {
+  let conn;
+  try {
+    const body = req.body || {};
+    const espUid = body.esp_uid || body.espUid;
+
+    if (!espUid) {
+      console.warn('[DOSING IOT] /commands sem esp_uid. Body=', body);
+      return res.status(400).json({ success: false, error: 'esp_uid obrigatório' });
+    }
+
+    const device = await verifyIoTToken(espUid);
+    if (!device) {
+      return res.status(404).json({ success: false, error: 'Device not found' });
+    }
+
+    conn = await pool.getConnection();
+
+    // Buscar comandos pendentes para este esp_uid
+    const rows = await conn.query(
+      `SELECT id, type, payload
+         FROM devicecommands
+        WHERE deviceId = ?
+          AND status = 'pending'
+        ORDER BY createdAt ASC
+        LIMIT 5`,
+      [espUid]
+    );
+
+
+    if (!rows || rows.length === 0) {
+      return res.json({ success: true, commands: [] });
+    }
+
+    // Parse de payload (JSON) e montagem da resposta
+    const commands = rows.map((r) => {
+      let payload = null;
+      if (r.payload != null) {
+        if (typeof r.payload === 'string') {
+          try {
+            payload = JSON.parse(r.payload);
+          } catch (e) {
+            console.error('[DOSING IOT] Erro JSON.parse payload comando', r.id, e.message, r.payload);
+            payload = null;
+          }
+        } else if (typeof r.payload === 'object') {
+          payload = r.payload;
+        }
+      }
+
+      return {
+        id: Number(r.id),
+        type: r.type,
+        payload,
+      };
+    });
+
+  // Marcar como "inprogress" para evitar duplicidade
+  const ids = rows.map((r) => r.id);
+    await conn.query(
+      `UPDATE devicecommands
+          SET status = 'inprogress', updatedAt = NOW()
+        WHERE id IN (${ids.map(() => '?').join(',')})
+          AND status = 'pending'`,
+      ids
+    );
+
+
+    return res.json({ success: true, commands });
+  } catch (err) {
+    console.error('Error in dosing commands poll:', err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
+// POST /v1/iot/dosing/commands/complete
+// ESP confirma conclusão de um comando
+router.post('/v1/iot/dosing/commands/complete', async (req, res) => {
+  let conn;
+  try {
+    const body = req.body || {};
+    const espUid       = body.esp_uid || body.espUid;
+    const commandId    = body.command_id || body.commandId;
+    const status       = body.status;        // 'done' | 'failed' (ou similar)
+    const errorMessage = body.error_message || body.errorMessage || null;
+
+    if (!espUid || !commandId || !status) {
+      return res.status(400).json({
+        success: false,
+        error: 'esp_uid, command_id e status são obrigatórios',
+      });
+    }
+
+    const device = await verifyIoTToken(espUid);
+    if (!device) {
+      return res.status(404).json({ success: false, error: 'Device not found' });
+    }
+
+    conn = await pool.getConnection();
+
+    const result = await conn.query(
+      `UPDATE devicecommands
+          SET status = ?, errorMessage = ?, updatedAt = NOW()
+        WHERE id = ?
+          AND deviceId = ?`,
+      [status, errorMessage, commandId, espUid]
+    );
+
+
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Comando não encontrado para este device',
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Error in dosing commands complete:', err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+
 // POST /v1/iot/dosing/execution
 // ESP reporta execução de dose
 router.post('/v1/iot/dosing/execution', async (req, res) => {
