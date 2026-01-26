@@ -231,9 +231,27 @@ table {
   font-size: 13px;
 }
 
+
+.badge-lcd,
+.badge-dos {
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+/* e no JS, em vez de 'badge-on'/'badge-off' direto */
+#lcdStatusIcon.badge-on,
+#lcdStatusIcon.badge-off,
+#dosingStatusIcon.badge-on,
+#dosingStatusIcon.badge-off {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+
 /* Relógio do topo (opcional) */
 .topbar-clock {
-  font-family: monospace;
+  font-family: inherit;
 }
 
 /* ===== MENU LATERAL / HAMBÚRGUER ===== */
