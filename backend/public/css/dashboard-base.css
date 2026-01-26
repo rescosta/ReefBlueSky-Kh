@@ -244,8 +244,10 @@ table {
 #lcdStatusIcon.badge-off,
 #dosingStatusIcon.badge-on,
 #dosingStatusIcon.badge-off {
-  padding: 2px 6px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.1;
+
 }
 
 
