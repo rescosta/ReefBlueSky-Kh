@@ -46,6 +46,13 @@ async function logDosingAlert(userId, deviceId, pumpId, type, message) {
 }
 
 // ===== HELPER: Atualizar status de device =====
+
+// updateDosingDeviceStatus(deviceId, online, lastIp)
+// - Atualiza dosing_devices.last_seen com NOW() em UTC.
+// - last_seen é sempre UTC no banco; o dashboard converte para timezone
+//   do usuário/device na hora de exibir (usando epoch ou helper de timezone).
+
+
 async function updateDosingDeviceStatus(deviceId, online, lastIp = null) {
   let conn;
   try {
@@ -95,11 +102,20 @@ async function notifyDosingAlert(userId, alertType, message) {
 
 
 
+
 // ============================================
 // ROTAS IoT (Para ESP - Sem JWT, com validação esp_uid)
 // ============================================
 
 // POST /v1/iot/dosing/handshake
+// - ESP envia esp_uid, hw_type, firmware_version.
+// - Resposta:
+//   - server_time: ISO 8601 em UTC (ex: "2026-01-26T21:04:07.976Z").
+//   - device_id: ID interno da dosadora no backend.
+//   - poll_interval_s: intervalo (segundos) para /status e /commands.
+//   - pumps[].schedules[].start_time / end_time: strings "HH:MM" em horário LOCAL do aquário,
+//     sem fuso; o firmware interpreta no timezone configurado no próprio device.
+
 // ESP contacta servidor pela primeira vez
 router.post('/handshake', async (req, res) => {
   let conn;
@@ -448,6 +464,16 @@ router.post('/commands/complete', async (req, res) => {
 
 
 // POST /v1/iot/dosing/execution
+// - ESP SEMPRE envia horários como EPOCH em segundos (UTC).
+//   - scheduled_at: epoch do horário planejado da dose (ou null para MANUAL).
+//   - executed_at: epoch do horário real da execução (ou null se não executou).
+// - Backend grava em dosing_executions:
+//   - scheduled_at / executed_at: DATETIME em UTC via FROM_UNIXTIME(epoch).
+// - Campos adicionais:
+//   - status: 'OK' | 'FAILED' | ... (estado final da dose).
+//   - origin: 'AUTO' (agenda) | 'MANUAL' (front) | 'CALIBRATION' etc.
+//   - error_code: string opcional com motivo da falha.
+
 // ESP reporta execução de dose
 router.post('/execution', async (req, res) => {
   let conn;

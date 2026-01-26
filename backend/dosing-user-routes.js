@@ -30,7 +30,7 @@ router.get('/devices', async (req, res) => {
     const devices = await conn.query(
       `SELECT
          d.id, d.name, d.hw_type, d.esp_uid, d.firmware_version,
-         d.online, d.last_seen, d.last_ip, d.timezone,
+         d.online, d.last_seen, UNIX_TIMESTAMP(d.last_seen) AS last_seen_epoch, d.last_ip, d.timezone,
          (SELECT COUNT(*) FROM dosing_pumps WHERE device_id = d.id) as pump_count,
          (SELECT COUNT(*) FROM dosing_alerts WHERE device_id = d.id AND resolved_at IS NULL) as alert_count
        FROM dosing_devices d
@@ -52,6 +52,7 @@ router.get('/devices', async (req, res) => {
         ...d,
         online: isOnline,
         last_seen: d.last_seen ? new Date(d.last_seen).toISOString() : null,
+        last_seen_epoch: d.last_seen_epoch || null,
       };
     });
 
@@ -217,8 +218,9 @@ router.get('/devices/:deviceId/test-connection', async (req, res) => {
 
     // 1) Buscar device dosing
     const devRows = await conn.query(
-      `SELECT id, name, esp_uid, online, last_seen
-         FROM dosing_devices
+      `SELECT id, name, esp_uid, online, last_seen,
+            UNIX_TIMESTAMP(last_seen) AS last_seen_epoch
+        FROM dosing_devices
         WHERE id = ? AND user_id = ?
         LIMIT 1`,
       [deviceId, userId]
@@ -271,6 +273,7 @@ router.get('/devices/:deviceId/test-connection', async (req, res) => {
         },
         lastSeen: {
           iso: dev.last_seen ? new Date(dev.last_seen).toISOString() : null,
+          epoch: dev.last_seen_epoch || null,
           ago
         },
         source: 'dosing_devices'

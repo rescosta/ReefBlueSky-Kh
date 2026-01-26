@@ -1987,6 +1987,14 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
 
     const user = rows[0];
 
+    // converte DATETIME UTC do banco em epoch UTC (segundos)
+    const createdAtEpoch = user.createdAt
+      ? Math.floor(new Date(user.createdAt).getTime() / 1000)
+      : null;
+    const updatedAtEpoch = user.updatedAt
+      ? Math.floor(new Date(user.updatedAt).getTime() / 1000)
+      : null;
+
     return res.json({
       success: true,
       data: {
@@ -1995,8 +2003,10 @@ app.get('/api/v1/auth/me', authUserMiddleware, async (req, res) => {
         name: user.name,
         timezone: user.timezone,
         role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+        createdAt: user.createdAt,     // DATETIME UTC do banco
+        updatedAt: user.updatedAt,     // DATETIME UTC do banco
+        createdAtEpoch,                // mesmo instante, em epoch UTC (s)
+        updatedAtEpoch                 // idem
       }
     });
   } catch (err) {
@@ -2050,7 +2060,15 @@ app.put('/api/v1/account/profile', authUserMiddleware, async (req, res) => {
     if (!rows || rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Usuário não encontrado.' });
     }
+
     const user = rows[0];
+
+    const createdAtEpoch = user.createdAt
+      ? Math.floor(new Date(user.createdAt).getTime() / 1000)
+      : null;
+    const updatedAtEpoch = user.updatedAt
+      ? Math.floor(new Date(user.updatedAt).getTime() / 1000)
+      : null;
 
     return res.json({
       success: true,
@@ -2060,10 +2078,13 @@ app.put('/api/v1/account/profile', authUserMiddleware, async (req, res) => {
         name: user.name,
         timezone: user.timezone,
         role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        createdAt: user.createdAt,   // DATETIME UTC
+        updatedAt: user.updatedAt,   // DATETIME UTC
+        createdAtEpoch,              // epoch UTC (s)
+        updatedAtEpoch,              // epoch UTC (s)
       },
     });
+
   } catch (err) {
     console.error('API account/profile error:', err.message);
     return res.status(500).json({ success: false, message: 'Erro ao atualizar perfil.' });
@@ -2209,10 +2230,8 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
         r.dosing_status === 'online' ? 'online' : 'offline';
 
       const lastSeenMs = r.lastSeen ? new Date(r.lastSeen).getTime() : null;
-      const online = computeOnlineFromLastSeen(r.lastSeen, 5); 
-
-      //const FIVE_MIN = 5 * 60 * 1000;
-      //const online = !!(lastSeenMs && (Date.now() - lastSeenMs) < FIVE_MIN);
+      const lastSeenEpoch = lastSeenMs != null ? Math.floor(lastSeenMs / 1000) : null;
+      const online = computeOnlineFromLastSeen(r.lastSeen, 5);
 
       return {
         id:        r.id,
@@ -2220,7 +2239,8 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
         name:      r.name,
         type:      r.type,
         localIp:   r.localIp,
-        lastSeen:  lastSeenMs,
+        lastSeenMs,          // legado, se quiser manter
+        lastSeenEpoch,       // usar este no front (epoch UTC)
         lcdStatus:
           r.lcd_status === 'online' || r.lcd_status === 'offline'
             ? r.lcd_status
@@ -2228,8 +2248,8 @@ app.get('/api/v1/user/devices', authUserMiddleware, async (req, res) => {
         dosingStatus,
         firmwareVersion: r.firmware_version || null,
         online,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
+        createdAt: r.createdAt,   // DATETIME UTC
+        updatedAt: r.updatedAt,   // DATETIME UTC
       };
     });
 
@@ -4433,6 +4453,11 @@ app.get('/api/v1/health', (req, res) => {
 // ============================================================================
 async function startServer() {
   try {
+
+    console.log('[BOOT] process.env.TZ =', process.env.TZ);
+    console.log('[BOOT] new Date().toString()    =', new Date().toString());
+    console.log('[BOOT] new Date().toISOString() =', new Date().toISOString());
+
     // 1) Inicializar tabela OTA logs
     await initOtaLogsTable();
     console.log('[OTA] device_ota_events pronta');
