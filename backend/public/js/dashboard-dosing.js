@@ -505,7 +505,7 @@ function openEditScheduleModal(scheduleId) {
   document.getElementById('editDosesPerDay').value = schedule.doses_per_day || 0;
   document.getElementById('editStartTime').value   = schedule.start_time || '';
   document.getElementById('editEndTime').value     = schedule.end_time || '';
-  document.getElementById('editVolumePerDay').value = formatMl(schedule.volume_per_day_ml || 0);
+  document.getElementById('editVolumePerDay').value = formatMl(schedule.volume_per_day_ml || schedule.volume_per_day || 0);
 
   // abre modal
   document.getElementById('editScheduleModal').style.display = 'flex';
@@ -551,7 +551,9 @@ async function saveEditScheduleModal() {
       doses_per_day: dosesPerDay,
       start_time: document.getElementById('editStartTime').value,
       end_time: document.getElementById('editEndTime').value,
+      volume_per_day: volumeEdit,
       volume_per_day_ml: volumeEdit
+
     };
 
     console.log('PUT data =>', data);
@@ -602,7 +604,7 @@ function getDailyVolumeForPump(index) {
   if (!Array.isArray(schedules)) return 0;
   return schedules
     .filter(s => s.pump_index === index && s.enabled)
-    .reduce((sum, s) => sum + (s.volume_per_day_ml || 0), 0);
+    .reduce((sum, s) => sum + (s.volume_per_day_ml || s.volume_per_day || 0),0);
 }
 
 
@@ -675,7 +677,7 @@ function renderScheduleTableAll() {
       <td>${daysText || '---'}</td>
       <td>${schedule.doses_per_day || 0}</td>
       <td>${startTime} - ${endTime}</td>
-      <td>${formatMl(schedule.volume_per_day_ml || 0)}</td>
+      <td>${formatMl(schedule.volume_per_day_ml || schedule.volume_per_day || 0)}</td>
       <td>
         <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
       </td>
@@ -702,13 +704,13 @@ async function createSchedule() {
   const dayCheckboxes = document.querySelectorAll('.day-checkbox');
   const activeDays = [];
   dayCheckboxes.forEach((cb, idx) => {
-    if (cb.checked) activeDays.push(idx); // 0 = Dom, 1 = Seg, ...
+    if (cb.checked) activeDays.push(idx);
   });
 
   const dosesPerDay = parseInt(document.getElementById('dosesPerDay').value, 10) || 0;
 
   const volumeStr = document.getElementById('volumePerDay').value.trim();
-  const volumePerDay = parseMl(volumeStr); // já troca vírgula por ponto
+  const volumePerDay = parseMl(volumeStr);
 
   if (!Number.isFinite(volumePerDay) || volumePerDay <= 0) {
     showError('Informe um Volume Diário (ml) válido e maior que zero.');
@@ -726,7 +728,8 @@ async function createSchedule() {
     doses_per_day: dosesPerDay,
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day_ml: volumePerDay
+    volume_per_day: volumePerDay,      // para validação do POST
+    volume_per_day_ml: volumePerDay    // para qualquer handler que use _ml
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
@@ -979,7 +982,7 @@ async function toggleSchedule(scheduleId) {
     doses_per_day: sched.doses_per_day || 0,
     start_time: sched.start_time || '',
     end_time: sched.end_time || '',
-    volume_per_day_ml: sched.volume_per_day || 0
+    volume_per_day_ml: sched.volume_per_day_ml || sched.volume_per_day || 0
   };
 
   const result = await apiCall(
@@ -1018,7 +1021,7 @@ function generateTimersForToday() {
     if (!pump) return;
 
     const dosesPerDay = s.doses_per_day || 1;
-    const volDay      = s.volume_per_day_ml || 0;
+    const volDay = s.volume_per_day_ml || s.volume_per_day || 0;
     const volDose     = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
 
     const start = s.start_time || '00:00';
