@@ -575,9 +575,9 @@ async function loadKhMetrics(deviceId) {
       return;
     }
 
-    let { khTarget, metrics } = json.data || {};
+    let { khTarget, metrics, avgCycleMs } = json.data || {};
 
-    // garante número
+
     if (khTarget != null) {
       khTarget = typeof khTarget === 'number' ? khTarget : parseFloat(khTarget);
       if (Number.isNaN(khTarget)) khTarget = null;
@@ -585,6 +585,12 @@ async function loadKhMetrics(deviceId) {
 
     if (khTargetSpan) {
       khTargetSpan.textContent = khTarget != null ? khTarget.toFixed(2) : '--';
+    }
+
+    if (typeof avgCycleMs === 'number' && Number.isFinite(avgCycleMs) && avgCycleMs > 0) {
+      testNowTotalMs = avgCycleMs;
+    } else {
+      testNowTotalMs = 8 * 60 * 1000;
     }
 
     formatMetricWindow(kh24hSpan, metrics['24h'], khTarget);
@@ -683,6 +689,19 @@ async function loadKhInfo(deviceId) {
   }
 }
 
+async function apiTestNow(deviceId) {
+  const res = await apiFetch(
+    `/api/v1/user/devices/${encodeURIComponent(deviceId)}/test-now`,
+    { method: 'POST' }
+  );
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Erro ao acionar testnow');
+  }
+  return json.data; // opcionalmente usa commandId depois
+}
+
+
 
 if (testModeToggle) {
   testModeToggle.addEventListener('change', async (e) => {
@@ -708,21 +727,20 @@ if (testNowBtn) {
     if (!deviceId) return;
 
     try {
-      await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`, {
-        method: 'POST',
-        body: JSON.stringify({ type: 'testnow' }),
-      });
+      // 1) dispara endpoint dedicado (fila com type = 'testnow')
+      await apiTestNow(deviceId);
 
-      // inicia barra de 5 etapas
+      // 2) inicia barra de 5 etapas local
       startTestNowProgress();
 
+      // 3) opcional: já força um refresh inicial
       await loadMeasurementsForSelected();
     } catch (err) {
       console.error('testnow command error', err);
+      alert('Erro ao iniciar teste agora: ' + (err.message || 'falha desconhecida'));
     }
   });
 }
-
 
 if (applyDoseBtn) {
   applyDoseBtn.addEventListener('click', async () => {
@@ -805,6 +823,7 @@ if (pump4CalibBtn) {
     }
   });
 }
+
 
 async function initDashboardMain() {
   await DashboardCommon.initTopbar();
