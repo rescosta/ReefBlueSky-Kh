@@ -8,6 +8,25 @@
 
   <style>
     /* LAYOUT PRINCIPAL */
+
+    #layout-root {
+      height: 100vh;              /* ocupa a viewport inteira */
+      display: flex;
+      flex-direction: column;
+    }
+
+    #topbar-root,
+    #footer-root {
+      flex-shrink: 0;             /* não encolhem, ficam “fixos” */
+    }
+
+    /* área central rolável */
+    #layout-root > .container {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .content {
       flex: 1;
       padding: 12px 10px 16px;
@@ -945,7 +964,6 @@
   </style>
 </head>
 <body>
-  <div id="topbar-root"></div>
 
   <!-- painel lateral -->
   <div id="sideMenu" class="side-menu">
@@ -978,6 +996,12 @@
     <a href="#" id="menuLogout">Sair</a>
   </div>
 
+
+  <div id="layout-root">
+
+  <div id="topbar-root"></div>
+
+  
   <div class="container">
     <!-- Alert Box -->
     <div id="alertBox"></div>
@@ -1322,6 +1346,7 @@
   </div>
 
   <div id="footer-root"></div>
+  </div>
 
   <!-- Modal Timers -->
   <div id="timersModal">
