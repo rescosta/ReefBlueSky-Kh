@@ -81,7 +81,6 @@ html, body {
   max-width: 100%;
   width: 100%;
   overflow-x: hidden;
-  height: 100%;
 }
 
 body {
@@ -92,9 +91,6 @@ body {
   color: #e5e7eb;
   font-size: 14px;
   line-height: 1.4;
-
-  /* impede o body de rolar, quem rola é o miolo */
-  overflow: hidden;
 }
 
 
