@@ -696,7 +696,7 @@ async function createSchedule() {
     doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10) || 0,
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day: parseMl(document.getElementById('volumePerDay').value) || 0 // <-- nome novo
+    volume_per_day_ml: parseMl(document.getElementById('volumePerDay').value) || 0 
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
@@ -962,6 +962,112 @@ async function toggleSchedule(scheduleId) {
     renderScheduleTableAll();
   }
 }
+
+
+function generateTimersForToday() {
+  if (!Array.isArray(schedules) || !Array.isArray(pumps)) {
+    const listEl = document.getElementById('timersList');
+    if (listEl) listEl.innerHTML = '<div class="no-timers">Carregando dados...</div>';
+    return;
+  }
+
+  const listEl = document.getElementById('timersList');
+  if (!listEl) return;
+
+  const today   = new Date();
+  const weekday = today.getDay(); // 0=Dom..6=Sab
+
+  const timers = [];
+
+  schedules.forEach(s => {
+    if (!s.enabled) return;
+    if (!Array.isArray(s.days_of_week) || !s.days_of_week.includes(weekday)) return;
+
+    const pump = pumps.find(p => p.index_on_device === s.pump_index);
+    if (!pump) return;
+
+    const dosesPerDay = s.doses_per_day || 1;
+    const volDay      = s.volume_per_day_ml || 0;
+    const volDose     = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
+
+    const start = s.start_time || '00:00';
+    const end   = s.end_time   || '23:59';
+
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+
+    const startSec = sh * 3600 + sm * 60;
+    const endSec   = eh * 3600 + em * 60;
+    if (endSec <= startSec || dosesPerDay <= 0) return;
+
+    const rangeSec = endSec - startSec;
+    const interval = rangeSec / dosesPerDay;
+
+    for (let i = 0; i < dosesPerDay; i++) {
+      const sec = Math.round(startSec + i * interval);
+      const h   = Math.floor(sec / 3600);
+      const m   = Math.floor((sec % 3600) / 60);
+      const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+      timers.push({
+        sortKey: sec,
+        time: timeStr,
+        pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
+        volume: volDose
+      });
+    }
+  });
+
+  timers.sort((a, b) => a.sortKey - b.sortKey);
+
+  if (!timers.length) {
+    listEl.innerHTML = '<div class="no-timers">Nenhuma dose programada para hoje.</div>';
+    return;
+  }
+
+  listEl.innerHTML = `
+    <div class="timers-grid">
+      ${timers.map(t => `
+        <div class="timer-card">
+          <div class="timer-time">${t.time}</div>
+          <div class="timer-pump">${t.pumpName}</div>
+          <div class="timer-volume">${t.volume.toFixed(2)} ml</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+
+function openTimersModal() {
+  generateTimersForToday();
+  const modal = document.getElementById('timersModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeTimersModal() {
+  const modal = document.getElementById('timersModal');
+  if (modal) modal.classList.remove('active');
+}
+
+// listeners globais
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'timersBtn') {
+    openTimersModal();
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const closeBtn = document.getElementById('timersClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeTimersModal);
+
+  const modal = document.getElementById('timersModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeTimersModal();
+    });
+  }
+});
 
 
 // ===== MODAL CLOSE =====
