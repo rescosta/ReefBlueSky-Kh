@@ -530,15 +530,29 @@ async function saveEditScheduleModal() {
       if (cb.checked) activeDays.push(day);
     });
 
-   const data = {
-    enabled: true,
-    days_of_week: activeDays,
-    doses_per_day: parseInt(document.getElementById('editDosesPerDay').value, 10) || 0,
-    start_time: document.getElementById('editStartTime').value,
-    end_time: document.getElementById('editEndTime').value,
-    volume_per_day_ml: parseMl(document.getElementById('editVolumePerDay').value) || 0
-  };
+    const dosesPerDay = parseInt(document.getElementById('editDosesPerDay').value, 10) || 0;
 
+    const volumeEditStr = document.getElementById('editVolumePerDay').value.trim();
+    const volumeEdit = parseMl(volumeEditStr);   // usa o mesmo helper
+
+    if (!Number.isFinite(volumeEdit) || volumeEdit <= 0) {
+      showError('Informe um Volume Diário (ml) válido na edição.');
+      return;
+    }
+
+    if (!Number.isFinite(dosesPerDay) || dosesPerDay <= 0) {
+      showError('Informe Doses por Dia maior que zero na edição.');
+      return;
+    }
+
+    const data = {
+      enabled: true,
+      days_of_week: activeDays,
+      doses_per_day: dosesPerDay,
+      start_time: document.getElementById('editStartTime').value,
+      end_time: document.getElementById('editEndTime').value,
+      volume_per_day_ml: volumeEdit
+    };
 
     console.log('PUT data =>', data);
 
@@ -556,6 +570,7 @@ async function saveEditScheduleModal() {
     showError(err.message || 'Erro ao atualizar agenda');
   }
 }
+
 
 
 
@@ -690,13 +705,28 @@ async function createSchedule() {
     if (cb.checked) activeDays.push(idx); // 0 = Dom, 1 = Seg, ...
   });
 
+  const dosesPerDay = parseInt(document.getElementById('dosesPerDay').value, 10) || 0;
+
+  const volumeStr = document.getElementById('volumePerDay').value.trim();
+  const volumePerDay = parseMl(volumeStr); // já troca vírgula por ponto
+
+  if (!Number.isFinite(volumePerDay) || volumePerDay <= 0) {
+    showError('Informe um Volume Diário (ml) válido e maior que zero.');
+    return;
+  }
+
+  if (!Number.isFinite(dosesPerDay) || dosesPerDay <= 0) {
+    showError('Informe Doses por Dia maior que zero.');
+    return;
+  }
+
   const data = {
-    enabled: true, 
+    enabled: true,
     days_of_week: activeDays,
-    doses_per_day: parseInt(document.getElementById('dosesPerDay').value, 10) || 0,
+    doses_per_day: dosesPerDay,
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day_ml: parseMl(document.getElementById('volumePerDay').value) || 0 
+    volume_per_day_ml: volumePerDay
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
@@ -713,6 +743,7 @@ async function createSchedule() {
     await loadAllSchedules(currentDevice.id);
   }
 }
+
 
 
 async function deleteSchedule(scheduleId) {
