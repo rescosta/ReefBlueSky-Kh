@@ -4096,11 +4096,32 @@ app.get('/api/v1/user/devices/:deviceId/kh-metrics', authUserMiddleware, async (
       };
     }
 
+
+    // duração média do ciclo (ms), nas últimas 5 medições válidas
+    const rowsAvg = await pool.query(
+      `SELECT AVG(finishedAt - startedAt) AS avgMs
+         FROM (
+           SELECT finishedAt, startedAt
+             FROM measurements
+            WHERE deviceId = ?
+              AND startedAt IS NOT NULL
+              AND finishedAt IS NOT NULL
+              AND finishedAt > startedAt
+              AND finishedAt - startedAt BETWEEN 60*1000 AND 60*60*1000
+            ORDER BY finishedAt DESC
+            LIMIT 5
+         ) AS last5`,
+      [deviceId]
+    );
+    const avgCycleMs = rowsAvg[0]?.avgMs || null;
+
+
     return res.json({
       success: true,
       data: {
         khTarget: kh_target,
         metrics,
+        avgCycleMs,
       },
     });
   } catch (err) {
