@@ -21,11 +21,19 @@
     }
 
     /* área central rolável */
-    #layout-root > .container {
+    #main-content {
       flex: 1 1 auto;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
+
+    /* mantém seu container interno */
+    #main-content > .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 10px 24px;
+    }
+
 
     .content {
       flex: 1;
@@ -519,6 +527,27 @@
       text-align: center;
     }
 
+    /* Wrapper da tabela da Agenda */
+    .dosing-table-wrapper {
+      max-height: calc(100vh - 230px); /* ajusta no olho depois */
+      overflow-y: auto;                /* rolagem vertical própria */
+      overflow-x: auto;                /* rolagem horizontal quando necessário */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Permite tabela mais larga que o card */
+    .dosing-table-wrapper table {
+      width: max-content;
+      min-width: 100%;
+    }
+
+    /* Evita quebra estranha nas colunas */
+    .dosing-table-wrapper th,
+    .dosing-table-wrapper td {
+      white-space: nowrap;
+    }
+
+
     /* Config: coluna BOMBA mais estreita */
     #configTab table th:nth-child(1),
     #configTab table td:nth-child(1) {
@@ -629,16 +658,17 @@
 
     /* CARD PADRÃO DA DOSADORA (todas as abas) */
     .dosing-card {
-      max-width: 900px;   /* mesma largura em todas as abas */
-      width: 100%;        /* sempre ocupar 100% até 900px */
+      max-width: 900px;
+      width: 100%;
       margin: 0 auto;
       background: #020617;
       border-radius: 10px;
       padding: 20px 24px;
       border: 1px solid #1f2937;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-      overflow-x: auto;   /* se algo passar, cria scroll interno */
+      /* remover esta linha: overflow-x: auto; */
     }
+
 
 
     .tab-content {
@@ -950,16 +980,15 @@
       }
 
       .dosing-card {
-      max-width: 100%;
-      padding: 12px 8px;
-      overflow-x: auto;
-      }
-
-      .dosing-card table {
-        width: max-content;
-        max-width: none;
+        max-width: 100%;
+        padding: 12px 8px;
+        /* remover estas duas linhas:
+        overflow-x: auto;
+        .dosing-card table { width: max-content; max-width: none; }
+        */
       }
     }
+
 
   </style>
 </head>
@@ -1001,17 +1030,17 @@
 
   <div id="topbar-root"></div>
 
-  
-  <div class="container">
-    <!-- Alert Box -->
-    <div id="alertBox"></div>
+  <div id="main-content">
+    <div class="container">
+      <!-- Alert Box -->
+      <div id="alertBox"></div>
 
-    <!-- Controls -->
-  <div class="controls">
-    <div class="control-group device-header-card" id="deviceInfo">
-      Carregando...
+      <!-- Controls -->
+    <div class="controls">
+      <div class="control-group device-header-card" id="deviceInfo">
+        Carregando...
+      </div>
     </div>
-  </div>
 
 
     <!-- Dashboard Tab -->
@@ -1040,23 +1069,24 @@
           </div>
         </div>
 
-
-        <table>
-          <thead>
-            <tr>
-              <th>STATUS</th>
-              <th>BOMBA</th>
-              <th>DIAS DA SEMANA</th>
-              <th>DOSES/DIA</th>
-              <th>JANELA HORÁRIA</th>
-              <th>VOL. DIÁRIO (ML)</th>
-              <th>AÇÕES</th>
-            </tr>
-          </thead>
-          <tbody id="scheduleTableBody">
-            <tr><td colspan="7" style="text-align: center;">Carregando...</td></tr>
-          </tbody>
-        </table>
+        <div class="dosing-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>STATUS</th>
+                <th>BOMBA</th>
+                <th>DIAS DA SEMANA</th>
+                <th>DOSES/DIA</th>
+                <th>JANELA HORÁRIA</th>
+                <th>VOL. DIÁRIO (ML)</th>
+                <th>AÇÕES</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody">
+              <tr><td colspan="7" style="text-align: center;">Carregando...</td></tr>
+            </tbody>
+          </table>
+         </div> 
       </div>
     </div>
 
@@ -1084,21 +1114,25 @@
     <div id="configTab" class="tab-content">
       <div class="dosing-card">
         <h2 class="section-title">Configurar Bombas</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>BOMBA</th>
-              <th>NOME</th>
-              <th>STATUS</th>
-              <th>VOL. RECIPIENTE (ML)</th>
-              <th>VOL. ATUAL (ML)</th>
-              <th>ALARME %</th>
-            </tr>
-          </thead>
-          <tbody id="configTableBody">
-            <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
-          </tbody>
-        </table>
+
+          <div class="dosing-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>BOMBA</th>
+                  <th>NOME</th>
+                  <th>STATUS</th>
+                  <th>VOL. RECIPIENTE (ML)</th>
+                  <th>VOL. ATUAL (ML)</th>
+                  <th>ALARME %</th>
+                </tr>
+              </thead>
+              <tbody id="configTableBody">
+                <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
       </div>
     </div>
 
@@ -1323,26 +1357,28 @@
     </div>
   </div>
 
-  <div id="calibrationOverlay" class="modal">
-    <div class="modal-content" style="max-width:420px; padding:20px;">
-      <h2>Calibração em andamento</h2>
-      <p id="calibrationCountdownText" class="help-text" style="margin-top:10px;">
-        Restam 60 segundos...
-      </p>
+    <div id="calibrationOverlay" class="modal">
+      <div class="modal-content" style="max-width:420px; padding:20px;">
+        <h2>Calibração em andamento</h2>
+        <p id="calibrationCountdownText" class="help-text" style="margin-top:10px;">
+          Restam 60 segundos...
+        </p>
 
-      <div style="margin-top:12px; margin-bottom:16px;">
-        <div class="small-text" style="margin-bottom:4px;">
-          Progresso
+        <div style="margin-top:12px; margin-bottom:16px;">
+          <div class="small-text" style="margin-bottom:4px;">
+            Progresso
+          </div>
+          <div class="progress-bar">
+            <div id="calibrationProgressFill" class="progress-fill"></div>
+          </div>
         </div>
-        <div class="progress-bar">
-          <div id="calibrationProgressFill" class="progress-fill"></div>
-        </div>
-      </div>
 
       <button class="btn-secondary" id="abortCalibrationBtn" onclick="abortCalibration()">
         ✖ Abortar teste
       </button>
     </div>
+  </div>
+
   </div>
 
   <div id="footer-root"></div>
