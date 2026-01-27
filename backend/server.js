@@ -2695,7 +2695,19 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
     for (const m of measurements) {
       try {
         await conn.execute(
-          'INSERT INTO measurements (deviceId, kh, phref, phsample, temperature, timestamp, status, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          `INSERT INTO measurements (
+             deviceId,
+             kh,
+             phref,
+             phsample,
+             temperature,
+             timestamp,
+             status,
+             confidence,
+             startedAt,
+             finishedAt
+           )
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             req.user.deviceId,
             m.kh,
@@ -2705,8 +2717,11 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
             m.timestamp,
             m.status || null,
             m.confidence || null,
+            m.startedAt || null,   // por enquanto quase sempre null
+            m.timestamp,           // finishedAt = timestamp final
           ]
         );
+
         insertedCount++;
       } catch (insertErr) {
         console.error(
