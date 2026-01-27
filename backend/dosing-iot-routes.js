@@ -3,7 +3,7 @@
 
 const { mailTransporter, ALERT_FROM, sendTelegramForUser } =
   require('./alerts-helpers');
-
+const { getUserTimezone, getUserUtcOffsetSec } = require('./user-timezone');
 
 
 // dosing-iot-routes.js
@@ -198,6 +198,11 @@ router.post('/handshake', async (req, res) => {
       [firmware_version, deviceId]
     );
 
+    // Buscar timezone e offset do usuário
+    const userTimezone     = await getUserTimezone(userId);
+    const userUtcOffsetSec = await getUserUtcOffsetSec(userId);
+
+
     // Buscar bombas e agendas
     const pumps = await conn.query(
       `SELECT 
@@ -234,6 +239,8 @@ router.post('/handshake', async (req, res) => {
       device_id: deviceId,
       server_time: new Date().toISOString(),
       poll_interval_s: 30,
+      user_timezone: userTimezone,
+      user_utc_offset_sec: userUtcOffsetSec,
       pumps: pumpData
     });
   } catch (err) {

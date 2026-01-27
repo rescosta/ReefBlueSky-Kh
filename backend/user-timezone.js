@@ -17,6 +17,22 @@ async function getUserTimezone(userId) {
   }
 }
 
+// Offset UTC em segundos para o timezone do usuário
+async function getUserUtcOffsetSec(userId) {
+  const tz = await getUserTimezone(userId);
+
+  const nowUtc = new Date();
+
+  // hora "no fuso do usuário"
+  const localStr = nowUtc.toLocaleString('en-US', { timeZone: tz });
+  const local = new Date(localStr);
+
+  // getTimezoneOffset é minutos *em relação ao local*, então:
+  // offset em minutos do fuso do usuário relativo a UTC
+  const offsetMin = -local.getTimezoneOffset();
+  return offsetMin * 60; // segundos
+}
+
 // Monta Date.toLocaleString com timezone do usuário
 async function formatWithUserTimezone(userId, date) {
   const tz = await getUserTimezone(userId);
@@ -59,6 +75,7 @@ async function formatDoserWithTimezone(dosingDeviceRow) {
 
 module.exports = {
   getUserTimezone,
+  getUserUtcOffsetSec,
   formatWithUserTimezone,
   formatDoserWithTimezone,
 };
