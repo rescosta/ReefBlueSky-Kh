@@ -501,10 +501,13 @@
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      min-width: 52px;
+      min-width: 56px;
+      max-width: 72px;
       line-height: 1;
-      margin: 0 auto;  
+      margin: 0 auto;
+      white-space: nowrap;
     }
+
 
     .btn-status.btn-on {
       background: #dcfce7;
@@ -973,18 +976,22 @@
       }
 
       .btn-status {
-        padding: 3px 10px;
-        min-width: 70px;
+        padding: 3px 8px;
+        min-width: 56px;
+        max-width: 64px;
         font-size: 11px;
+        white-space: nowrap;   /* ON/OFF nunca quebra */
       }
 
       .dosing-card {
         max-width: 100%;
         padding: 12px 8px;
-        /* remover estas duas linhas:
-        overflow-x: auto;
-        .dosing-card table { width: max-content; max-width: none; }
-        */
+      }
+
+      /* garante coluna de Status com largura fixa na dashboard */
+      .dashboard-header,
+      .dashboard-row {
+        grid-template-columns: 40px 50px 70px 3.1fr 1.4fr;
       }
     }
 
