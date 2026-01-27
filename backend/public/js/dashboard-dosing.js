@@ -1027,6 +1027,26 @@ function generateTimersForToday() {
 
   listEl.innerHTML = `
     <div class="timers-grid">
+      ${timers.map(t => {
+        const volStr = t.volume.toFixed(2).replace('.', ',');
+        return `
+          <div class="timer-card">
+            <div>
+              <div class="timer-time">${t.time}</div>
+              <div class="timer-pump">${t.pumpName}</div>
+            </div>
+            <div class="timer-volume">${volStr} ml</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+
+  // opçao vertical de timers
+  /*
+  listEl.innerHTML = `
+    <div class="timers-grid">
       ${timers.map(t => `
         <div class="timer-card">
           <div class="timer-time">${t.time}</div>
@@ -1035,7 +1055,7 @@ function generateTimersForToday() {
         </div>
       `).join('')}
     </div>
-  `;
+  `;*/
 }
 
 
