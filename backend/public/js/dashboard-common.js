@@ -303,36 +303,30 @@ function updateDeviceStatusBadge() {
 
   const deviceId = select.value;
   const dev = currentDevices.find((d) => d.deviceId === deviceId);
-  if (!dev || !dev.lastSeen) {
+  if (!dev) {
     badge.className = 'badge badge-off';
     badge.textContent = 'Desconhecido';
     return;
   }
 
-  const last = typeof dev.lastSeen === 'number'
-    ? dev.lastSeen
-    : Date.parse(dev.lastSeen);
-
-  if (!last || Number.isNaN(last)) {
-    badge.className = 'badge badge-off';
-    badge.textContent = 'Desconhecido';
-    return;
-  }
-
-  const diffMs = Date.now() - last;
-  const diffMin = diffMs / 60000;
-
-  if (diffMin <= 5) {
+  // Usa o campo online vindo da API /user/devices
+  if (dev.online === true) {
     badge.className = 'badge badge-on';
     badge.textContent = 'Online';
-  } else if (diffMin <= 60) {
-    badge.className = 'badge badge-off';
-    badge.textContent = 'Offline';
-  } else {
-    badge.className = 'badge badge-off';
-    badge.textContent = 'Offline';
+    return;
   }
+
+  if (dev.online === false) {
+    badge.className = 'badge badge-off';
+    badge.textContent = 'Offline';
+    return;
+  }
+
+  // Fallback se nem online estiver definido
+  badge.className = 'badge badge-off';
+  badge.textContent = 'Desconhecido';
 }
+
 
 async function hasDosingDevices() {
   try {
