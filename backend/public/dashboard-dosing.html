@@ -845,40 +845,37 @@
       background: #111827;
       color: #e5e7eb;
     }
+
     .timers-list {
-      flex: 1;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 14px 16px 18px;
-      scrollbar-width: thin;
-      scrollbar-color: #4b5563 #020617;
+    flex: 1;
+    overflow-y: auto;      /* agora scroll é vertical */
+    overflow-x: hidden;
+    padding: 14px 16px 18px;
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #020617;
     }
     .timers-list::-webkit-scrollbar {
-      height: 6px;
+      width: 6px;           /* largura em vez de altura */
     }
-    .timers-list::-webkit-scrollbar-track {
-      background: #020617;
-    }
-    .timers-list::-webkit-scrollbar-thumb {
-      background: #4b5563;
-      border-radius: 3px;
-    }
-    .timers-list::-webkit-scrollbar-thumb:hover {
-      background: #6b7280;
-    }
+
     .timers-grid {
       display: flex;
-      gap: 12px;
-      min-width: max-content;
+      flex-direction: column;  /* empilha verticalmente */
+      gap: 8px;
     }
+
     .timer-card {
       background: #020617;
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 10px 14px;
-      min-width: 130px;
-      box-shadow: 0 6px 14px rgba(15,23,42,0.7);
+      min-height: 52px;
+      box-shadow: 0 4px 10px rgba(15,23,42,0.7);
       border: 1px solid #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
+
     .timer-time {
       font-size: 16px;
       font-weight: 700;
