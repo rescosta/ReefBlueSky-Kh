@@ -20,18 +20,15 @@ async function getUserTimezone(userId) {
 // Offset UTC em segundos para o timezone do usuário
 async function getUserUtcOffsetSec(userId) {
   const tz = await getUserTimezone(userId);
-
-  const nowUtc = new Date();
-
-  // hora "no fuso do usuário"
-  const localStr = nowUtc.toLocaleString('en-US', { timeZone: tz });
-  const local = new Date(localStr);
-
-  // getTimezoneOffset é minutos *em relação ao local*, então:
-  // offset em minutos do fuso do usuário relativo a UTC
-  const offsetMin = -local.getTimezoneOffset();
-  return offsetMin * 60; // segundos
+  const local = new Date().toLocaleString('en-US', { timeZone: tz });
+  const asDate = new Date(local);
+  const offsetMin = -asDate.getTimezoneOffset();
+  const offsetSec = offsetMin * 60;
+  console.log('TZ DEBUG', { userId, tz, local, offsetMin, offsetSec });
+  return offsetSec;
 }
+
+
 
 // Monta Date.toLocaleString com timezone do usuário
 async function formatWithUserTimezone(userId, date) {
