@@ -1,3 +1,4 @@
+/*dashboard-base.css */
 /* ===== NAVBAR BASE ===== */
 .topbar-left {
   display: flex;
@@ -80,6 +81,7 @@ html, body {
   max-width: 100%;
   width: 100%;
   overflow-x: hidden;
+  height: 100%;
 }
 
 body {
@@ -88,12 +90,13 @@ body {
     sans-serif;
   background: #020617;
   color: #e5e7eb;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;          /* tamanho padrão de texto */
+  font-size: 14px;
   line-height: 1.4;
+
+  /* impede o body de rolar, quem rola é o miolo */
+  overflow: hidden;
 }
+
 
 a {
   color: inherit;
