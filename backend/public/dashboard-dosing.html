@@ -808,7 +808,7 @@
       background: #020617;
       border-radius: 14px;
       width: auto;
-      max-width: 320px;
+      min-width: 320px;
       max-width: 420px;
       max-height: 80vh;
       display: flex;
@@ -924,6 +924,17 @@
         padding: 3px 10px;
         min-width: 70px;
         font-size: 11px;
+      }
+
+      .dosing-card {
+      max-width: 100%;
+      padding: 12px 8px;
+      overflow-x: auto;
+      }
+
+      .dosing-card table {
+        width: max-content;
+        max-width: none;
       }
     }
 
