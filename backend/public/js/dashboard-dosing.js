@@ -551,7 +551,7 @@ async function saveEditScheduleModal() {
       doses_per_day: dosesPerDay,
       start_time: document.getElementById('editStartTime').value,
       end_time: document.getElementById('editEndTime').value,
-      volume_per_day_ml: volumeEdit
+      volume_per_day: volumeEdit
     };
 
     console.log('PUT data =>', data);
@@ -602,7 +602,7 @@ function getDailyVolumeForPump(index) {
   if (!Array.isArray(schedules)) return 0;
   return schedules
     .filter(s => s.pump_index === index && s.enabled)
-    .reduce((sum, s) => sum + (s.volume_per_day_ml || 0), 0);
+    .reduce((sum, s) => sum + (s.volume_per_day || 0), 0);
 }
 
 
@@ -675,7 +675,7 @@ function renderScheduleTableAll() {
       <td>${daysText || '---'}</td>
       <td>${schedule.doses_per_day || 0}</td>
       <td>${startTime} - ${endTime}</td>
-      <td>${formatMl(schedule.volume_per_day_ml || 0)}</td>
+      <td>${formatMl(schedule.volume_per_day || 0)}</td>
       <td>
         <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
       </td>
@@ -726,7 +726,7 @@ async function createSchedule() {
     doses_per_day: dosesPerDay,
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
-    volume_per_day_ml: volumePerDay
+    volume_per_day: volumePerDay
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
@@ -1018,7 +1018,7 @@ function generateTimersForToday() {
     if (!pump) return;
 
     const dosesPerDay = s.doses_per_day || 1;
-    const volDay      = s.volume_per_day_ml || 0;
+    const volDay      = s.volume_per_day || 0;
     const volDose     = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
 
     const start = s.start_time || '00:00';
