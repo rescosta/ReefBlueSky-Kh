@@ -250,7 +250,11 @@ async function loadDevicesCommon() {
 
     const allDevices  = json.data || [];
     
-    currentDevices = allDevices.filter((d) => d.type === 'KH');
+    currentDevices = allDevices.filter((d) => 
+      d.type === 'KH' || 
+      d.name?.toUpperCase().includes('KH') ||
+      d.deviceId?.toUpperCase().includes('KH')
+    );
 
     devicesCache = currentDevices;
     devicesCacheTime = now;
