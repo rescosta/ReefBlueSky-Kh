@@ -306,8 +306,14 @@
             <input id="khRefInput" type="number" step="0.01" placeholder="Ex: 7.50" />
             <button id="saveKhRefBtn" class="btn-primary">Salvar KH ref</button>
           </div>
+          <div style="margin-top:6px;" class="inline">
+            <button id="openKhCalibModalBtn" type="button" class="btn-primary">
+              Calibrar KH (assistente)
+            </button>
+          </div>
           <div id="khRefStatus" class="hint">Referência atual --</div>
         </div>
+
 
         <!-- KH alvo do aquário -->
         <div class="field-row">
@@ -630,9 +636,43 @@
     </div>
   </div>
 
+
+
+    <!-- Modal de calibração de KH -->
+    <div id="khCalibModal" class="modal-backdrop hidden">
+      <div class="modal">
+        <!-- Passo 1: câmaras vazias? -->
+        <div id="khCalibStep1">
+          <h3>Calibração de KH</h3>
+          <p>
+            As câmaras A, B e C estão vazias/preparadas conforme o guia
+            de calibração?
+          </p>
+          <button id="khCalibStep1Yes" class="btn-primary">Sim, estão vazias/OK</button>
+          <button id="khCalibStep1No"  class="btn-primary">Não, continuar mesmo assim</button>
+        </div>
+
+        <!-- Passo 2: KH de referência -->
+        <div id="khCalibStep2" class="hidden">
+          <h3>Informe o KH de referência</h3>
+          <p>Digite o KH da solução de referência usada na câmara C.</p>
+          <input id="khCalibRefInput" type="text" placeholder="Ex: 7.50" />
+          <div id="khCalibModalStatus" class="hint" style="margin-top:4px;"></div>
+          <div class="inline" style="margin-top:8px;">
+            <button id="khCalibSaveBtn"   class="btn-primary">Salvar KH ref</button>
+            <button id="khCalibCancelBtn" class="btn-primary">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   <button id="abortBtn" class="btn-abort" style="display:none;">
     ⚠ ABORTAR
   </button>
+
+
+
+
 
   <div id="footer-root"></div>
 
