@@ -475,9 +475,17 @@ async function loadConfigForSelected() {
   const cfg = await apiLoadDeviceConfig(deviceId);
   if (!cfg) return;
 
+  let khRef = null;
   if (typeof cfg.khReference === 'number') {
-    khRefInput.value = cfg.khReference.toFixed(2);
-    khRefStatus.textContent = `Referência atual: ${cfg.khReference.toFixed(2)} dKH`;
+    khRef = cfg.khReference;
+  } else if (cfg.khReference != null) {
+    const v = parseFloat(cfg.khReference);
+    khRef = Number.isNaN(v) ? null : v;
+  }
+
+  if (khRef != null) {
+    khRefInput.value = khRef.toFixed(2);
+    khRefStatus.textContent = `Referência atual: ${khRef.toFixed(2)} dKH`;
   } else {
     khRefStatus.textContent = 'Referência atual --';
     khRefInput.value = '';
@@ -877,35 +885,49 @@ if (khCalibSaveBtn) {
     khCalibSaveBtn.disabled = true;
     khCalibModalStatus.textContent = 'Salvando KH de referência...';
 
-    // Por enquanto, só salva KH ref como hoje:
+    // 1) salva KH ref na API (como já fazia)
     const ok = await apiSetKhConfig(deviceId, val, null);
 
-    khCalibSaveBtn.disabled = false;
-
-    if (ok) {
-      khCalibModalStatus.textContent =
-        `Referência salva: ${val.toFixed(2)} dKH.`;
-
-      // sincroniza UI local
-      if (khRefInput) {
-        khRefInput.value = val.toFixed(2);
-      }
-      if (khRefStatus) {
-        khRefStatus.textContent =
-          `Referência atual: ${val.toFixed(2)} dKH`;
-      }
-
-      window.dispatchEvent(new CustomEvent('deviceChanged'));
-
-      // pequeno delay para o usuário ver a mensagem
-      setTimeout(() => closeKhCalibModal(), 800);
-    } else {
+    if (!ok) {
       khCalibModalStatus.textContent =
         'Erro ao salvar KH de referência.';
+      khCalibSaveBtn.disabled = false;
+      return;
     }
 
-    // FUTURO: aqui vamos também chamar o comando khcalibrate com
-    // { assumeEmpty: khCalibAssumeEmpty, khRefUser: val }
+    // 2) sincroniza UI local
+    if (khRefInput) {
+      khRefInput.value = val.toFixed(2);
+    }
+    if (khRefStatus) {
+      khRefStatus.textContent =
+        `Referência atual: ${val.toFixed(2)} dKH`;
+    }
+    window.dispatchEvent(new CustomEvent('deviceChanged'));
+
+    // 3) dispara a calibração de KH no device
+    khCalibModalStatus.textContent =
+      'Referência salva. Iniciando calibração no dispositivo...';
+
+    try {
+      await sendDeviceCommand(deviceId, 'khcalibrate', {
+        assumeEmpty: khCalibAssumeEmpty, // true se usuário respondeu "Sim", false se "Não"
+        khRefUser: val,
+      });
+
+      khCalibModalStatus.textContent =
+        'Calibração iniciada. Acompanhe o ciclo no dispositivo.';
+      isRunningCycle = true;
+      updateAbortVisibility();
+
+      setTimeout(() => closeKhCalibModal(), 1000);
+    } catch (err) {
+      console.error('khcalibrate error', err);
+      khCalibModalStatus.textContent =
+        'Erro ao iniciar calibração no dispositivo.';
+    } finally {
+      khCalibSaveBtn.disabled = false;
+    }
   });
 }
 
@@ -917,82 +939,10 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-async function apiStartCalibration(deviceId) {
-  // por enquanto usa o mesmo fluxo de test_now
-  const res = await apiFetch(
-    `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ type: 'khcalibrate' }),
-    }
-  );
-  const json = await res.json();
-  return res.ok && json.success;
-}
-
-async function apiAbort(deviceId) {
-  const res = await apiFetch(
-    `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ type: 'abort' }),
-    }
-  );
-  const json = await res.json();
-  return res.ok && json.success;
-}
-
-abortBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-  if (!deviceId) return;
-  if (!confirm('Deseja realmente abortar o teste/calibração em andamento?')) return;
-
-  const ok = await apiAbort(deviceId);
-  if (ok) {
-    isRunningCycle = false;
-    updateAbortVisibility();
-    calibrationStatus.textContent = 'Ciclo abortado pelo usuário.';
-
-    try {
-      await sendDeviceCommand(deviceId, 'pump4abort');
-    } catch (e) {
-      console.error('pump4abort error', e);
-    }
-
-    if (pump4CalibRunning) {
-      pump4CalibRunning = false;
-      if (pump4CalibTimerId) {
-        clearInterval(pump4CalibTimerId);
-        pump4CalibTimerId = null;
-      }
-      if (pump4CalibProgressFill && pump4CalibProgressLabel) {
-        pump4CalibProgressFill.style.width = '0%';
-        pump4CalibProgressLabel.textContent = 'Calibração abortada.';
-      }
-      pump4CalibStatusEl.textContent =
-        'Calibração abortada. Ajuste o setup e inicie novamente se necessário.';
-      pump4RunCalibBtn.disabled = false;
-    }
-  }
-});
-
-
-
-document
-  .getElementById('startCalibrationBtn')
-  .addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
-    calibrationStatus.textContent = 'Iniciando calibração...';
-    const ok = await apiStartCalibration(deviceId);
-    calibrationStatus.textContent = ok
-      ? 'Calibração iniciada. Aguardando resposta do device...'
-      : 'Erro ao iniciar calibração.';
-
-    if (ok) {
-    isRunningCycle = true;
-    updateAbortVisibility();
-    }
-
+if (startCalibrationBtn) {
+  startCalibrationBtn.addEventListener('click', () => {
+    showKhCalibModal();
   });
+}
+
 
