@@ -806,7 +806,7 @@ async function apiStartCalibration(deviceId) {
     `/api/v1/user/devices/${encodeURIComponent(deviceId)}/command`,
     {
       method: 'POST',
-      body: JSON.stringify({ type: 'test_now' }),
+      body: JSON.stringify({ type: 'khcalibrate' }),
     }
   );
   const json = await res.json();
