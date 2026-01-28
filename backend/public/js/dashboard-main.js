@@ -240,7 +240,7 @@ function startPump4CalibProgress() {
   pump4CalibTimerId = setInterval(updatePump4CalibProgress, 500);
 }
 
-
+/*
 function applyTestModeUI(testModeEnabled) {
   if (!testModeToggle || !testNowBtn) return;
   testModeToggle.checked = !!testModeEnabled;
@@ -252,6 +252,17 @@ function applyTestModeUI(testModeEnabled) {
 
   testNowBtn.disabled = !testModeEnabled || !hasRef;
 }
+*/
+
+function applyTestModeUI(testModeEnabled) {
+  if (!testModeToggle || !testNowBtn) return;
+  testModeToggle.checked = !!testModeEnabled;
+
+  // antes: travava se não tivesse Calibração: OK
+  // agora: só depende do test mode
+  testNowBtn.disabled = !testModeEnabled;
+}
+
 
 // Utilitário simples de data/hora
 function formatDateTime(ms) {
@@ -695,7 +706,7 @@ async function loadKhInfo(deviceId) {
           : 'ref: --';
     }
 
-  // Label de calibração + trava/libera botão Teste agora
+/*  // Label de calibração + trava/libera botão Teste agora
   if (khCalibrationLabel && testNowBtn) {
     if (khReference != null && !Number.isNaN(khReference)) {
       khCalibrationLabel.textContent =
@@ -709,7 +720,20 @@ async function loadKhInfo(deviceId) {
         'Calibre o KH em Configurações → Calibração de KH antes de iniciar testes.';
     }
   }
+*/
+    if (khCalibrationLabel && testNowBtn) {
+      if (khReference != null && !Number.isNaN(khReference)) {
+        khCalibrationLabel.textContent =
+          `Calibração: OK (${khReference.toFixed(2)} dKH)`;
+      } else {
+        khCalibrationLabel.textContent = 'Calibração: --';
+      }
 
+      // botão sempre liberado
+      testNowBtn.disabled = false;
+      testNowBtn.title = '';
+    }
+      
 
   } catch (err) {
     console.error('loadKhInfo error', err);
