@@ -3008,19 +3008,26 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
 
     const health = req.body || {};
 
-    // Normaliza para os nomes esperados (com underscore)
-    const cpu = health.cpu_usage ?? health.cpuusage ?? 0;
-    const mem = health.memory_usage ?? health.memoryusage ?? 0;
-    const storage = health.storage_usage ?? health.storageusage ?? null;
-    const wifi = health.wifi_rssi ?? health.wifirssi ?? null;
-    const uptime = health.uptime ?? 0;
+    const cpu = Number(
+      health.cpu_usage ?? health.cpuusage ?? 0
+    );
+    const mem = Number(
+      health.memory_usage ?? health.memoryusage ?? 0
+    );
+    const storageRaw = health.storage_usage ?? health.storageusage ?? null;
+    const storage =
+      storageRaw == null ? null : Number(storageRaw);
+    const wifiRaw = health.wifi_rssi ?? health.wifirssi ?? null;
+    const wifi =
+      wifiRaw == null ? null : Number(wifiRaw);
+    const uptime = Number(health.uptime ?? 0);
 
-    // Valida
-    if (typeof cpu !== 'number' || typeof mem !== 'number' || typeof uptime !== 'number') {
-      console.log('[API] Health validation failed:', { cpu, mem, uptime });
-      return res.status(400).json({
-        success: false,
-        message: 'Métricas de saúde inválidas',
+    if (!Number.isFinite(cpu) || !Number.isFinite(mem) || !Number.isFinite(uptime)) {
+      console.log('[API] Health validation failed (coerção):', { cpu, mem, uptime });
+      // Não derruba o device; só loga e responde OK.
+      return res.json({
+        success: true,
+        message: 'Métricas ignoradas (formato inválido)',
       });
     }
 
@@ -3028,7 +3035,8 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       cpu: cpu + '%',
       memory: mem + '%',
       uptime: uptime + 's',
-      wifi: wifi,
+      wifi,
+      storage,
     });
 
     await pool.query(
@@ -3052,6 +3060,7 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 
 // GET /api/v1/device/kh-reference
