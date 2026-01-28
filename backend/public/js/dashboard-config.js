@@ -636,7 +636,7 @@ saveIntervalBtn.addEventListener('click', async () => {
 });
 
 
-const saveKhHealthBtn = document.getElementById('saveKhHealthBtn');
+const saveKhHealthBtn = document.getElementById('btnSaveKhHealthRanges');
 
 if (saveKhHealthBtn) {
   saveKhHealthBtn.addEventListener('click', async () => {
@@ -793,6 +793,123 @@ async function initDashboardConfig() {
   updateIntervalLabel(intervalRange.value);
   await loadConfigForSelected();
 }
+
+// === Modal de Calibração de KH (assistente) ===
+const khCalibModal        = document.getElementById('khCalibModal');
+const openKhCalibModalBtn = document.getElementById('openKhCalibModalBtn');
+const khCalibStep1        = document.getElementById('khCalibStep1');
+const khCalibStep2        = document.getElementById('khCalibStep2');
+const khCalibStep1Yes     = document.getElementById('khCalibStep1Yes');
+const khCalibStep1No      = document.getElementById('khCalibStep1No');
+const khCalibRefInput     = document.getElementById('khCalibRefInput');
+const khCalibSaveBtn      = document.getElementById('khCalibSaveBtn');
+const khCalibCancelBtn    = document.getElementById('khCalibCancelBtn');
+const khCalibModalStatus  = document.getElementById('khCalibModalStatus');
+
+// flag que depois vamos mandar para o backend (assumeEmpty)
+let khCalibAssumeEmpty = true;
+
+function showKhCalibModal() {
+  if (!khCalibModal) return;
+  khCalibAssumeEmpty = true;          // default = câmaras vazias
+  khCalibStep1.classList.remove('hidden');
+  khCalibStep2.classList.add('hidden');
+  khCalibModalStatus.textContent = '';
+  // sugere o valor atual se existir
+  if (khRefInput && khRefInput.value) {
+    khCalibRefInput.value = khRefInput.value;
+  } else {
+    khCalibRefInput.value = '';
+  }
+  khCalibModal.classList.remove('hidden');
+}
+
+function closeKhCalibModal() {
+  if (!khCalibModal) return;
+  khCalibModal.classList.add('hidden');
+}
+
+if (openKhCalibModalBtn && khCalibModal) {
+  openKhCalibModalBtn.addEventListener('click', () => {
+    showKhCalibModal();
+  });
+}
+
+if (khCalibStep1Yes) {
+  khCalibStep1Yes.addEventListener('click', () => {
+    // usuário disse que câmaras estão vazias
+    khCalibAssumeEmpty = true;
+    khCalibStep1.classList.add('hidden');
+    khCalibStep2.classList.remove('hidden');
+    khCalibRefInput.focus();
+  });
+}
+
+if (khCalibStep1No) {
+  khCalibStep1No.addEventListener('click', () => {
+    // usuário disse que NÃO estão vazias -> no futuro assumeEmpty=false
+    khCalibAssumeEmpty = false;
+    khCalibStep1.classList.add('hidden');
+    khCalibStep2.classList.remove('hidden');
+    khCalibRefInput.focus();
+  });
+}
+
+if (khCalibCancelBtn) {
+  khCalibCancelBtn.addEventListener('click', () => {
+    closeKhCalibModal();
+  });
+}
+
+if (khCalibSaveBtn) {
+  khCalibSaveBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    const raw = (khCalibRefInput.value || '').trim();
+    const val = parseFloat(raw.replace(',', '.'));
+    if (!Number.isFinite(val) || val <= 0 || val > 25) {
+      khCalibModalStatus.textContent =
+        'Informe um KH de referência válido (0–25).';
+      return;
+    }
+
+    khCalibSaveBtn.disabled = true;
+    khCalibModalStatus.textContent = 'Salvando KH de referência...';
+
+    // Por enquanto, só salva KH ref como hoje:
+    const ok = await apiSetKhConfig(deviceId, val, null);
+
+    khCalibSaveBtn.disabled = false;
+
+    if (ok) {
+      khCalibModalStatus.textContent =
+        `Referência salva: ${val.toFixed(2)} dKH.`;
+
+      // sincroniza UI local
+      if (khRefInput) {
+        khRefInput.value = val.toFixed(2);
+      }
+      if (khRefStatus) {
+        khRefStatus.textContent =
+          `Referência atual: ${val.toFixed(2)} dKH`;
+      }
+
+      window.dispatchEvent(new CustomEvent('deviceChanged'));
+
+      // pequeno delay para o usuário ver a mensagem
+      setTimeout(() => closeKhCalibModal(), 800);
+    } else {
+      khCalibModalStatus.textContent =
+        'Erro ao salvar KH de referência.';
+    }
+
+    // FUTURO: aqui vamos também chamar o comando khcalibrate com
+    // { assumeEmpty: khCalibAssumeEmpty, khRefUser: val }
+  });
+}
+
+
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboardConfig().catch((err) =>
