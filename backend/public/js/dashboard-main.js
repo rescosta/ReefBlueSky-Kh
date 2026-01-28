@@ -1,5 +1,9 @@
 // dashboard-main.js
 
+
+const khCalibrationLabel = document.getElementById('khCalibrationLabel');
+
+
 const khValueEl = document.getElementById('khValue');
 const khDiffEl = document.getElementById('khDiff');
 const khPrevEl = document.getElementById('khPrev');
@@ -240,7 +244,13 @@ function startPump4CalibProgress() {
 function applyTestModeUI(testModeEnabled) {
   if (!testModeToggle || !testNowBtn) return;
   testModeToggle.checked = !!testModeEnabled;
-  testNowBtn.disabled = !testModeEnabled;
+
+  // respeita também o estado de calibração
+  const hasRef =
+    khCalibrationLabel &&
+    khCalibrationLabel.textContent.startsWith('Calibração: OK');
+
+  testNowBtn.disabled = !testModeEnabled || !hasRef;
 }
 
 // Utilitário simples de data/hora
@@ -684,6 +694,23 @@ async function loadKhInfo(deviceId) {
           ? `ref: ${khReference.toFixed(2)}`
           : 'ref: --';
     }
+
+  // Label de calibração + trava/libera botão Teste agora
+  if (khCalibrationLabel && testNowBtn) {
+    if (khReference != null && !Number.isNaN(khReference)) {
+      khCalibrationLabel.textContent =
+        `Calibração: OK (${khReference.toFixed(2)} dKH)`;
+      testNowBtn.disabled = false;
+      testNowBtn.title = '';
+    } else {
+      khCalibrationLabel.textContent = 'Calibração: necessária';
+      testNowBtn.disabled = true;
+      testNowBtn.title =
+        'Calibre o KH em Configurações → Calibração de KH antes de iniciar testes.';
+    }
+  }
+
+
   } catch (err) {
     console.error('loadKhInfo error', err);
   }
