@@ -3353,8 +3353,9 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'setpump4mlpersec',
       'khcorrection',
       'fake_measurement',
-      'pump4abort', 
-
+      'pump4abort',
+      'khcalibrate',     
+ 
     ]);
 
     if (!allowed.has(type)) {
@@ -3432,6 +3433,12 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
 
       case 'pump4abort':      
       dbType = 'pump4abort'; 
+      payload = {};
+      break;
+
+      case 'khcalibrate':          
+      // firmware: cmd.action == "khcalibrate" → envia 'K' para FSM KH_Calibrator
+      dbType = 'khcalibrate';
       payload = {};
       break;
 
