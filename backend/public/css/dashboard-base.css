@@ -416,6 +416,31 @@ table {
 }
 
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+}
+
+.modal {
+  background: #020617;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #1f2937;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+.hidden {
+  display: none;
+}
+
+
 /* ===== MOBILE (<=768px) ===== */
 @media (max-width: 768px) {
   /* esconder menu textual e rótulos que ocupam espaço */
