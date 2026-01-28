@@ -1377,36 +1377,6 @@ app.post('/api/display/register-device', authUserMiddleware, async (req, res) =>
   }
 });
 
-
-
-/*
-app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
-  console.log('FW REPORT body=', req.body);
-  console.log('FW REPORT user=', req.user);
-
-  const deviceId = req.user.deviceId;
-  const { firmwareVersion } = req.body || {};
-  if (!firmwareVersion) {
-    return res.status(400).json({ success: false, message: 'firmwareVersion obrigatório' });
-  }
-
-  let conn;
-  try {
-    conn = await pool.getConnection();
-    await conn.query(
-      'UPDATE devices SET firmware_version = ?, updatedAt = NOW() WHERE deviceId = ?',
-      [firmwareVersion, deviceId]
-    );
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('POST /device/firmware error', err);
-    return res.status(500).json({ success: false, message: 'Erro ao atualizar firmwareVersion' });
-  } finally {
-    if (conn) try { conn.release(); } catch (e) {}
-  }
-});
-*/
-
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
   console.log('FW REPORT body=', req.body);
   console.log('FW REPORT user=', req.user);
@@ -1419,8 +1389,18 @@ app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
     deviceId = mainDeviceId;
   }
 
+  // Em vez de 400, só loga e retorna success=true se algo vier faltando
   if (!firmwareVersion || !deviceId) {
-    return res.status(400).json({ success: false, message: 'firmwareVersion ou deviceId ausente' });
+    console.log('[FW] payload incompleto em /device/firmware', {
+      firmwareVersion,
+      deviceId,
+      mainDeviceId,
+      user: req.user,
+    });
+    return res.json({
+      success: true,
+      message: 'payload de firmware ignorado (incompleto)',
+    });
   }
 
   let conn;
@@ -1433,11 +1413,14 @@ app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('POST /device/firmware error', err);
-    return res.status(500).json({ success: false, message: 'Erro ao atualizar firmwareVersion' });
+    return res
+      .status(500)
+      .json({ success: false, message: 'Erro ao atualizar firmwareVersion' });
   } finally {
     if (conn) try { conn.release(); } catch (e) {}
   }
 });
+
 
 // ============================================================================
 // [API] Endpoints de Autenticação (v1)
@@ -3004,27 +2987,22 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
     const deviceId = req.user.deviceId;
     const userId = req.user.userId;
     console.log('[API] POST /api/v1/device/health - Device:', deviceId);
-    console.log('HEALTH RAW body =', req.body); 
+    console.log('HEALTH RAW body =', req.body);
 
     const health = req.body || {};
 
-    const cpu = Number(
-      health.cpu_usage ?? health.cpuusage ?? 0
-    );
-    const mem = Number(
-      health.memory_usage ?? health.memoryusage ?? 0
-    );
+    // Converte tudo pra número
+    const cpu = Number(health.cpu_usage ?? health.cpuusage ?? 0);
+    const mem = Number(health.memory_usage ?? health.memoryusage ?? 0);
     const storageRaw = health.storage_usage ?? health.storageusage ?? null;
-    const storage =
-      storageRaw == null ? null : Number(storageRaw);
+    const storage = storageRaw == null ? null : Number(storageRaw);
     const wifiRaw = health.wifi_rssi ?? health.wifirssi ?? null;
-    const wifi =
-      wifiRaw == null ? null : Number(wifiRaw);
+    const wifi = wifiRaw == null ? null : Number(wifiRaw);
     const uptime = Number(health.uptime ?? 0);
 
     if (!Number.isFinite(cpu) || !Number.isFinite(mem) || !Number.isFinite(uptime)) {
       console.log('[API] Health validation failed (coerção):', { cpu, mem, uptime });
-      // Não derruba o device; só loga e responde OK.
+      // Não derruba o device, só ignora o insert
       return res.json({
         success: true,
         message: 'Métricas ignoradas (formato inválido)',
@@ -3043,7 +3021,7 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       'UPDATE devices SET last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
       [deviceId]
     );
-      
+
     await pool.query(
       `INSERT INTO device_health
          (deviceId, userId, cpu_usage, mem_usage, storage_usage, wifi_rssi, uptime_seconds)
@@ -3051,15 +3029,13 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       [deviceId, userId, cpu, mem, storage, wifi, uptime]
     );
 
-    return res.json({
-      success: true,
-      message: 'Métricas de saúde recebidas',
-    });
+    return res.json({ success: true, message: 'Métricas de saúde recebidas' });
   } catch (err) {
     console.error('Error saving device health', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 
 
