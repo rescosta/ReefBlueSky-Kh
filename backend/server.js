@@ -1378,6 +1378,7 @@ app.post('/api/display/register-device', authUserMiddleware, async (req, res) =>
 });
 
 app.post('/api/v1/device/firmware', verifyToken, async (req, res) => {
+  console.log('*** DEVICE FIRMWARE HANDLER NOVO ***');
   console.log('FW REPORT body=', req.body);
   console.log('FW REPORT user=', req.user);
 
@@ -2983,6 +2984,8 @@ app.post('/api/v1/device/logs', verifyToken, async (req, res) => {
  * [SEGURANÇA] Enviar métricas de saúde
  */
 app.post('/api/v1/device/health', verifyToken, async (req, res) => {
+  console.log('*** DEVICE HEALTH HANDLER NOVO ***');
+
   try {
     const deviceId = req.user.deviceId;
     const userId = req.user.userId;
