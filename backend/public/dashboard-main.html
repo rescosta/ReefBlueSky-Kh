@@ -437,7 +437,42 @@
         </div>
       </div>
 
-    
+      <!-- [FIX] Card de Status do Sistema (Sanity Checks) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">💚 Status do Sistema</div>
+        </div>
+        <div class="card-subtitle" style="margin-bottom: 12px;">
+          Indicadores de sanity checks (validações automáticas)
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+          <!-- Vazão -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #020617; border: 1px solid #1f2937; border-radius: 6px;">
+            <span style="color: #9ca3af;">💧 Vazão (0.1-10 mL/s)</span>
+            <span id="statusFlowRate" class="status-badge" style="font-size: 12px;">--</span>
+          </div>
+
+          <!-- pH -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #020617; border: 1px solid #1f2937; border-radius: 6px;">
+            <span style="color: #9ca3af;">🧪 pH (6.0-9.0)</span>
+            <span id="statusPHRange" class="status-badge" style="font-size: 12px;">--</span>
+          </div>
+
+          <!-- Temperatura -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #020617; border: 1px solid #1f2937; border-radius: 6px;">
+            <span style="color: #9ca3af;">🌡️ Temperatura (15-35°C)</span>
+            <span id="statusTempRange" class="status-badge" style="font-size: 12px;">--</span>
+          </div>
+
+          <!-- Último alerta -->
+          <div style="margin-top: 6px; padding: 8px 10px; background: #020617; border: 1px solid #1f2937; border-radius: 6px;">
+            <div style="color: #9ca3af; font-size: 11px; margin-bottom: 4px;">📢 Último alerta:</div>
+            <div id="lastAlertText" style="color: #e5e7eb; font-size: 12px;">Nenhum alerta recente</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Correção de KH (Bomba 4) -->
       <div class="card">
         <div class="card-header">
@@ -494,8 +529,6 @@
                 <th>Data/hora</th>
                 <th></th>
                 <th>KH</th>
-                <th>pH ref</th>
-                <th>pH amostra</th>
                 <th>Temp (°C)</th>
                 <th>Status</th>
               </tr>

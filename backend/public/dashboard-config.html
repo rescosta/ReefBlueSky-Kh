@@ -562,6 +562,135 @@
           </div>
         </div>
 
+        <!-- Card: Modo Manutenção -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔧 Modo Manutenção</div>
+          </div>
+          <div class="card-subtitle">
+            Testes manuais de bombas, sensores e câmaras para diagnóstico e manutenção.
+          </div>
+
+          <!-- Testes de bombas individuais -->
+          <div class="field-row">
+            <label>Testar bombas individualmente</label>
+            <div class="hint" style="margin-bottom:8px;">
+              Aciona cada bomba por um tempo específico. Use para verificar se as bombas estão funcionando corretamente.
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button id="testPump1Btn" class="btn-primary" style="flex:1;">
+                  Bomba 1
+                </button>
+                <input id="testPump1Duration" type="number" value="5" min="1" max="60"
+                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
+                <span style="font-size:11px; color:#9ca3af;">seg</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button id="testPump2Btn" class="btn-primary" style="flex:1;">
+                  Bomba 2
+                </button>
+                <input id="testPump2Duration" type="number" value="5" min="1" max="60"
+                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
+                <span style="font-size:11px; color:#9ca3af;">seg</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button id="testPump3Btn" class="btn-primary" style="flex:1;">
+                  Bomba 3
+                </button>
+                <input id="testPump3Duration" type="number" value="5" min="1" max="60"
+                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
+                <span style="font-size:11px; color:#9ca3af;">seg</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button id="testPump4Btn" class="btn-primary" style="flex:1;">
+                  Bomba 4
+                </button>
+                <input id="testPump4Duration" type="number" value="5" min="1" max="60"
+                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
+                <span style="font-size:11px; color:#9ca3af;">seg</span>
+              </div>
+            </div>
+            <span id="pumpTestStatus" class="hint" style="margin-top:6px; display:block;">
+              Selecione uma bomba e duração, depois clique para testar.
+            </span>
+          </div>
+
+          <!-- Leituras de sensores em tempo real -->
+          <div class="field-row">
+            <label>Leituras dos sensores</label>
+            <div class="hint" style="margin-bottom:8px;">
+              Valores atuais reportados pelos sensores do dispositivo.
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:8px;">
+              <div style="background:#020617; border:1px solid #374151; border-radius:6px; padding:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">Nível A</div>
+                <div id="sensorLevelA" style="font-size:16px; font-weight:600; color:#4ade80;">--</div>
+              </div>
+              <div style="background:#020617; border:1px solid #374151; border-radius:6px; padding:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">Nível B</div>
+                <div id="sensorLevelB" style="font-size:16px; font-weight:600; color:#4ade80;">--</div>
+              </div>
+              <div style="background:#020617; border:1px solid #374151; border-radius:6px; padding:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">Nível C</div>
+                <div id="sensorLevelC" style="font-size:16px; font-weight:600; color:#4ade80;">--</div>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
+              <div style="background:#020617; border:1px solid #374151; border-radius:6px; padding:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">Temperatura</div>
+                <div id="sensorTemp" style="font-size:16px; font-weight:600; color:#60a5fa;">--</div>
+              </div>
+              <div style="background:#020617; border:1px solid #374151; border-radius:6px; padding:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; margin-bottom:4px;">pH interno</div>
+                <div id="sensorPH" style="font-size:16px; font-weight:600; color:#60a5fa;">--</div>
+              </div>
+            </div>
+            <button id="refreshSensorsBtn" class="btn-primary" style="margin-top:8px; width:100%;">
+              🔄 Atualizar leituras
+            </button>
+            <span id="sensorReadStatus" class="hint" style="margin-top:6px; display:block;">
+              Clique para solicitar leituras atualizadas do dispositivo.
+            </span>
+          </div>
+
+          <!-- Testes de câmaras individuais -->
+          <div class="field-row">
+            <label>Testar enchimento de câmaras</label>
+            <div class="hint" style="margin-bottom:8px;">
+              Preenche uma câmara específica para teste. Use para verificar válvulas e níveis.
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+              <button id="fillChamberABtn" class="btn-primary">
+                Encher Câmara A
+              </button>
+              <button id="fillChamberBBtn" class="btn-primary">
+                Encher Câmara B
+              </button>
+              <button id="fillChamberCBtn" class="btn-primary">
+                Encher Câmara C
+              </button>
+            </div>
+            <span id="chamberTestStatus" class="hint" style="margin-top:6px; display:block;">
+              Selecione uma câmara para testar o enchimento.
+            </span>
+          </div>
+
+          <!-- Limpeza do sistema -->
+          <div class="field-row">
+            <label>Limpeza e manutenção</label>
+            <div class="hint" style="margin-bottom:8px;">
+              Executa ciclo de limpeza do sistema (flush de todas as câmaras e tubulações).
+            </div>
+            <button id="systemFlushBtn" class="btn-primary" style="width:100%;">
+              🚿 Executar ciclo de limpeza completo
+            </button>
+            <span id="flushStatus" class="hint" style="margin-top:6px; display:block;">
+              Ciclo de limpeza demora aproximadamente 2 minutos.
+            </span>
+          </div>
+        </div>
+
          <!-- Card: Alertas por Telegram -->
         <div class="card">
           <div class="card-header">
@@ -633,21 +762,35 @@
           <div class="modal">
             <!-- Passo 1: câmaras vazias? -->
             <div id="khCalibStep1">
-              <h3>Calibração de KH</h3>
-              <p>As câmaras estão vazias</p>
-              <button id="khCalibStep1Yes" class="btn-primary">Sim</button>
-              <button id="khCalibStep1No"  class="btn-primary">Não</button>
+              <h3>🔬 Calibração de KH - Preparação</h3>
+              <p style="margin-bottom: 12px;"><strong>As câmaras A, B e C estão vazias?</strong></p>
+
+              <div class="hint" style="text-align: left; margin-bottom: 16px; line-height: 1.6;">
+                <strong>📋 Processo de calibração (automático):</strong><br>
+                <strong>• Fase B1:</strong> Bomba 1 enche câmara A (água do aquário), depois bomba 2 transfere 50mL de A→B<br>
+                <strong>• Fase B2:</strong> Mede pH e temperatura da solução padrão em B (50mL)<br>
+                <strong>• Fase B3:</strong> Bomba 3 transfere 150mL de B→C, com reabastecimento contínuo de A→B e aquário→A<br>
+                <br>
+                <strong>⚠️ Importante:</strong> Se responder "Não", o sistema assume que as câmaras já contêm água e pula etapas de enchimento inicial.
+              </div>
+
+              <button id="khCalibStep1Yes" class="btn-primary">✓ Sim, estão vazias</button>
+              <button id="khCalibStep1No"  class="btn-primary">✗ Não, já contêm água</button>
             </div>
 
             <!-- Passo 2: KH de referência -->
             <div id="khCalibStep2" class="hidden">
-              <h3>Calibração de KH</h3>
-              <p>Informe KH de Referência</p>
+              <h3>🔬 Calibração de KH - Valor de Referência</h3>
+              <p>Informe o KH de referência da solução padrão (câmara C):</p>
+              <div class="hint" style="margin-bottom: 8px;">
+                Este valor será usado como referência para calcular o KH do aquário.<br>
+                Exemplo: Se sua solução padrão tem 7.50 dKH, digite 7.50
+              </div>
               <input id="khCalibRefInput" type="text" placeholder="Ex: 7.50" />
               <div id="khCalibModalStatus" class="hint" style="margin-top:4px;"></div>
               <div class="inline" style="margin-top:8px;">
-                <button id="khCalibSaveBtn"   class="btn-primary">Salvar</button>
-                <button id="khCalibCancelBtn" class="btn-primary">Cancelar</button>
+                <button id="khCalibSaveBtn"   class="btn-primary">✓ Iniciar Calibração</button>
+                <button id="khCalibCancelBtn" class="btn-primary">✗ Cancelar</button>
               </div>
             </div>
           </div>

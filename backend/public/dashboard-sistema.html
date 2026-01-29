@@ -150,6 +150,76 @@
     }
     .btn-danger:hover { filter: brightness(1.05); }
 
+    /* [FIX] Estilos para alertas */
+    .alert-item {
+      background: #020617;
+      border-radius: 8px;
+      border-left: 4px solid;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .alert-item-low {
+      border-left-color: #60a5fa; /* azul */
+      background: rgba(96, 165, 250, 0.05);
+    }
+    .alert-item-medium {
+      border-left-color: #facc15; /* amarelo */
+      background: rgba(250, 204, 21, 0.05);
+    }
+    .alert-item-high {
+      border-left-color: #f97373; /* vermelho */
+      background: rgba(249, 115, 115, 0.05);
+    }
+    .alert-item-critical {
+      border-left-color: #b91c1c; /* vermelho escuro */
+      background: rgba(185, 28, 28, 0.1);
+    }
+    .alert-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .alert-type {
+      font-weight: 600;
+      font-size: 13px;
+      color: #e5e7eb;
+    }
+    .alert-severity {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .alert-severity-low {
+      background: #60a5fa;
+      color: #020617;
+    }
+    .alert-severity-medium {
+      background: #facc15;
+      color: #020617;
+    }
+    .alert-severity-high {
+      background: #f97373;
+      color: #fff;
+    }
+    .alert-severity-critical {
+      background: #b91c1c;
+      color: #fff;
+    }
+    .alert-message {
+      color: #9ca3af;
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .alert-timestamp {
+      font-size: 11px;
+      color: #6b7280;
+    }
+
     .muted {
       color: #6b7280;
       font-size: 12px;
@@ -290,6 +360,35 @@
           Aguardando dados de saúde do dispositivo.
         </div>
       </div>
+
+      <!-- [FIX] Card de Backup e Export -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📦 Backup e Export</div>
+        </div>
+        <div class="card-subtitle">
+          Exportar dados e fazer backup das configurações.
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:13px; margin-top:12px;">
+          <button id="exportMeasurementsBtn" class="btn-primary">
+            📊 Exportar Medições (CSV)
+          </button>
+          <button id="backupConfigBtn" class="btn-primary">
+            💾 Backup Configurações (JSON)
+          </button>
+          <div style="margin-top:4px;">
+            <label for="importConfigFile" class="btn-primary" style="display:inline-block; cursor:pointer; text-align:center;">
+              📥 Importar Configurações
+            </label>
+            <input type="file" id="importConfigFile" accept=".json" style="display:none;">
+          </div>
+        </div>
+
+        <div id="backupStatus" class="muted" style="margin-top:8px;">
+          Clique nos botões acima para exportar/importar dados.
+        </div>
+      </div>
     </div>
 
     <!-- Coluna direita: comandos e eventos -->
@@ -329,6 +428,20 @@
 
         <div id="eventsList" class="events-list">
           <div class="muted">Nenhum evento carregado ainda.</div>
+        </div>
+      </div>
+
+      <!-- [FIX] Card de Alertas Recentes -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🚨 Alertas Recentes</div>
+        </div>
+        <div class="card-subtitle">
+          Histórico de alertas de calibração, erros e avisos do sistema (enviados via Telegram/Email).
+        </div>
+
+        <div id="alertsList" class="events-list" style="max-height: 300px; overflow-y: auto;">
+          <div class="muted">Nenhum alerta registrado ainda.</div>
         </div>
       </div>
     </div>

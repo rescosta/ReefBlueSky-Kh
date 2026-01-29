@@ -220,6 +220,47 @@
         </div>
       </div>
     </div>
+
+    <!-- [FIX] Card com gráfico de Temperatura -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Gráfico de Temperatura</div>
+          <div class="card-subtitle">Série histórica de temperatura do sistema (°C)</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <span id="tempChartInfo" class="muted">Carregando dados...</span>
+      </div>
+
+      <!-- Grid com 3 gráficos lado a lado -->
+      <div class="charts-grid">
+        <!-- Gráfico 1: Último dia -->
+        <div class="chart-box">
+          <div class="chart-label">📅 Último Dia - Temperatura</div>
+          <div class="chart-wrapper">
+            <canvas id="tempDailyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico 2: Últimos 7 dias -->
+        <div class="chart-box">
+          <div class="chart-label">📊 Últimos 7 Dias - Temperatura</div>
+          <div class="chart-wrapper">
+            <canvas id="tempWeeklyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico 3: Últimos 30 dias -->
+        <div class="chart-box">
+          <div class="chart-label">📈 Últimos 30 Dias - Temperatura</div>
+          <div class="chart-wrapper">
+            <canvas id="tempMonthlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="footer-root"></div>
