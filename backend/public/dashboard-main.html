@@ -430,6 +430,29 @@
           </span>
         </div>
 
+       <div class="card">
+          <div class="card-header">
+            <div class="card-title">Últimas medições</div>
+            <div class="card-subtitle" id="lastCountInfo">-- registros recentes</div>
+          </div>
+          
+          <div class="kh-history-container">
+            <table class="table-small">
+              <thead>
+                <tr>
+                  <th>Data/hora</th>
+                  <th></th>
+                  <th>KH</th>
+                  <th>Temp (°C)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="measurementsBody"></tbody>
+            </table>
+          </div>
+        </div>  
+
+
     <!-- Progresso do teste manual + botão ABORT -->
         <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
           <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
@@ -447,7 +470,6 @@
       </div>
     </div>
 
-  
 
     <!-- Coluna direita -->
     <div class="right-col" style="display:flex; flex-direction:column; gap:16px;">
@@ -550,27 +572,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Últimas medições</div>
-          <div class="card-subtitle" id="lastCountInfo">-- registros recentes</div>
-        </div>
-        
-        <div class="kh-history-container">
-          <table class="table-small">
-            <thead>
-              <tr>
-                <th>Data/hora</th>
-                <th></th>
-                <th>KH</th>
-                <th>Temp (°C)</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="measurementsBody"></tbody>
-          </table>
-        </div>
-      </div>  
+ 
     </div>
   </div>
 
