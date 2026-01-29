@@ -20,13 +20,36 @@ async function getUserTimezone(userId) {
 // Offset UTC em segundos para o timezone do usuário
 async function getUserUtcOffsetSec(userId) {
   const tz = await getUserTimezone(userId);
-  const local = new Date().toLocaleString('en-US', { timeZone: tz });
-  const asDate = new Date(local);
-  const offsetMin = -asDate.getTimezoneOffset();
-  const offsetSec = offsetMin * 60;
-  console.log('TZ DEBUG', { userId, tz, local, offsetMin, offsetSec });
+
+  // Pega componentes de data/hora no fuso do usuário
+  const now = new Date();
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const parts = dtf.formatToParts(now).reduce((acc, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+
+  const localIso = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+
+  const asDate = new Date(localIso);
+  const offsetMin = (asDate.getTime() - now.getTime()) / (60 * 1000);
+  const offsetSec = Math.round(offsetMin * 60);
+
+  console.log('TZ DEBUG', { userId, tz, localIso, offsetMin, offsetSec });
+
   return offsetSec;
 }
+
 
 
 
