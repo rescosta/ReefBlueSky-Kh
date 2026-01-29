@@ -571,49 +571,105 @@
             Testes manuais de bombas, sensores e câmaras para diagnóstico e manutenção.
           </div>
 
-          <!-- Testes de bombas individuais -->
+          <!-- Testes de bombas individuais (com sentido e barra de progresso) -->
           <div class="field-row">
             <label>Testar bombas individualmente</label>
             <div class="hint" style="margin-bottom:8px;">
-              Aciona cada bomba por um tempo específico. Use para verificar se as bombas estão funcionando corretamente.
+              Controle manual das bombas 1-4, incluindo sentido de giro e tempo de ativação com barra regressiva.
             </div>
-            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
-              <div style="display:flex; align-items:center; gap:6px;">
-                <button id="testPump1Btn" class="btn-primary" style="flex:1;">
-                  Bomba 1
-                </button>
-                <input id="testPump1Duration" type="number" value="5" min="1" max="60"
-                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
-                <span style="font-size:11px; color:#9ca3af;">seg</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <button id="testPump2Btn" class="btn-primary" style="flex:1;">
-                  Bomba 2
-                </button>
-                <input id="testPump2Duration" type="number" value="5" min="1" max="60"
-                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
-                <span style="font-size:11px; color:#9ca3af;">seg</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <button id="testPump3Btn" class="btn-primary" style="flex:1;">
-                  Bomba 3
-                </button>
-                <input id="testPump3Duration" type="number" value="5" min="1" max="60"
-                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
-                <span style="font-size:11px; color:#9ca3af;">seg</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <button id="testPump4Btn" class="btn-primary" style="flex:1;">
-                  Bomba 4
-                </button>
-                <input id="testPump4Duration" type="number" value="5" min="1" max="60"
-                       style="width:50px; padding:4px; border:1px solid #374151; border-radius:4px; background:#020617; color:#e5e7eb;">
-                <span style="font-size:11px; color:#9ca3af;">seg</span>
-              </div>
-            </div>
-            <span id="pumpTestStatus" class="hint" style="margin-top:6px; display:block;">
-              Selecione uma bomba e duração, depois clique para testar.
-            </span>
+
+            <table class="pump-table" style="margin-top:8px;">
+              <thead>
+                <tr>
+                  <th>Bomba</th>
+                  <th>Status</th>
+                  <th>Sentido</th>
+                  <th>Tempo (s)</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-pump="1">
+                  <td>1</td>
+                  <td><span id="maintPumpStatus1" class="badge-level badge-level-off">PARADA</span></td>
+                  <td>
+                    <select id="maintPumpDirSelect1">
+                      <option value="forward">Normal</option>
+                      <option value="reverse">Reverso</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input id="maintPumpTime1" type="number" min="1" max="600" value="10" style="width:60px;" />
+                  </td>
+                  <td>
+                    <button class="btn-primary maintPumpStartBtn" data-pump="1">Ativar</button>
+                    <div class="progress-bar" style="margin-top:4px;">
+                      <div id="maintPumpProg1" class="progress-inner" style="width:0;"></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr data-pump="2">
+                  <td>2</td>
+                  <td><span id="maintPumpStatus2" class="badge-level badge-level-off">PARADA</span></td>
+                  <td>
+                    <select id="maintPumpDirSelect2">
+                      <option value="forward">Normal</option>
+                      <option value="reverse">Reverso</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input id="maintPumpTime2" type="number" min="1" max="600" value="10" style="width:60px;" />
+                  </td>
+                  <td>
+                    <button class="btn-primary maintPumpStartBtn" data-pump="2">Ativar</button>
+                    <div class="progress-bar" style="margin-top:4px;">
+                      <div id="maintPumpProg2" class="progress-inner" style="width:0;"></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr data-pump="3">
+                  <td>3</td>
+                  <td><span id="maintPumpStatus3" class="badge-level badge-level-off">PARADA</span></td>
+                  <td>
+                    <select id="maintPumpDirSelect3">
+                      <option value="forward">Normal</option>
+                      <option value="reverse">Reverso</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input id="maintPumpTime3" type="number" min="1" max="600" value="10" style="width:60px;" />
+                  </td>
+                  <td>
+                    <button class="btn-primary maintPumpStartBtn" data-pump="3">Ativar</button>
+                    <div class="progress-bar" style="margin-top:4px;">
+                      <div id="maintPumpProg3" class="progress-inner" style="width:0;"></div>
+                    </div>
+                  </td>
+                </tr>
+
+                <tr data-pump="4">
+                  <td>4</td>
+                  <td><span id="maintPumpStatus4" class="badge-level badge-level-off">PARADA</span></td>
+                  <td>
+                    <select id="maintPumpDirSelect4">
+                      <option value="forward">Normal</option>
+                      <option value="reverse">Reverso</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input id="maintPumpTime4" type="number" min="1" max="600" value="10" style="width:60px;" />
+                  </td>
+                  <td>
+                    <button class="btn-primary maintPumpStartBtn" data-pump="4">Ativar</button>
+                    <div class="progress-bar" style="margin-top:4px;">
+                      <div id="maintPumpProg4" class="progress-inner" style="width:0;"></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <!-- Leituras de sensores em tempo real -->
