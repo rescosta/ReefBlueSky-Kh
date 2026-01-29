@@ -629,30 +629,49 @@
     </div>
   </div>
 
+        <!-- Modal de calibração de KH -->
+        <div id="khCalibModal" class="modal-backdrop hidden">
+          <div class="modal">
+            <!-- Passo 1: câmaras vazias? -->
+            <div id="khCalibStep1">
+              <h3>Calibração de KH</h3>
+              <p>As câmaras estão vazias</p>
+              <button id="khCalibStep1Yes" class="btn-primary">Sim</button>
+              <button id="khCalibStep1No"  class="btn-primary">Não</button>
+            </div>
 
-
-    <!-- Modal de calibração de KH -->
-    <div id="khCalibModal" class="modal-backdrop hidden">
-      <div class="modal">
-        <!-- Passo 1: câmaras vazias? -->
-        <div id="khCalibStep1">
-          <h3>Calibração de KH</h3>
-          <p>
-            As câmaras estão vazias
-          </p>
-          <button id="khCalibStep1Yes" class="btn-primary">Sim</button>
-          <button id="khCalibStep1No"  class="btn-primary">Não</button>
+            <!-- Passo 2: KH de referência -->
+            <div id="khCalibStep2" class="hidden">
+              <h3>Calibração de KH</h3>
+              <p>Informe KH de Referência</p>
+              <input id="khCalibRefInput" type="text" placeholder="Ex: 7.50" />
+              <div id="khCalibModalStatus" class="hint" style="margin-top:4px;"></div>
+              <div class="inline" style="margin-top:8px;">
+                <button id="khCalibSaveBtn"   class="btn-primary">Salvar</button>
+                <button id="khCalibCancelBtn" class="btn-primary">Cancelar</button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Passo 2: KH de referência -->
-        <div id="khCalibStep2" class="hidden">
-          <h3>Calibração de KH</h3>
-          <p>Informe KH de Referência</p>
-          <input id="khCalibRefInput" type="text" placeholder="Ex: 7.50" />
-          <div id="khCalibModalStatus" class="hint" style="margin-top:4px;"></div>
-          <div class="inline" style="margin-top:8px;">
-            <button id="khCalibSaveBtn"   class="btn-primary">Salvar</button>
-            <button id="khCalibCancelBtn" class="btn-primary">Cancelar</button>
+        <!-- Modal para alterar KH de referência manualmente -->
+        <div id="khRefEditModal" class="modal-backdrop hidden">
+          <div class="modal">
+            <h3>Alterar KH de referência</h3>
+            <p style="margin-bottom:4px;">
+              Referência atual: <span id="khRefCurrentSpan">--</span> dKH
+            </p>
+            <label for="khRefEditInput" class="hint">
+              Novo KH de referência
+            </label>
+            <input id="khRefEditInput" type="text" placeholder="Ex: 7.50" />
+
+            <div id="khRefEditStatus" class="hint" style="margin-top:4px;"></div>
+
+            <div class="inline" style="margin-top:8px;">
+              <button id="khRefEditSaveBtn"   class="btn-primary">Salvar</button>
+              <button id="khRefEditCancelBtn" class="btn-primary">Cancelar</button>
+            </div>
           </div>
         </div>
 
