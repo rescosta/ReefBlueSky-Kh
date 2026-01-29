@@ -271,8 +271,8 @@ function applyTestModeUI(testModeEnabled) {
     label.textContent = isEnabled ? 'ON' : 'OFF';
   }
 
-  // Salvar estado no localStorage
-  localStorage.setItem('testModeEnabled', isEnabled ? '1' : '0');
+  // Estado agora vem do backend (salvo no banco de dados)
+  // Não usa mais localStorage
 
   // Habilitar/desabilitar botão "Iniciar teste agora"
   testNowBtn.disabled = !testModeEnabled;
@@ -763,6 +763,10 @@ async function loadKhInfo(deviceId) {
         : 'status-badge off';
     }
 
+    // Aplicar estado do test_mode do backend (estado real do ESP32)
+    const testModeEnabled = !!data.testMode;
+    applyTestModeUI(testModeEnabled);
+
     if (typeof data.pump4MlPerSec === 'number') {
       pump4MlPerSec = data.pump4MlPerSec;
     } else if (data.pump4MlPerSec != null) {
@@ -846,13 +850,7 @@ async function apiTestNow(deviceId) {
 
 
 if (testModeToggle) {
-  // Carregar estado salvo ao inicializar
-  const savedState = localStorage.getItem('testModeEnabled');
-  if (savedState !== null) {
-    const isEnabled = savedState === '1';
-    applyTestModeUI(isEnabled);
-  }
-
+  // Estado é carregado do backend via loadKhInfo() ao trocar device
   testModeToggle.addEventListener('click', async (e) => {
     const currentState = testModeToggle.getAttribute('data-state');
     const enabled = currentState !== 'on'; // Alterna o estado
