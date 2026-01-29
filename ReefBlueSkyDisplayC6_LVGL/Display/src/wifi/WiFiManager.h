@@ -1,3 +1,6 @@
+//WiFiManager.h
+
+
 #ifndef WIFI_MANAGER_H
 #define WIFI_MANAGER_H
 
@@ -21,8 +24,12 @@ esp_err_t   wifi_manager_connect_auto(void);
 wifi_state_t wifi_manager_get_state(void);
 bool        wifi_manager_is_connected(void);
 
+// NOVO: chamada periódica no main para retry/backoff
+void        wifi_manager_poll(void);
 
-void         wifi_manager_stop_ap(void);
+// Desliga AP (mantém só STA)
+void        wifi_manager_stop_ap(void);
+
 
 #ifdef __cplusplus
 }

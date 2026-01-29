@@ -1,3 +1,4 @@
+//JWTHandler.c
 #include "JWTHandler.h"
 #include <string.h>
 #include "esp_log.h"
@@ -7,6 +8,8 @@ static const char *TAG = "JWT";
 static char s_access[512]        = {0};
 static char s_user_token[1024]   = {0};
 static char s_display_token[1024]= {0};
+static char s_device_token[1024]  = {0};
+
 
 void jwt_handler_set_user_token(const char *tok) {
     if (!tok) {
@@ -39,6 +42,25 @@ const char *jwt_handler_get_display_token(void) {
     ESP_LOGI(TAG, "get display token, len=%d", (int)strlen(s_display_token));
     return s_display_token;
 }
+
+void jwt_handler_set_device_token(const char *tok)
+{
+    if (!tok) {
+        s_device_token[0] = 0;
+        ESP_LOGI(TAG, "device token clear");
+        return;
+    }
+    strncpy(s_device_token, tok, sizeof(s_device_token) - 1);
+    s_device_token[sizeof(s_device_token) - 1] = 0;
+    ESP_LOGI(TAG, "device token set (%d bytes)", (int)strlen(s_device_token));
+}
+
+const char *jwt_handler_get_device_token(void)
+{
+    ESP_LOGI(TAG, "get device token, len=%d", (int)strlen(s_device_token));
+    return s_device_token;
+}
+
 
 esp_err_t jwt_handler_set_access_token(const char *token)
 {

@@ -17,6 +17,8 @@ const char *jwt_handler_get_user_token(void);
 void jwt_handler_set_display_token(const char *tok);
 const char *jwt_handler_get_display_token(void);
 
+void jwt_handler_set_device_token(const char *tok);
+const char *jwt_handler_get_device_token(void);
 
 #ifdef __cplusplus
 }

@@ -11,6 +11,12 @@ idf_component_register(
         "wifi/WiFiManager.c"
         "../lib/captdns/captdns.c"
 
+        # FIRMWARE VERSION (C++)
+        "version/FwVersion.cpp"
+
+        # OTA
+        "ota/LcdOta.c"
+
         # Display / LVGL
         "display/display_simple.cpp"
         "display/LVGLSetup.cpp"
@@ -40,4 +46,7 @@ idf_component_register(
         "display"
         "display/assets" 
         "../lib/captdns"
+        "version"
+        "ota"
+
 )

@@ -4,6 +4,10 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include "wifi/WiFiManager.h"
 #include "storage/NVSStorage.h"
 #include "led/LEDController.h"
@@ -18,6 +22,10 @@
 
 #include "nvs_flash.h"
 #include "nvs.h"
+
+#include "ota/LcdOta.h"
+#include "esp_log.h"
+
 
 #define EXAMPLE_PIN_NUM_BK_LIGHT       22
 
@@ -35,6 +43,15 @@ static cached_summary_t g_cached_summary;
 
 static const char *TAG = "MAIN";
 
+
+static void ota_progress_cb(int percent) {
+    ESP_LOGI("LCD_OTA", "OTA %d%%", percent);
+}
+
+static void ota_event_cb(const char *event, const char *details) {
+    ESP_LOGI("LCD_OTA", "event=%s details=%s", event, details);
+}
+
 static void start_setup_mode(void);
 
 void save_cached_summary_to_nvs(const cached_summary_t *c);
@@ -48,15 +65,28 @@ static void time_sync_notification_cb(struct timeval *tv)
     ESP_LOGI("TIME", "Time synchronized");
 }
 
+static bool sntp_started = false;
+
 void time_init(void)
 {
+    if (sntp_started) {
+        ESP_LOGI("TIME", "SNTP já inicializado, pulando time_init()");
+        return;
+    }
+
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "time.google.com");
     esp_sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     esp_sntp_init();
 
-    setenv("TZ", "BRT3", 1);
+    sntp_started = true;
+}
+
+void apply_timezone_from_nvs(void)
+{
+    setenv("TZ", "BRT3", 1);     // UTC-3 Brasil
     tzset();
+    ESP_LOGI("TIME", "BRT3 FORÇADO");
 }
 
 
@@ -64,43 +94,51 @@ void time_init(void)
 
 static void login_task(void *arg)
 {
+    bool first_time = true;
+
     while (1) {
-        // Tenta conectar em qualquer rede salva (multi‑WiFi)
-        if (wifi_manager_connect_auto() != ESP_OK) {
-            ESP_LOGW(TAG, "Nenhuma rede conectou, entrando em modo setup");
-            start_setup_mode();                 // AP + DNS + HTTP (captive)
-            vTaskDelay(pdMS_TO_TICKS(30000));   // espera 30s e tenta de novo
+        // 1) Espera WiFi ficar conectado (WiFiManager + poll cuidam das tentativas)
+        if (!wifi_manager_is_connected()) {
+            if (first_time) {
+                ESP_LOGI(TAG, "login_task: aguardando primeira conexão WiFi...");
+                first_time = false;
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
-        ESP_LOGI(TAG, "WiFi conectado, seguindo fluxo normal");
+        ESP_LOGI(TAG, "login_task: WiFi conectado, seguindo fluxo normal");
         wifi_manager_stop_ap();   // desliga AP de setup, se estiver ligado
 
-        // NTP
+        // 2) NTP
         time_init();
 
-        // Login + registro do display
-        if (display_client_login_and_register() == ESP_OK) {
+        // 3) Login + registro do display
+        esp_err_t dres = display_client_login_and_register();
+        if (dres == ESP_OK) {
             ESP_LOGI(TAG, "Display login/register OK");
-            display_client_load_kh_devices();
-            g_wifi_status = true;
         } else {
-            ESP_LOGW(TAG, "Login falhou, voltando para setup");
-            g_wifi_status = false;
-            start_setup_mode();                 // volta para captive
-            vTaskDelay(pdMS_TO_TICKS(30000));
-            continue;
+            ESP_LOGW(TAG, "Display login/register erro (%d), mas seguindo fluxo assim mesmo", dres);
         }
 
-        // ONLINE: fica aqui enquanto WiFi estiver ok
+        // 4) Timezone + devices (mesmo se register falhar)
+        apply_timezone_from_nvs(); 
+        display_client_load_kh_devices();
+        g_wifi_status = true;
+
+        // 5) Loop enquanto WiFi estiver ok
+        ESP_LOGI(TAG, "login_task: entrando em loop online, monitorando WiFi");
         while (wifi_manager_is_connected()) {
             vTaskDelay(pdMS_TO_TICKS(10000));
         }
 
+        // 6) Perdeu WiFi -> marca offline e volta ao início para aguardar reconexão
         g_wifi_status = false;
-        // Saiu do while -> perdeu Wi‑Fi, volta para o loop e tenta de novo
+        ESP_LOGW(TAG, "login_task: WiFi perdido, aguardando reconexão pelo WiFiManager...");
+        // na próxima iteração, vai cair no bloco !wifi_manager_is_connected()
     }
 }
+
 
 static void start_setup_mode(void)
 {
@@ -153,6 +191,7 @@ static void summary_task(void *arg)
     display_simple_set_loading(true, "Sincronizando...");
 
     static uint32_t last_ping_ms = 0;
+    static uint32_t last_cmd_ms  = 0;
 
     // Loop principal (por enquanto só LED + resumo KH)
     while (1) {
@@ -216,8 +255,16 @@ static void summary_task(void *arg)
             }
 
             idx = (idx + 1) % count;
-        }
 
+         }
+
+        // Checar comando OTA do display a cada 30s
+        uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+        if (now - last_cmd_ms > 30000) { // 30 s
+            display_client_poll_commands();
+            last_cmd_ms = now;
+
+        }
     }
 }
 
@@ -245,7 +292,13 @@ void load_cached_summary_from_nvs(cached_summary_t *c) {
     nvs_close(handle);
 }
 
-
+static void wifi_watchdog_task(void *arg)
+{
+    while (1) {
+        wifi_manager_poll();
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
 
 void app_main(void)
 {
@@ -303,6 +356,10 @@ void app_main(void)
 
     // Task de resumo / rotação dos devices
     xTaskCreate(summary_task, "summary", 8192, NULL, 5, NULL);
+
+    xTaskCreate(wifi_watchdog_task, "wifi_watchdog", 4096, NULL, 4, NULL);
+
+    lcd_ota_init("http://iot.reefbluesky.com.br", ota_progress_cb, ota_event_cb);
 
 }
 

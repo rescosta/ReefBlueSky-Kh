@@ -1,14 +1,27 @@
+//WiFiManager.c
+
 #include "WiFiManager.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_timer.h"
 
 #include "NVSStorage.h"
+
+static uint64_t wifi_mgr_millis(void)
+{
+    return esp_timer_get_time() / 1000ULL; // us -> ms
+}
 
 static const char *TAG = "WiFiMgr";
 
 static wifi_state_t s_state = WIFI_STATE_IDLE;
+
+// Watchdog leve de WiFi
+static uint32_t s_fail_count = 0;               // falhas consecutivas de auto-connect
+static uint64_t s_last_retry_ms = 0;           // último auto-connect
+static const uint32_t WIFI_RETRY_INTERVAL_MS = 60000;  // 60s, similar à doser
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -22,11 +35,29 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ESP_LOGI(TAG, "WiFi got IP");
         s_state = WIFI_STATE_CONNECTED;
+        s_fail_count = 0;
     }
 }
 
 esp_err_t wifi_manager_connect_auto(void)
 {
+    if (wifi_manager_is_connected()) {
+        ESP_LOGI(TAG, "wifi_manager_connect_auto: já conectado, pulando auto-connect");
+        return ESP_OK;
+    }
+
+        // 2) Confirma com o driver se a STA está associada a um AP
+    wifi_ap_record_t ap_info;
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+        ESP_LOGI(TAG,
+                 "wifi_manager_connect_auto: STA já associada ao AP '%s', pulando auto-connect",
+                 (char *)ap_info.ssid);
+        // Garante consistência do estado interno
+        s_state = WIFI_STATE_CONNECTED;
+        s_fail_count = 0;
+        return ESP_OK;
+    }
+
     wifi_network_t nets[WIFI_MAX_NETWORKS];
     uint32_t count = 0;
 
@@ -35,6 +66,9 @@ esp_err_t wifi_manager_connect_auto(void)
         ESP_LOGW(TAG, "No WiFi networks stored in NVS");
         return ESP_FAIL;
     }
+
+    s_last_retry_ms = wifi_mgr_millis();
+
 
     for (uint32_t i = 0; i < count; i++) {
         ESP_LOGI(TAG, "Trying WiFi %u/%u (SSID=%s)", i + 1, count, nets[i].ssid);
@@ -74,6 +108,7 @@ esp_err_t wifi_manager_connect_auto(void)
     }
 
     ESP_LOGE(TAG, "All stored WiFi networks failed");
+    s_fail_count++; 
     return ESP_FAIL;
 }
 
@@ -94,7 +129,7 @@ esp_err_t wifi_manager_init(void)
         ESP_LOGE(TAG, "esp_wifi_init failed: %d", err);
         return err;
     }
-
+    
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
                                                &wifi_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
@@ -134,7 +169,6 @@ esp_err_t wifi_manager_connect_sta(const char *ssid, const char *password)
     return err;
 }
 
-esp_err_t wifi_manager_connect_auto(void);
 
 wifi_state_t wifi_manager_get_state(void)
 {
@@ -156,3 +190,26 @@ void wifi_manager_stop_ap(void)
         esp_wifi_set_mode(WIFI_MODE_STA);  // desliga AP, mantém STA
     }
 }
+
+void wifi_manager_poll(void)
+{
+    // Se já está conectado, não faz nada.
+    if (wifi_manager_is_connected()) {
+        return;
+    }
+
+    uint64_t now = wifi_mgr_millis();
+
+    // Se nunca tentamos ou já passou o intervalo, dispara auto-connect.
+    if (s_last_retry_ms == 0 || (now - s_last_retry_ms) >= WIFI_RETRY_INTERVAL_MS) {
+        ESP_LOGI(TAG, "wifi_manager_poll: tentando auto-connect (fails=%u)", (unsigned)s_fail_count);
+        esp_err_t err = wifi_manager_connect_auto();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "wifi_manager_poll: auto-connect falhou (%d)", err);
+        }
+    }
+
+    // Aqui depois podemos plugar um reboot inteligente, algo como:
+    // if (s_fail_count >= 10) { ESP_LOGE(TAG, "Muitas falhas de WiFi, reiniciando..."); esp_restart(); }
+}
+
