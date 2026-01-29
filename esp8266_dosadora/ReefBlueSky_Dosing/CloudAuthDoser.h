@@ -1,3 +1,5 @@
+//CloudAuthDoser.h
+
 #ifndef CLOUDAUTH_DOSER_H
 #define CLOUDAUTH_DOSER_H
 #include "DoserControl.h"
@@ -12,6 +14,8 @@
 
 #include <ArduinoJson.h>
 #include <time.h>
+
+extern int32_t g_userUtcOffsetSec;
 
 // Variável global do ESP UID (definida no .ino)
 extern String espUid;
@@ -38,8 +42,13 @@ private:
   bool loadCredentials();
 
 public:
+
   bool init(const String& sUrl, const String& uname, const String& upass);
   bool isAuthenticated() const { return accessToken.length() > 0; }
+
+  // Novo: expõe o token para outros módulos (FwVersion, OTA, etc.)
+  const String& getAccessToken() const { return accessToken; }
+
   void processCommands(DoserControl* doser);
 
   bool ensureTokenFresh();
@@ -48,6 +57,7 @@ public:
   bool reportDosingExecution(uint32_t pumpId, uint16_t volumeMl, uint32_t scheduledAt, uint32_t executedAt, const char* status, const char* origin);
 
   String getAuthHeader() const;
+
 };
 
 #endif

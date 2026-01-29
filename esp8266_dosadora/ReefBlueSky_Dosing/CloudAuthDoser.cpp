@@ -1,4 +1,8 @@
+//CloudAuthDoser.cpp
+
 #include "CloudAuthDoser.h"
+#include "FwVersion.h"
+#include "OtaUpdate.h"
 
 #ifdef ESP8266
   #include <ESP8266HTTPClient.h>
@@ -11,9 +15,7 @@
   static constexpr const char* HW_TYPE = "ESP32";
 #endif
 
-#ifndef DOSER_FW_VERSION
-  #define DOSER_FW_VERSION "0.0.0"
-#endif
+int32_t g_userUtcOffsetSec = 0;
 
 bool CloudAuthDoser::init(const String& sUrl, const String& uname, const String& upass) {
   serverUrl = sUrl;
@@ -185,7 +187,7 @@ bool CloudAuthDoser::fetchDoserConfig(JsonDocument& outConfig) {
   DynamicJsonDocument payload(256);
   payload["esp_uid"] = espUid;
   payload["hw_type"] = HW_TYPE;
-  payload["firmware_version"] = DOSER_FW_VERSION;     
+  payload["firmware_version"] = FW_VERSION;     
 
   String jsonPayload;
   serializeJson(payload, jsonPayload);
@@ -212,8 +214,17 @@ bool CloudAuthDoser::fetchDoserConfig(JsonDocument& outConfig) {
     return false;
   }
 
+  Serial.print("[CloudAuth] Handshake resp: ");
+  Serial.println(response);
 
   deserializeJson(outConfig, response);
+
+  if (outConfig.containsKey("user_utc_offset_sec")) {
+    g_userUtcOffsetSec = outConfig["user_utc_offset_sec"].as<int32_t>();
+    Serial.printf("[CloudAuth] user_utc_offset_sec=%ld\n", (long)g_userUtcOffsetSec);
+  }
+
+
   return outConfig.containsKey("pumps");
 }
 
@@ -244,8 +255,14 @@ bool CloudAuthDoser::sendDoserStatus(uint32_t uptime, int8_t rssi, const JsonDoc
 
   return (httpCode == 200 || httpCode == 201);
 }
-
-bool CloudAuthDoser::reportDosingExecution(uint32_t pumpId, uint16_t volumeMl, uint32_t scheduledAt, uint32_t executedAt, const char* status, const char* origin) {
+bool CloudAuthDoser::reportDosingExecution(
+    uint32_t pumpId,
+    uint16_t volumeMl,
+    uint32_t scheduledAt,
+    uint32_t executedAt,
+    const char* status,
+    const char* origin
+) {
   if (!isAuthenticated()) return false;
 
   HTTPClient http;
@@ -260,9 +277,11 @@ bool CloudAuthDoser::reportDosingExecution(uint32_t pumpId, uint16_t volumeMl, u
   payload["status"]       = status;
   payload["origin"]       = origin;
 
-
+  // LOG AQUI
   String jsonPayload;
   serializeJson(payload, jsonPayload);
+  Serial.print("[DosingExec] JSON: ");
+  Serial.println(jsonPayload);
 
   WiFiClient client; 
   http.begin(client, url);   
@@ -270,6 +289,10 @@ bool CloudAuthDoser::reportDosingExecution(uint32_t pumpId, uint16_t volumeMl, u
   http.addHeader("Authorization", getAuthHeader());
 
   int httpCode = http.POST(jsonPayload);
+  String resp = http.getString();
+  Serial.printf("[DosingExec] POST %s code=%d resp=%s\n",
+                url.c_str(), httpCode, resp.c_str());
+
   http.end();
 
   return (httpCode == 200 || httpCode == 201);
@@ -279,15 +302,19 @@ bool CloudAuthDoser::fetchCommands(JsonDocument& outDoc) {
   if (!isAuthenticated()) return false;
 
   HTTPClient http;
-  String url = serverUrl + "/iot/dosing/commands?esp_uid=" + espUid;
-  //Serial.print("[CloudAuth] fetchCommands URL: ");
-  //Serial.println(url);
+  String url = serverUrl + "/iot/dosing/commands"; 
+ 
+  DynamicJsonDocument payload(128);
+  payload["esp_uid"] = espUid;
+
+  String jsonPayload;
+  serializeJson(payload, jsonPayload);
 
   WiFiClient client;
   http.begin(client, url);
-  http.addHeader("Authorization", getAuthHeader());
+  http.addHeader("Content-Type", "application/json");
 
-  int httpCode = http.GET();
+  int httpCode = http.POST(jsonPayload);
   String response = http.getString();
   http.end();
 
@@ -303,7 +330,6 @@ bool CloudAuthDoser::fetchCommands(JsonDocument& outDoc) {
     return false;
   }
 
-  // loga só quando vier algo
   JsonArray cmds = outDoc["commands"].as<JsonArray>();
   if (!cmds.isNull() && cmds.size() > 0) {
     Serial.printf("[CloudAuth] %d command(s) received\n", cmds.size());
@@ -311,6 +337,7 @@ bool CloudAuthDoser::fetchCommands(JsonDocument& outDoc) {
 
   return true;
 }
+
 
 void CloudAuthDoser::handleCommand(JsonObject cmd, DoserControl* doser) {
   String type = cmd["type"].as<String>();
@@ -323,7 +350,30 @@ void CloudAuthDoser::handleCommand(JsonObject cmd, DoserControl* doser) {
       doser->stopManualDose(pumpId);
     }
   }
+  else if (type == "MANUAL_DOSE") {
+    // NÃO depender de pump_id vindo do servidor
+    uint8_t  pumpIndex   = payload["pump_index"]   | 0;
+    uint16_t volumeMl    = payload["volume_ml"]    | 0;
+    uint32_t execId      = payload["execution_id"] | 0;
+    const char* origin   = payload["origin"] | "MANUAL";
+
+    Serial.printf("[CMD] MANUAL_DOSE idx=%u vol=%u execId=%lu origin=%s\n",
+                  pumpIndex, volumeMl, execId, origin);
+
+    if (doser) {
+      // usa só o índice; DoserControl pega pump.id da config
+      doser->startManualDose(pumpIndex, volumeMl, execId);
+    }
+  }
+
+  else if (type == "otaupdate") {
+    Serial.println("[CMD] otaupdate recebido (DOSER), iniciando OTA...");
+    otaUpdateDoser();
+  }
 }
+
+
+
 
 void CloudAuthDoser::processCommands(DoserControl* doser) {
   DynamicJsonDocument doc(2048);

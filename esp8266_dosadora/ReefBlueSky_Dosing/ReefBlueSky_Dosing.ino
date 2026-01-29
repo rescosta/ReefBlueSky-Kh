@@ -1,4 +1,11 @@
+//ReefBlueSky_Dosing.ino
+
 #include <Arduino.h>
+#include "FwVersion.h"
+#include "OtaUpdate.h"
+
+const char* FW_DEVICE_TYPE = "DOSER";
+const char* FW_VERSION     = "RBS_DOSER_260130.bin";
 
 #ifdef ESP8266
   #include <ESP8266WiFi.h>
@@ -12,6 +19,8 @@
 #include <ArduinoJson.h>
 #include <time.h>
 
+
+
 // Módulos da dosadora
 #include "WiFiSetupDoser.h"
 #include "CloudAuthDoser.h"
@@ -23,15 +32,14 @@
 
 #include "HardwarePinsDoser.h"
 
-
 const int* PUMP_PINS = DOSER_PUMP_PINS;
 const int  BTN_CONFIG = DOSER_BTN_CONFIG;
-const int  LED_STATUS = DOSER_LED_STATUS;
+
 
 // ============================================================================
 // OBJETOS GLOBAIS
 // ============================================================================
-
+String deviceToken;
 String espUid;
 WiFiSetupDoser* wifiSetup = nullptr;
 CloudAuthDoser* cloudAuth = nullptr;
@@ -63,7 +71,10 @@ void setup() {
 
   // APENAS PARA LIMPAR UMA VEZ
   //SPIFFS.remove("/doser_wifi_config.json");
-  //Serial.println("CONFIG WiFi apagada!");
+  //SPIFFS.remove("/doser_auth.json");
+  //SPIFFS.remove("/doser_config.json");
+  //Serial.println("CONFIG WiFi/ AUTH / DOSER apagada!");
+
 
   Serial.println();
   Serial.println();
@@ -86,10 +97,13 @@ void setup() {
   }
 
   Serial.println("[SETUP] WiFi conectado!");
-  digitalWrite(LED_STATUS, HIGH);
 
   // 4. NTP Time sync
   setupTimeNTP();
+
+  time_t dbgNow = time(nullptr);
+  Serial.printf("[MAIN] After NTP, now=%lu\n", (unsigned long)dbgNow);
+
 
   // 5. Cloud Authentication
   setupCloud();
@@ -97,18 +111,48 @@ void setup() {
   // 6. DoserControl init
   doser = new DoserControl();
   doser->initPins(PUMP_PINS);
-  doser->onExecution([](uint32_t pumpId, uint16_t volumeMl, uint32_t scheduleId, uint32_t whenEpoch, const char* status) {
-    handleExecution(pumpId, volumeMl, scheduleId, whenEpoch, status);
+  doser->onExecution([](uint32_t pumpId, uint16_t volumeMl,
+                        uint32_t scheduleId, uint32_t whenEpoch,
+                        const char* status, const char* origin) {
+    handleExecution(pumpId, volumeMl, scheduleId, whenEpoch, status, origin);
   });
 
-  // 7. Handshake inicial e carregar config
+  // 7. Handshake inicial: SEMPRE tentar config do servidor primeiro
+  bool configLoaded = false;
   DynamicJsonDocument configDoc(8192);
+
   if (cloudAuth && cloudAuth->fetchDoserConfig(configDoc)) {
+    Serial.println("[SETUP] Config do servidor recebida, carregando doser...");
     doser->loadFromServer(configDoc);
-    Serial.println("[SETUP] ✓ Dosadora pronta!");
+    configLoaded = true;
+    Serial.println("[SETUP] ✓ Dosadora pronta com config do servidor!");
   } else {
-    Serial.println("[SETUP] Falha no handshake inicial, tentando no loop");
+    Serial.println("[SETUP] Falha no handshake inicial, tentando config local...");
   }
+
+  // 7.1 Se handshake falhar, tenta config local (modo offline)
+  if (!configLoaded && SPIFFS.exists("/doser_config.json")) {
+    File f = SPIFFS.open("/doser_config.json", "r");
+    if (f) {
+      DynamicJsonDocument localDoc(8192);
+      DeserializationError err = deserializeJson(localDoc, f);
+      f.close();
+      if (!err && localDoc.containsKey("pumps")) {
+        Serial.println("[SETUP] Config local encontrada, carregando doser (offline)...");
+        doser->loadFromServer(localDoc);
+        configLoaded = true;
+      } else {
+        Serial.printf("[SETUP] Falha ao ler config local: %s\n", err.c_str());
+      }
+    } else {
+      Serial.println("[SETUP] Erro ao abrir /doser_config.json");
+    }
+  }
+
+  if (!configLoaded) {
+    Serial.println("[SETUP] Nenhuma config válida (server nem local); aguardando próximo handshake...");
+  }
+
 }
 
 void generateEspUid() {
@@ -135,7 +179,6 @@ void loop() {
     if (wifiSetup) {
       wifiSetup->loopReconnect(); // mantém portal e DNS
     }
-    digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));  // Pisca LED
     delay(100);
     return;
   }
@@ -164,7 +207,7 @@ void loop() {
     }
 
     // Handshake periódico (5min)
-    if (now - lastHandshake > 300000) {
+    if (now - lastHandshake > 60000) {
       DynamicJsonDocument configDoc(8192);
       if (cloudAuth->fetchDoserConfig(configDoc)) {
         doser->loadFromServer(configDoc);
@@ -183,16 +226,13 @@ void loop() {
 
   // 6) DoserControl loop
   if (doser) {
-    time_t nowSec = time(nullptr);
-    doser->loop(nowSec);
+    time_t nowUtc = time(nullptr);
+    time_t nowUsr = nowUtc + g_userUtcOffsetSec;
+
+    doser->loop(nowUsr);  // usa horário local do usuário
   }
 
-  // 7) LED status
-  if (WiFi.status() == WL_CONNECTED) {
-    digitalWrite(LED_STATUS, HIGH);
-  } else {
-    digitalWrite(LED_STATUS, LOW);
-  }
+
 
   // Reconexão leve em STA, com portal normalmente fechado
   if (wifiSetup) {
@@ -230,9 +270,7 @@ String generateDoserId() {
 
 
 void initHardware() {
-  pinMode(LED_STATUS, OUTPUT);
   pinMode(BTN_CONFIG, INPUT_PULLUP);
-  digitalWrite(LED_STATUS, LOW);
   Serial.println("[HW] GPIO initialized");
 }
 
@@ -260,9 +298,10 @@ void handleConfigButton() {
   }
 }
 
+/*
 void setupTimeNTP() {
-  const long gmtOffset_sec      = -3 * 3600;  // UTC-3 (Brasil)
-  const int  daylightOffset_sec = 0;          // sem horário de verão
+  const long gmtOffset_sec      = 0;  // UTC
+  const int  daylightOffset_sec = 0;
 
   configTime(gmtOffset_sec, daylightOffset_sec, "time.google.com");
   Serial.println("[NTP] Syncing time...");
@@ -278,11 +317,36 @@ void setupTimeNTP() {
   Serial.println();
 
   if (now > 24 * 3600) {
-    Serial.printf("[NTP] ✓ Time synced: %s\n", ctime(&now));
+    Serial.printf("[NTP] ✓ Time synced (UTC): %s\n", ctime(&now));
   } else {
     Serial.println("[NTP] Time sync failed, continuing anyway");
   }
 }
+*/
+void setupTimeNTP() {
+  const long gmtOffset_sec      = 0;  // UTC
+  const int  daylightOffset_sec = 0;
+
+  configTime(gmtOffset_sec, daylightOffset_sec, "time.google.com");
+  Serial.println("[NTP] Syncing time...");
+
+  time_t now = time(nullptr);
+  int attempts = 0;
+  while (now < 24 * 3600 && attempts < 20) {
+    delay(500);
+    now = time(nullptr);
+    attempts++;
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (now > 24 * 3600) {
+    Serial.printf("[NTP] ✓ Time synced (UTC): %s\n", ctime(&now));
+  } else {
+    Serial.println("[NTP] Time sync failed, continuing anyway");
+  }
+}
+
 
 
 void setupCloud() {
@@ -295,13 +359,44 @@ void setupCloud() {
     Serial.println("[CLOUD] Will retry in loop...");
     return;
   }
+  deviceToken = cloudAuth->getAccessToken();
+
   Serial.println("[CLOUD] ✓ Authenticated");
+
+  // Após autenticar, reporta versão de firmware da doser
+  String apiBase = "http://iot.reefbluesky.com.br/api/v1";
+
+  otaInit("http://iot.reefbluesky.com.br", nullptr, nullptr);
+
+  reportFirmwareVersion(apiBase, cloudAuth->getAccessToken());
 }
 
-void handleExecution(uint32_t pumpId, uint16_t volumeMl, uint32_t scheduleId, uint32_t whenEpoch, const char* status) {
-  Serial.printf("[EXEC] Pump %lu Volume %u Status %s\n", pumpId, volumeMl, status);
+
+void handleExecution(uint32_t pumpId, uint16_t volumeMl,
+                     uint32_t scheduleId, uint32_t whenEpoch,
+                     const char* status, const char* origin) {
+  Serial.printf("[EXEC] PumpId=%lu Volume=%u Sched=%lu When=%lu Status=%s Origin=%s\n",
+                pumpId, volumeMl, scheduleId, whenEpoch, status, origin);
 
   if (cloudAuth && cloudAuth->isAuthenticated()) {
-    cloudAuth->reportDosingExecution(pumpId, volumeMl, scheduleId, whenEpoch, status, "AUTO");
+    uint32_t scheduledAt = 0;
+
+    if (strcmp(origin, "AUTO") == 0) {
+      scheduledAt = scheduleId;      // whenEpoch do job automático
+    } else {
+      scheduledAt = 0;               // MANUAL → sem agendamento
+    }
+
+    cloudAuth->reportDosingExecution(
+      pumpId,
+      volumeMl,
+      scheduledAt,
+      whenEpoch,
+      status,
+      origin
+    );
   }
 }
+
+
+

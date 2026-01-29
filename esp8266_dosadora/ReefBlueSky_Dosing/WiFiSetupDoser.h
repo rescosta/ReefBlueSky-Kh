@@ -1,3 +1,5 @@
+//WiFiSetupDoser.h
+
 #ifndef WIFISETUP_DOSER_H
 #define WIFISETUP_DOSER_H
 
@@ -57,6 +59,13 @@ private:
 
 public:
   WiFiSetupDoser() : server(80) {}
+
+  ~WiFiSetupDoser() {
+    if (networks) {
+      delete[] networks;
+      networks = nullptr;
+    }
+  }
 
   bool begin();
   bool createAccessPoint();

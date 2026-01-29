@@ -1,3 +1,4 @@
+//DoserControl.h
 #ifndef DOSER_CONTROL_H
 #define DOSER_CONTROL_H
 
@@ -5,13 +6,10 @@
 #include <ArduinoJson.h>
 #include <time.h>
 
-#define MAX_PUMPS 4
+#define MAX_PUMPS      6
 #define MAX_SCHEDULES 10
 #define MAX_DOSE_JOBS (MAX_PUMPS * 5)
-
-/**
- * DoserControl: Gerenciamento completo de bombas e agendas de dosagem
- */
+#define MAX_ACTIVE_RUNS MAX_PUMPS
 
 struct PumpConfig {
   uint32_t id;
@@ -30,10 +28,13 @@ struct Schedule {
   bool     enabled;
   uint8_t  daysMask;
   uint8_t  dosesPerDay;
+  uint16_t volumePerDayMl;
+  uint16_t minGapMinutes;
   uint32_t startSecSinceMidnight;
   uint32_t endSecSinceMidnight;
-  uint16_t volumePerDayMl;
+  uint8_t  pumpIndex;   
 };
+
 
 struct DoseJob {
   uint32_t pumpId;
@@ -50,34 +51,51 @@ struct ManualRun {
   uint8_t  pumpIndex;
   uint32_t startMs;
   uint32_t durationMs;
-  uint32_t scheduleId;  
+  uint32_t scheduleId;
   uint16_t volumeMl;
+  const char* origin;
+};
+
+struct ActiveRun {
+  bool     inUse;
+  uint8_t  pumpIndex;
+  uint32_t endMs;
+  uint32_t pumpId;
+  uint32_t scheduleId;
+  uint16_t volumeMl;
+  const char* origin;
 };
 
 
 class DoserControl {
 private:
   PumpConfig pumps[MAX_PUMPS];
-  uint8_t pumpCount = 0;
+  uint8_t    pumpCount = 0;
 
   Schedule schedules[MAX_SCHEDULES];
-  uint8_t scheduleCount = 0;
+  uint8_t  scheduleCount = 0;
 
-  DoseJob doseJobs[MAX_DOSE_JOBS];
-  uint8_t doseJobCount = 0;
+  DoseJob  doseJobs[MAX_DOSE_JOBS];
+  uint8_t  doseJobCount = 0;
 
-  ManualRun manualRun;  
+  ManualRun manualRun;
+  ActiveRun activeRuns[MAX_ACTIVE_RUNS];
 
-  int pumpPins[MAX_PUMPS];
+  int       pumpPins[MAX_PUMPS];
 
-  uint32_t lastJobsRebuild = 0;
-  uint32_t lastDailyExecuted = 0;
+  uint32_t lastAnyExecEpoch = 0;    // horário da última dose automática (qualquer bomba)
+  uint32_t lastPumpIdExec   = 0;    // pumpId da última dose automática
+
+  uint32_t  lastJobsRebuild = 0;
+  uint32_t  lastDailyExecuted = 0;
 
   typedef std::function<void(uint32_t pumpId,
-                             uint16_t volumeMl,
-                             uint32_t scheduleId,
-                             uint32_t whenEpoch,
-                             const char* status)> ExecutionCallback;
+                            uint16_t volumeMl,
+                            uint32_t scheduleId,
+                            uint32_t whenEpoch,
+                            const char* status,
+                            const char* origin)> ExecutionCallback;
+
   ExecutionCallback onExecutionCallback = nullptr;
 
 public:
@@ -89,13 +107,14 @@ public:
   void rebuildJobs(time_t now);
   void loop(time_t now);
 
-  void startManualDose(uint8_t pumpIndex, uint16_t volumeMl, uint32_t scheduleId = 0);
+  void startManualDose(uint8_t pumpIdx, uint16_t volumeMl,
+                     uint32_t scheduleId, uint32_t pumpIdOverride = 0);
   void stopManualDose(uint32_t pumpId);
 
-  uint8_t getPumpCount() const { return pumpCount; }
+  uint8_t        getPumpCount() const { return pumpCount; }
   const PumpConfig& getPump(uint8_t idx) const { return pumps[idx]; }
-  uint8_t getScheduleCount() const { return scheduleCount; }
-  uint8_t getDoseJobCount() const { return doseJobCount; }
+  uint8_t        getScheduleCount() const { return scheduleCount; }
+  uint8_t        getDoseJobCount() const { return doseJobCount; }
   const DoseJob& getDoseJob(uint8_t idx) const { return doseJobs[idx]; }
 
   void buildPumpsStatusJson(JsonDocument& outDoc) const;
@@ -103,11 +122,13 @@ public:
   void onExecution(ExecutionCallback cb) { onExecutionCallback = cb; }
 
 private:
-  void runPump(int pumpIdx, uint32_t durationMs);
-  void checkSchedulerTask(time_t now);
-  void dosingTask(time_t now);
-
   uint32_t parseTimeToSeconds(const String& timeStr);
+  void     startAutoRun(uint8_t pumpIdx, uint32_t durationMs,
+                        uint32_t pumpId, uint32_t scheduleId, uint16_t volumeMl);
+  void     processActiveRuns(uint32_t nowMs, time_t nowSec);
+
+  void     saveConfigToFile(const JsonDocument& config);
 };
 
 #endif
+

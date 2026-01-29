@@ -1,3 +1,4 @@
+//WiFiSetupDoser.cpp
 #include "WiFiSetupDoser.h"
 
 const char* statusName(wl_status_t st) {
@@ -53,7 +54,6 @@ bool WiFiSetupDoser::begin() {
   Serial.println("[WiFiSetupDoser] Nenhuma configuração encontrada, criando AP...");
   return createAccessPoint();
 }
-
 
 // ============================================================================
 // Criar Access Point com captive portal
@@ -150,11 +150,10 @@ bool WiFiSetupDoser::connectToWiFi() {
     Serial.println();
 
     if (WiFi.status() == WL_CONNECTED) {
-        WiFi.setAutoReconnect(true);       
+      WiFi.setAutoReconnect(true);
     #ifdef ESP8266
-        WiFi.persistent(true);
+      WiFi.persistent(true);
     #endif
-
       Serial.printf("[WiFiSetupDoser] Conectado ao WiFi! IP: %s\n",
                     WiFi.localIP().toString().c_str());
       Serial.printf("[WiFiSetupDoser] RSSI: %d dBm\n", WiFi.RSSI());
@@ -165,8 +164,37 @@ bool WiFiSetupDoser::connectToWiFi() {
     return false;
   }
 
-  // Tenta cada rede salva
+  // 1) Sempre tenta primeiro a ÚLTIMA rede conhecida (ssid/password atuais)
+  if (!ssid.isEmpty()) {
+    Serial.printf("[WiFiSetupDoser] Tentando última rede conhecida primeiro: %s\n", ssid.c_str());
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true);
+    delay(500);
+    WiFi.begin(ssid.c_str(), password.c_str());
 
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) { // ~10s
+      delay(500);
+      Serial.print(".");
+      attempts++;
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      WiFi.setAutoReconnect(true);
+    #ifdef ESP8266
+      WiFi.persistent(true);
+    #endif
+      Serial.printf("[WiFiSetupDoser] Conectado à última rede: %s\n", ssid.c_str());
+      Serial.printf("[WiFiSetupDoser] IP: %s\n", WiFi.localIP().toString().c_str());
+      Serial.printf("[WiFiSetupDoser] RSSI: %d dBm\n", WiFi.RSSI());
+      return true;
+    }
+
+    Serial.println("[WiFiSetupDoser] Falhou na última rede, tentando demais salvas...");
+  }
+
+  // 2) Se falhou, Multi‑WiFi: tentar cada rede salva
   for (JsonObject net : nets) {
     String s = net["ssid"].as<String>();
     String p = net["password"].as<String>();
@@ -174,6 +202,9 @@ bool WiFiSetupDoser::connectToWiFi() {
 
     Serial.printf("[WiFiSetupDoser] Rede salva: %s\n", s.c_str());
     Serial.printf("[WiFiSetupDoser] Tentando SSID: %s\n", s.c_str());
+
+    WiFi.disconnect(true);
+    delay(500);
     WiFi.begin(s.c_str(), p.c_str());
 
     int attempts = 0;
@@ -186,15 +217,23 @@ bool WiFiSetupDoser::connectToWiFi() {
 
     if (WiFi.status() == WL_CONNECTED) {
       WiFi.setAutoReconnect(true);
-  #ifdef ESP8266
+    #ifdef ESP8266
       WiFi.persistent(true);
-  #endif
+    #endif
       Serial.printf("[WiFiSetupDoser] Conectado ao WiFi: %s\n", s.c_str());
       ssid     = s;
       password = p;
       Serial.printf("[WiFiSetupDoser] IP: %s\n",
                     WiFi.localIP().toString().c_str());
       Serial.printf("[WiFiSetupDoser] RSSI: %d dBm\n", WiFi.RSSI());
+
+      // Garante que essa vire a “primeira” também para BG
+      if (networks && numNetworks > 0) {
+        networks[0].ssid     = s;
+        networks[0].password = p;
+        currentNetworkIndex  = 0;
+      }
+
       return true;
     }
   }
@@ -202,7 +241,6 @@ bool WiFiSetupDoser::connectToWiFi() {
   // Se chegou aqui, nenhuma conectou
   Serial.println("[WiFiSetupDoser] Nenhuma rede conectou na inicialização.");
   return false;
-
 }
 
 // ============================================================================
@@ -454,6 +492,7 @@ String WiFiSetupDoser::getConfigHTML() {
 // ============================================================================
 // Handlers HTTP
 // ============================================================================
+
 void WiFiSetupDoser::handleConfigSubmit() {
   Serial.println("[WiFiSetupDoser] Recebendo configuração do cliente...");
 
@@ -492,8 +531,8 @@ void WiFiSetupDoser::handleConfigSubmit() {
   password       = newPass;
   serverUsername = newUser;
   serverPassword = newPwd;
-  // ======== ATUALIZA VETOR EM RAM (networks[]) ========
 
+  // ======== ATUALIZA VETOR EM RAM (networks[]) ========
   if (!networks) {
     networks = new WiFiCred[MAX_NETS];
     numNetworks = 0;
@@ -524,9 +563,7 @@ void WiFiSetupDoser::handleConfigSubmit() {
     }
   }
 
-
   // ======== RECONSTRÓI JSON INTEIRO A PARTIR DO VETOR ========
-
   DynamicJsonDocument full(2048);
   full["serverUsername"] = newUser;
   full["serverPassword"] = newPwd;
@@ -573,7 +610,11 @@ void WiFiSetupDoser::handleStatus() {
 }
 
 void WiFiSetupDoser::handleScan() {
-  int n = WiFi.scanNetworks();
+  // Modo AP+STA para scan mais confiável
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.disconnect();  // garante scan limpo
+
+  int n = WiFi.scanNetworks(false);
   DynamicJsonDocument doc(1024);
   JsonArray arr = doc.createNestedArray("networks");
 
@@ -655,7 +696,6 @@ bool WiFiSetupDoser::loadConfigFromSPIFFS() {
   return true;
 }
 
-
 bool WiFiSetupDoser::saveConfigToSPIFFS(const DynamicJsonDocument& config) {
   Serial.printf("[WiFiSetupDoser] Salvando configuração em %s\n", CONFIG_FILE);
 
@@ -677,18 +717,21 @@ bool WiFiSetupDoser::saveConfigToSPIFFS(const DynamicJsonDocument& config) {
   return true;
 }
 
+// ============================================================================
+// Reconexão em background
+// ============================================================================
+
 void WiFiSetupDoser::tryReconnect() {
-
-
   if (!configured || numNetworks == 0) return;
 
-  if (portalActive && WiFi.status() != WL_CONNECTED && millis() < 30000) { // 30s após boot
+  // 30s pós-boot com portal ativo: evita matar AP cedo demais
+  if (portalActive && WiFi.status() != WL_CONNECTED && millis() < 30000) {
     return;
   }
 
   if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastReconnectTry < RECONNECT_INTERVAL) return;
-  
+
   wl_status_t st = WiFi.status();
   Serial.printf("[WiFiSetupDoser] tryReconnect: configured=%d numNetworks=%d status=%d (%s)\n",
                 configured, numNetworks, st, statusName(st));
@@ -713,7 +756,7 @@ void WiFiSetupDoser::tryReconnect() {
   WiFi.begin(ssidTry.c_str(), passTry.c_str());
 
   unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) { // 15s
+  while (WiFi.status() != WL_CONNECTED && millis() - start < CONNECT_TIMEOUT) {
     delay(100);
     if (portalActive) {
       dnsServer.processNextRequest();
@@ -745,9 +788,7 @@ void WiFiSetupDoser::tryReconnect() {
   }
 
   lastReconnectTry = millis();
-
 }
-
 
 void WiFiSetupDoser::loopReconnect() {
   // Mantém portal/DNS se estiver ativo
