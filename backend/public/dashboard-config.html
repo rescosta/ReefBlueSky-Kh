@@ -320,13 +320,12 @@
 
         </div>
 
-
         <!-- KH alvo do aquário -->
         <div class="field-row">
           <label for="khTargetInput">KH alvo do aquário</label>
           <div class="inline">
             <input id="khTargetInput" type="number" step="0.01" placeholder="Ex: 8.00" />
-            <button id="saveKhTargetBtn" class="btn-primary">Salvar KH</button>
+            <button id="saveKhTargetBtn" class="btn-primary">Alterar KH alvo</button>
           </div>
           <div id="khTargetStatus" class="hint">Alvo atual --</div>
         </div>
@@ -674,6 +673,29 @@
             </div>
           </div>
         </div>
+
+        <!-- Modal para alterar KH alvo do aquário -->
+        <div id="khTargetEditModal" class="modal-backdrop hidden">
+          <div class="modal">
+            <h3>Alterar KH alvo do aquário</h3>
+            <p style="margin-bottom:4px;">
+              Alvo atual: <span id="khTargetCurrentSpan">--</span> dKH
+            </p>
+            <label for="khTargetEditInput" class="hint">
+              Novo KH alvo
+            </label>
+            <input id="khTargetEditInput" type="text" placeholder="Ex: 8.00" />
+
+            <div id="khTargetEditStatus" class="hint" style="margin-top:4px;"></div>
+
+            <div class="inline" style="margin-top:8px;">
+              <button id="khTargetEditSaveBtn"   class="btn-primary">Salvar</button>
+              <button id="khTargetEditCancelBtn" class="btn-primary">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+
 
       </div>
     </div>
