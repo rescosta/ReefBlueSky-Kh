@@ -430,7 +430,22 @@
           </span>
         </div>
 
-       <div class="card">
+    <!-- Progresso do teste manual + botão ABORT -->
+        <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+          <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="testNowProgressFill"></div>
+            </div>
+          </div>
+
+        <div id="abortArea" style="display:none; margin-top:8px;">
+          <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
+            ABORTAR teste/dose
+          </button>
+          <div id="abortStatusText" class="muted" style="margin-top:4px;">&nbsp;</div>
+        </div>
+
+        <div class="card">
           <div class="card-header">
             <div class="card-title">Últimas medições</div>
             <div class="card-subtitle" id="lastCountInfo">-- registros recentes</div>
@@ -451,22 +466,6 @@
             </table>
           </div>
         </div>  
-
-
-    <!-- Progresso do teste manual + botão ABORT -->
-        <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
-          <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="testNowProgressFill"></div>
-          </div>
-        </div>
-
-        <div id="abortArea" style="display:none; margin-top:8px;">
-          <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
-            ABORTAR teste/dose
-          </button>
-          <div id="abortStatusText" class="muted" style="margin-top:4px;">&nbsp;</div>
-        </div>
       </div>
     </div>
 
