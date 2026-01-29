@@ -507,6 +507,10 @@ function openEditScheduleModal(scheduleId) {
   document.getElementById('editEndTime').value     = schedule.end_time || '';
   document.getElementById('editVolumePerDay').value = formatMl(schedule.volume_per_day_ml || schedule.volume_per_day || 0);
 
+  // notificações
+  document.getElementById('editNotifyTelegram').checked = !!schedule.notify_telegram;
+  document.getElementById('editNotifyEmail').checked = !!schedule.notify_email;
+
   // abre modal
   document.getElementById('editScheduleModal').style.display = 'flex';
 }
@@ -552,8 +556,9 @@ async function saveEditScheduleModal() {
       start_time: document.getElementById('editStartTime').value,
       end_time: document.getElementById('editEndTime').value,
       volume_per_day: volumeEdit,
-      volume_per_day_ml: volumeEdit
-
+      volume_per_day_ml: volumeEdit,
+      notify_telegram: document.getElementById('editNotifyTelegram').checked,
+      notify_email: document.getElementById('editNotifyEmail').checked
     };
 
     console.log('PUT data =>', data);
@@ -722,6 +727,8 @@ async function createSchedule() {
     return;
   }
 
+  const minGapMinutes = parseInt(document.getElementById('minGapMinutes').value, 10) || 30;
+
   const data = {
     enabled: true,
     days_of_week: activeDays,
@@ -729,7 +736,10 @@ async function createSchedule() {
     start_time: document.getElementById('startTime').value,
     end_time: document.getElementById('endTime').value,
     volume_per_day: volumePerDay,      // para validação do POST
-    volume_per_day_ml: volumePerDay    // para qualquer handler que use _ml
+    volume_per_day_ml: volumePerDay,   // para qualquer handler que use _ml
+    min_gap_minutes: minGapMinutes,
+    notify_telegram: document.getElementById('notifyTelegram').checked,
+    notify_email: document.getElementById('notifyEmail').checked
   };
 
   console.log('📅 Criando agenda:', pumpIndex, data);
