@@ -75,16 +75,19 @@ if (telegramBotTokenInput && toggleTokenBtn) {
   });
 }
 
-// Modo Manutenção - elementos DOM
-const testPump1Btn = document.getElementById('testPump1Btn');
-const testPump2Btn = document.getElementById('testPump2Btn');
-const testPump3Btn = document.getElementById('testPump3Btn');
-const testPump4Btn = document.getElementById('testPump4Btn');
-const testPump1Duration = document.getElementById('testPump1Duration');
-const testPump2Duration = document.getElementById('testPump2Duration');
-const testPump3Duration = document.getElementById('testPump3Duration');
-const testPump4Duration = document.getElementById('testPump4Duration');
-const pumpTestStatus = document.getElementById('pumpTestStatus');
+// Modo Manutenção - elementos DOM (bombas com barra de progresso)
+const maintPumpStatusEls = {
+  1: document.getElementById('maintPumpStatus1'),
+  2: document.getElementById('maintPumpStatus2'),
+  3: document.getElementById('maintPumpStatus3'),
+  4: document.getElementById('maintPumpStatus4'),
+};
+const maintPumpProgEls = {
+  1: document.getElementById('maintPumpProg1'),
+  2: document.getElementById('maintPumpProg2'),
+  3: document.getElementById('maintPumpProg3'),
+  4: document.getElementById('maintPumpProg4'),
+};
 
 const sensorLevelA = document.getElementById('sensorLevelA');
 const sensorLevelB = document.getElementById('sensorLevelB');
@@ -1134,77 +1137,61 @@ async function sendMaintenanceCommand(deviceId, type, params = {}) {
   }
 }
 
-// Testes individuais de bombas
-if (testPump1Btn) {
-  testPump1Btn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
+// Controle manual bombas modo manutenção (1-4) com barra regressiva e sentido
+const maintPumpStartButtons = document.querySelectorAll('.maintPumpStartBtn');
+const maintActiveTimers = {};
 
-    const duration = parseInt(testPump1Duration.value) || 5;
-    testPump1Btn.disabled = true;
-    pumpTestStatus.textContent = `Acionando bomba 1 por ${duration} segundos...`;
+maintPumpStartButtons.forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const pumpId = parseInt(btn.dataset.pump, 10);
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId || !pumpId) return;
 
-    const ok = await sendMaintenanceCommand(deviceId, 'test_pump', { pump: 1, duration });
-    pumpTestStatus.textContent = ok
-      ? `Bomba 1 acionada com sucesso por ${duration}s.`
-      : 'Erro ao acionar bomba 1.';
+    const dirSelect = document.getElementById(`maintPumpDirSelect${pumpId}`);
+    const timeInput = document.getElementById(`maintPumpTime${pumpId}`);
 
-    testPump1Btn.disabled = false;
+    const seconds = parseInt(timeInput.value, 10);
+    const direction = dirSelect.value;
+
+    if (Number.isNaN(seconds) || seconds <= 0) return;
+
+    const ok = await apiManualPump(deviceId, pumpId, direction, seconds);
+    if (!ok) return;
+
+    updateMaintPumpStatus(pumpId, true, direction);
+    const progEl = maintPumpProgEls[pumpId];
+    let remaining = seconds;
+    progEl.style.width = '100%';
+
+    if (maintActiveTimers[pumpId]) clearInterval(maintActiveTimers[pumpId]);
+
+    maintActiveTimers[pumpId] = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(maintActiveTimers[pumpId]);
+        delete maintActiveTimers[pumpId];
+        progEl.style.width = '0';
+        updateMaintPumpStatus(pumpId, false);
+      } else {
+        const pct = (remaining / seconds) * 100;
+        progEl.style.width = `${pct}%`;
+      }
+    }, 1000);
   });
-}
+});
 
-if (testPump2Btn) {
-  testPump2Btn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
-
-    const duration = parseInt(testPump2Duration.value) || 5;
-    testPump2Btn.disabled = true;
-    pumpTestStatus.textContent = `Acionando bomba 2 por ${duration} segundos...`;
-
-    const ok = await sendMaintenanceCommand(deviceId, 'test_pump', { pump: 2, duration });
-    pumpTestStatus.textContent = ok
-      ? `Bomba 2 acionada com sucesso por ${duration}s.`
-      : 'Erro ao acionar bomba 2.';
-
-    testPump2Btn.disabled = false;
-  });
-}
-
-if (testPump3Btn) {
-  testPump3Btn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
-
-    const duration = parseInt(testPump3Duration.value) || 5;
-    testPump3Btn.disabled = true;
-    pumpTestStatus.textContent = `Acionando bomba 3 por ${duration} segundos...`;
-
-    const ok = await sendMaintenanceCommand(deviceId, 'test_pump', { pump: 3, duration });
-    pumpTestStatus.textContent = ok
-      ? `Bomba 3 acionada com sucesso por ${duration}s.`
-      : 'Erro ao acionar bomba 3.';
-
-    testPump3Btn.disabled = false;
-  });
-}
-
-if (testPump4Btn) {
-  testPump4Btn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
-
-    const duration = parseInt(testPump4Duration.value) || 5;
-    testPump4Btn.disabled = true;
-    pumpTestStatus.textContent = `Acionando bomba 4 por ${duration} segundos...`;
-
-    const ok = await sendMaintenanceCommand(deviceId, 'test_pump', { pump: 4, duration });
-    pumpTestStatus.textContent = ok
-      ? `Bomba 4 acionada com sucesso por ${duration}s.`
-      : 'Erro ao acionar bomba 4.';
-
-    testPump4Btn.disabled = false;
-  });
+function updateMaintPumpStatus(pumpId, running, direction) {
+  const badgeEl = maintPumpStatusEls[pumpId];
+  if (!badgeEl) return;
+  if (running) {
+    badgeEl.textContent = direction === 'reverse' ? 'REVERSO' : 'ACIONADA';
+    badgeEl.classList.remove('badge-level-off');
+    badgeEl.classList.add('badge-level-on');
+  } else {
+    badgeEl.textContent = 'PARADA';
+    badgeEl.classList.remove('badge-level-on');
+    badgeEl.classList.add('badge-level-off');
+  }
 }
 
 // Atualizar leituras dos sensores
