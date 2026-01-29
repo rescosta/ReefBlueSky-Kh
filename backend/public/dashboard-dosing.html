@@ -1285,6 +1285,25 @@
           <input type="time" id="endTime" value="20:00">
         </div>
       </div>
+
+      <!-- Notificações -->
+      <div class="form-group" style="border-top: 1px solid #374151; padding-top: 12px; margin-top: 12px;">
+        <label style="font-weight: 600; margin-bottom: 8px; display: block;">🔔 Notificações de Dosagem Concluída</label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="notifyTelegram" style="cursor: pointer;">
+            <span>📱 Enviar notificação no Telegram</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="notifyEmail" style="cursor: pointer;">
+            <span>📧 Enviar notificação por Email</span>
+          </label>
+        </div>
+        <small class="small-text" style="display: block; margin-top: 6px; color: #9ca3af;">
+          Você receberá uma mensagem quando a dosagem automática for concluída com sucesso.
+        </small>
+      </div>
+
       <div class="button-group">
         <button class="btn-secondary" onclick="closeAgendaModal()">Cancelar</button>
         <button class="btn-primary" onclick="createSchedule()">+ Criar Agenda</button>
@@ -1354,6 +1373,24 @@
         <label for="editMinGapMinutes">Intervalo mín. entre bombas:</label>
         <input type="number" id="editMinGapMinutes" min="5" max="120" value="30" style="width:80px;">
         <small class="small-text">minutos (padrão 30)</small>
+      </div>
+
+      <!-- Notificações -->
+      <div class="form-group" style="border-top: 1px solid #374151; padding-top: 12px; margin-top: 12px;">
+        <label style="font-weight: 600; margin-bottom: 8px; display: block;">🔔 Notificações de Dosagem Concluída</label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="editNotifyTelegram" style="cursor: pointer;">
+            <span>📱 Enviar notificação no Telegram</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="editNotifyEmail" style="cursor: pointer;">
+            <span>📧 Enviar notificação por Email</span>
+          </label>
+        </div>
+        <small class="small-text" style="display: block; margin-top: 6px; color: #9ca3af;">
+          Você receberá uma mensagem quando a dosagem automática for concluída com sucesso.
+        </small>
       </div>
 
       <div class="button-group">
