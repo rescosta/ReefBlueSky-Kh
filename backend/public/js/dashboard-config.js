@@ -599,23 +599,6 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
 }
 
 
-saveKhTargetBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-  if (!deviceId) return;
-
-  const val = parseFloat(khTargetInput.value.replace(',', '.'));
-  if (Number.isNaN(val)) {
-    alert('Informe um KH alvo válido');
-    return;
-  }
-
-  const ok = await apiSetKhConfig(deviceId, null, val);
-  if (ok) {
-    khTargetStatus.textContent = `Alvo atual: ${val.toFixed(2)} dKH`;
-    window.dispatchEvent(new CustomEvent('deviceChanged'));
-  }
-});
-
 
 saveIntervalBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
@@ -926,6 +909,7 @@ const khRefEditStatus    = document.getElementById('khRefEditStatus');
 const khRefEditSaveBtn   = document.getElementById('khRefEditSaveBtn');
 const khRefEditCancelBtn = document.getElementById('khRefEditCancelBtn');
 
+
 function showKhRefEditModal() {
   if (!khRefEditModal) return;
 
@@ -997,6 +981,93 @@ if (khRefEditSaveBtn) {
     setTimeout(() => {
       khRefEditSaveBtn.disabled = false;
       closeKhRefEditModal();
+    }, 400);
+  });
+}
+
+
+// === Modal para ALTERAR KH alvo do aquário ===
+const khTargetEditModal     = document.getElementById('khTargetEditModal');
+const khTargetCurrentSpan   = document.getElementById('khTargetCurrentSpan');
+const khTargetEditInput     = document.getElementById('khTargetEditInput');
+const khTargetEditStatus    = document.getElementById('khTargetEditStatus');
+const khTargetEditSaveBtn   = document.getElementById('khTargetEditSaveBtn');
+const khTargetEditCancelBtn = document.getElementById('khTargetEditCancelBtn');
+
+function showKhTargetEditModal() {
+  if (!khTargetEditModal) return;
+
+  // ler valor atual do texto "Alvo atual: X.XX dKH"
+  let current = null;
+  const txt = khTargetStatus?.textContent || '';
+  const m = txt.match(/([0-9]+[.,][0-9]+)/);
+  if (m) current = parseFloat(m[1].replace(',', '.'));
+
+  khTargetCurrentSpan.textContent =
+    current != null && Number.isFinite(current)
+      ? current.toFixed(2)
+      : '--';
+
+  khTargetEditInput.value =
+    current != null && Number.isFinite(current)
+      ? current.toFixed(2)
+      : '';
+
+  khTargetEditStatus.textContent = '';
+  khTargetEditModal.classList.remove('hidden');
+}
+
+function closeKhTargetEditModal() {
+  if (!khTargetEditModal) return;
+  khTargetEditModal.classList.add('hidden');
+}
+
+// botão "Alterar KH alvo" abre o modal
+if (saveKhTargetBtn) {
+  saveKhTargetBtn.addEventListener('click', () => {
+    showKhTargetEditModal();
+  });
+}
+
+if (khTargetEditCancelBtn) {
+  khTargetEditCancelBtn.addEventListener('click', () => {
+    closeKhTargetEditModal();
+  });
+}
+
+if (khTargetEditSaveBtn) {
+  khTargetEditSaveBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    const raw = (khTargetEditInput.value || '').trim();
+    const val = parseFloat(raw.replace(',', '.'));
+    if (!Number.isFinite(val) || val <= 0 || val > 25) {
+      khTargetEditStatus.textContent =
+        'Informe um KH alvo válido (0–25).';
+      return;
+    }
+
+    khTargetEditSaveBtn.disabled = true;
+    khTargetEditStatus.textContent = 'Salvando KH alvo...';
+
+    const ok = await apiSetKhConfig(deviceId, null, val);
+    if (!ok) {
+      khTargetEditStatus.textContent = 'Erro ao salvar KH alvo.';
+      khTargetEditSaveBtn.disabled = false;
+      return;
+    }
+
+    khTargetStatus.textContent = `Alvo atual: ${val.toFixed(2)} dKH`;
+    if (khTargetInput) {
+      khTargetInput.value = val.toFixed(2); // se continuar usando o input
+    }
+    window.dispatchEvent(new CustomEvent('deviceChanged'));
+
+    khTargetEditStatus.textContent = 'KH alvo atualizado.';
+    setTimeout(() => {
+      khTargetEditSaveBtn.disabled = false;
+      closeKhTargetEditModal();
     }, 400);
   });
 }
