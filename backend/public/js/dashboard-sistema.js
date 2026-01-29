@@ -56,10 +56,20 @@ function classifyPercent(v) {
   return 'health-bad';
 }
 
-function classifyWifi(rssi) {
-  if (rssi == null || Number.isNaN(rssi)) return 'health-bad';
-  if (rssi >= -60) return 'health-ok';
-  if (rssi >= -75) return 'health-warn';
+function rssiToPercent(rssi) {
+  // Converte RSSI (dBm) para porcentagem
+  // -50 dBm ou melhor = 100%
+  // -100 dBm ou pior = 0%
+  if (rssi == null || Number.isNaN(rssi)) return null;
+  if (rssi >= -50) return 100;
+  if (rssi <= -100) return 0;
+  return Math.round(2 * (rssi + 100));
+}
+
+function classifyWifi(rssiPercent) {
+  if (rssiPercent == null || Number.isNaN(rssiPercent)) return 'health-bad';
+  if (rssiPercent >= 70) return 'health-ok';
+  if (rssiPercent >= 40) return 'health-warn';
   return 'health-bad';
 }
 
@@ -260,10 +270,11 @@ function renderHealth(health) {
   const storageRaw = health.storageUsage ?? health.storage ?? null;
 
   const wifiRaw = health.wifiRssi ?? health.rssi ?? null;
-  const wifi = Number.isFinite(wifiRaw) ? wifiRaw : Number(wifiRaw);
+  const wifiRssi = Number.isFinite(wifiRaw) ? wifiRaw : Number(wifiRaw);
+  const wifiPercent = rssiToPercent(wifiRssi);
   healthWifiEl.textContent =
-    Number.isFinite(wifi) ? `${wifi.toFixed(0)}dBm` : '--';
-  healthWifiEl.className = `health-value ${classifyWifi(wifi)}`;
+    Number.isFinite(wifiPercent) ? `${wifiPercent}%` : '--';
+  healthWifiEl.className = `health-value ${classifyWifi(wifiPercent)}`;
 
 
   const uptime = health.uptimeSeconds ?? health.uptime ?? null;
