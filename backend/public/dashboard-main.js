@@ -262,10 +262,19 @@ function applyTestModeUI(testModeEnabled) {
 
 function applyTestModeUI(testModeEnabled) {
   if (!testModeToggle || !testNowBtn) return;
-  testModeToggle.checked = !!testModeEnabled;
 
-  // antes: travava se não tivesse Calibração: OK
-  // agora: só depende do test mode
+  // Atualizar botão toggle visual
+  const isEnabled = !!testModeEnabled;
+  testModeToggle.setAttribute('data-state', isEnabled ? 'on' : 'off');
+  const label = testModeToggle.querySelector('.toggle-label');
+  if (label) {
+    label.textContent = isEnabled ? 'ON' : 'OFF';
+  }
+
+  // Salvar estado no localStorage
+  localStorage.setItem('testModeEnabled', isEnabled ? '1' : '0');
+
+  // Habilitar/desabilitar botão "Iniciar teste agora"
   testNowBtn.disabled = !testModeEnabled;
 }
 
@@ -837,8 +846,16 @@ async function apiTestNow(deviceId) {
 
 
 if (testModeToggle) {
-  testModeToggle.addEventListener('change', async (e) => {
-    const enabled = e.target.checked;
+  // Carregar estado salvo ao inicializar
+  const savedState = localStorage.getItem('testModeEnabled');
+  if (savedState !== null) {
+    const isEnabled = savedState === '1';
+    applyTestModeUI(isEnabled);
+  }
+
+  testModeToggle.addEventListener('click', async (e) => {
+    const currentState = testModeToggle.getAttribute('data-state');
+    const enabled = currentState !== 'on'; // Alterna o estado
     const deviceId = DashboardCommon.getSelectedDeviceId();
     if (!deviceId) return;
 
