@@ -484,11 +484,16 @@ async function loadConfigForSelected() {
   }
 
   if (khRef != null) {
-    khRefInput.value = khRef.toFixed(2);
+    // se o input existir (no futuro), mantém sincronizado, mas é opcional
+    if (khRefInput) {
+      khRefInput.value = khRef.toFixed(2);
+    }
     khRefStatus.textContent = `Referência atual: ${khRef.toFixed(2)} dKH`;
   } else {
     khRefStatus.textContent = 'Referência atual --';
-    khRefInput.value = '';
+    if (khRefInput) {
+      khRefInput.value = '';
+    }
   }
 
   if (typeof cfg.khTarget === 'number') {
@@ -593,24 +598,6 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
   }
 }
 
-
-
-saveKhRefBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-  if (!deviceId) return;
-
-  const val = parseFloat(khRefInput.value.replace(',', '.'));
-  if (Number.isNaN(val)) {
-    alert('Informe um KH de referência válido');
-    return;
-  }
-
-  const ok = await apiSetKhConfig(deviceId, val, null);
-  if (ok) {
-    khRefStatus.textContent = `Referência atual: ${val.toFixed(2)} dKH`;
-    window.dispatchEvent(new CustomEvent('deviceChanged'));
-  }
-});
 
 saveKhTargetBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
