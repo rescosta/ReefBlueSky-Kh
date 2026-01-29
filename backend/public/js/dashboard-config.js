@@ -496,12 +496,25 @@ async function loadConfigForSelected() {
     }
   }
 
+  // --- KH alvo do aquário: converte número ou string do backend ---
+  let khTarget = null;
   if (typeof cfg.khTarget === 'number') {
-    khTargetInput.value = cfg.khTarget.toFixed(2);
-    khTargetStatus.textContent = `Alvo atual: ${cfg.khTarget.toFixed(2)} dKH`;
+    khTarget = cfg.khTarget;
+  } else if (cfg.khTarget != null) {
+    const v = parseFloat(cfg.khTarget);
+    khTarget = Number.isNaN(v) ? null : v;
+  }
+
+  if (khTarget != null) {
+    if (khTargetInput) {
+      khTargetInput.value = khTarget.toFixed(2);
+    }
+    khTargetStatus.textContent = `Alvo atual: ${khTarget.toFixed(2)} dKH`;
   } else {
     khTargetStatus.textContent = 'Alvo atual --';
-    khTargetInput.value = '';
+    if (khTargetInput) {
+      khTargetInput.value = '';
+    }
   }
 
   if (typeof cfg.khHealthGreenMaxDev === 'number') {
