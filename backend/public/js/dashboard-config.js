@@ -918,6 +918,88 @@ if (khCalibSaveBtn) {
   });
 }
 
+// === Modal para ALTERAR KH de referência manualmente ===
+const khRefEditModal     = document.getElementById('khRefEditModal');
+const khRefCurrentSpan   = document.getElementById('khRefCurrentSpan');
+const khRefEditInput     = document.getElementById('khRefEditInput');
+const khRefEditStatus    = document.getElementById('khRefEditStatus');
+const khRefEditSaveBtn   = document.getElementById('khRefEditSaveBtn');
+const khRefEditCancelBtn = document.getElementById('khRefEditCancelBtn');
+
+function showKhRefEditModal() {
+  if (!khRefEditModal) return;
+
+  // ler valor atual do texto "Referência atual: X.XX dKH"
+  let current = null;
+  const txt = khRefStatus?.textContent || '';
+  const m = txt.match(/([0-9]+[.,][0-9]+)/);
+  if (m) current = parseFloat(m[1].replace(',', '.'));
+
+  khRefCurrentSpan.textContent =
+    current != null && Number.isFinite(current)
+      ? current.toFixed(2)
+      : '--';
+
+  khRefEditInput.value =
+    current != null && Number.isFinite(current)
+      ? current.toFixed(2)
+      : '';
+
+  khRefEditStatus.textContent = '';
+  khRefEditModal.classList.remove('hidden');
+}
+
+function closeKhRefEditModal() {
+  if (!khRefEditModal) return;
+  khRefEditModal.classList.add('hidden');
+}
+
+// botão "Alterar KH de Referência" abre o modal
+if (saveKhRefBtn) {
+  saveKhRefBtn.addEventListener('click', () => {
+    showKhRefEditModal();
+  });
+}
+
+if (khRefEditCancelBtn) {
+  khRefEditCancelBtn.addEventListener('click', () => {
+    closeKhRefEditModal();
+  });
+}
+
+if (khRefEditSaveBtn) {
+  khRefEditSaveBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
+    if (!deviceId) return;
+
+    const raw = (khRefEditInput.value || '').trim();
+    const val = parseFloat(raw.replace(',', '.'));
+    if (!Number.isFinite(val) || val <= 0 || val > 25) {
+      khRefEditStatus.textContent =
+        'Informe um KH de referência válido (0–25).';
+      return;
+    }
+
+    khRefEditSaveBtn.disabled = true;
+    khRefEditStatus.textContent = 'Salvando KH de referência...';
+
+    const ok = await apiSetKhConfig(deviceId, val, null);
+    if (!ok) {
+      khRefEditStatus.textContent = 'Erro ao salvar KH de referência.';
+      khRefEditSaveBtn.disabled = false;
+      return;
+    }
+
+    khRefStatus.textContent = `Referência atual: ${val.toFixed(2)} dKH`;
+    window.dispatchEvent(new CustomEvent('deviceChanged'));
+
+    khRefEditStatus.textContent = 'Referência atualizada.';
+    setTimeout(() => {
+      khRefEditSaveBtn.disabled = false;
+      closeKhRefEditModal();
+    }, 400);
+  });
+}
 
 
 document.addEventListener('DOMContentLoaded', () => {
