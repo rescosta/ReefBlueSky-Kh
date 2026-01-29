@@ -399,129 +399,10 @@
           </div>
         </div>
       </div>
-
-<!--      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Sensores de nível</div>
-        </div>
-        <div class="card-subtitle">
-          Estado atual dos sensores nas câmaras A, B e C.
-        </div>
-
-        <div class="field-row inline">
-          <span>Câmara A</span>
-          <span id="levelA" class="badge-level badge-level-off">OFF</span>
-        </div>
-        <div class="field-row inline">
-          <span>Câmara B</span>
-          <span id="levelB" class="badge-level badge-level-off">OFF</span>
-        </div>
-        <div class="field-row inline">
-          <span>Câmara C</span>
-          <span id="levelC" class="badge-level badge-level-off">OFF</span>
-        </div>
-
-        <div class="hint">
-          Esses estados virão de um endpoint de status do dispositivo a ser implementado.
-        </div>
-      </div>
     </div>
--->    
 
-    <!-- Coluna direita: Bombas 1-3 + Correção KH (bomba 4) -->
-<!--    <div style="display:flex; flex-direction:column; gap:16px;">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Bombas de dosagem</div>
-            </div>
-          <div class="card-subtitle">
-            Controle manual das bombas 1, 2 e 3, incluindo sentido de giro e tempo de ativação com barra regressiva.
-          </div>
-
-          <table class="pump-table">
-            <thead>
-              <tr>
-                <th>Bomba</th>
-                <th>Status</th>
-                <th>Sentido</th>
-                <th>Tempo (s)</th>
-                <th>Ação</th>
-              </tr>
-            </thead>
-          <tbody>
-            <tr data-pump="1">
-              <td>1</td>
-              <td><span id="pumpStatus1" class="badge-level badge-level-off">PARADA</span></td>
-            <td>
-              <select id="pumpDirSelect1">
-                  <option value="forward">Normal</option>
-                  <option value="reverse">Reverso</option>
-              </select>
-            </td>
-            <td>
-                <input id="pumpTime1" type="number" min="1" max="600" value="10" style="width:60px;" />
-            </td>
-              <td>
-                <button class="btn-primary pumpStartBtn" data-pump="1">Ativar</button>
-                <div class="progress-bar" style="margin-top:4px;">
-                  <div id="pumpProg1" class="progress-inner" style="width:0;"></div>
-                </div>
-              </td>
-            </tr>
-
-            <tr data-pump="2">
-              <td>2</td>
-              <td><span id="pumpStatus2" class="badge-level badge-level-off">PARADA</span></td>
-              <td>
-                <select id="pumpDirSelect2">
-                  <option value="forward">Normal</option>
-                  <option value="reverse">Reverso</option>
-                </select>
-              </td>
-              <td>
-                <input id="pumpTime2" type="number" min="1" max="600" value="10" style="width:60px;" />
-              </td>
-              <td>
-                <button class="btn-primary pumpStartBtn" data-pump="2">Ativar</button>
-                <div class="progress-bar" style="margin-top:4px;">
-                  <div id="pumpProg2" class="progress-inner" style="width:0;"></div>
-                </div>
-              </td>
-              </tr>
-
-              <tr data-pump="3">
-                <td>3</td>
-                <td><span id="pumpStatus3" class="badge-level badge-level-off">PARADA</span></td>
-                <td>
-                  <select id="pumpDirSelect3">
-                    <option value="forward">Normal</option>
-                    <option value="reverse">Reverso</option>
-                  </select>
-                </td>
-                <td>
-                  <input id="pumpTime3" type="number" min="1" max="600" value="10"    style="width:60px;" />
-                </td>
-                <td>
-                  <button class="btn-primary pumpStartBtn" data-pump="3">Ativar</button>
-                  <div class="progress-bar" style="margin-top:4px;">
-                    <div id="pumpProg3" class="progress-inner" style="width:0;"></div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-        <div class="hint" style="margin-top:8px;">
-          Os comandos são enviados via API para o backend, que então repassa para o dispositivo.
-          Esta versão apenas faz a chamada REST; a lógica no device será implementada depois.
-        </div>
-      </div>
--->
-
-    </div>
-    
-     <!-- Coluna direita -->
-      <div style="display:flex; flex-direction:column; gap:16px;">
+    <!-- Coluna direita -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
 
       <!-- Card: Calibração bomba 4 -->
       <div class="card">
@@ -815,8 +696,6 @@
           </div>
 
         </div>
-      </div>
-      </div>
     </div>
   </div>
 
