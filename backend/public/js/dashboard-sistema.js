@@ -95,15 +95,23 @@ function updateDeviceInfoFromList() {
       return;
     }
 
+    console.log('[Sistema] Device data:', {
+      deviceId: dev.deviceId,
+      lastSeenMs: dev.lastSeenMs,
+      lastSeenEpoch: dev.lastSeenEpoch,
+      online: dev.online,
+      localIp: dev.localIp
+    });
+
     infoDeviceIdEl.textContent = dev.deviceId;
     infoDeviceNameEl.textContent =
       dev.name && dev.name.trim() ? dev.name : dev.deviceId;
     infoLocalIpEl.textContent = dev.localIp || dev.localip || '--';
 
-    const last = dev.lastSeen || dev.lastseen;
-    if (last) {
-      const ts =
-        typeof last === 'number' ? last : Date.parse(last);
+    // Backend retorna lastSeenMs (timestamp em milissegundos)
+    const lastSeenMs = dev.lastSeenMs || dev.lastSeen || dev.lastseen;
+    if (lastSeenMs) {
+      const ts = typeof lastSeenMs === 'number' ? lastSeenMs : Date.parse(lastSeenMs);
       infoLastSeenEl.textContent = ts ? formatDateTime(ts) : '--';
     } else {
       infoLastSeenEl.textContent = '--';
@@ -133,9 +141,19 @@ function updateOnlineUI(dev) {
     return;
   }
 
-  const last = dev.lastSeen || dev.lastseen;
-  const ts = last ? (typeof last === 'number' ? last : Date.parse(last)) : null;
+  // Backend retorna lastSeenMs (timestamp em milissegundos)
+  const lastSeenMs = dev.lastSeenMs || dev.lastSeen || dev.lastseen;
+  const ts = lastSeenMs ? (typeof lastSeenMs === 'number' ? lastSeenMs : Date.parse(lastSeenMs)) : null;
   const online = isDeviceOnline(ts);
+
+  console.log('[Sistema] Online status:', {
+    deviceId: dev.deviceId,
+    lastSeenMs,
+    timestamp: ts,
+    online,
+    now: Date.now(),
+    diff: ts ? (Date.now() - ts) : null
+  });
 
   // Badge existente
   if (badgeEl) {
