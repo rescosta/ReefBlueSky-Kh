@@ -10,7 +10,7 @@ const saveKhTargetBtn = document.getElementById('saveKhTargetBtn');
 
 const intervalRange = document.getElementById('intervalRange');
 const intervalLabel = document.getElementById('intervalLabel');
-const saveIntervalBtn = document.getElementById('saveIntervalBtn');
+//const saveIntervalBtn = document.getElementById('saveIntervalBtn');
 
 const levelAEl = document.getElementById('levelA');
 const levelBEl = document.getElementById('levelB');
@@ -644,7 +644,7 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
 }
 
 
-
+/*
 saveIntervalBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   const hours = parseInt(intervalRange.value, 10);
@@ -657,7 +657,7 @@ saveIntervalBtn.addEventListener('click', async () => {
     alert('Erro ao salvar intervalo.');
   }
 });
-
+*/
 
 const saveKhHealthBtn = document.getElementById('btnSaveKhHealthRanges');
 
