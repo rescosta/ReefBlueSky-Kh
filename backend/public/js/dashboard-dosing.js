@@ -1035,31 +1035,60 @@ function generateTimersForToday() {
     const volDay = s.volume_per_day_ml || s.volume_per_day || 0;
     const volDose     = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
 
-    const start = s.start_time || '00:00';
-    const end   = s.end_time   || '23:59';
+    // Usar adjusted_times se disponível (horários ajustados pelo backend)
+    let adjustedTimes = [];
+    if (s.adjusted_times && typeof s.adjusted_times === 'string') {
+      try {
+        adjustedTimes = JSON.parse(s.adjusted_times);
+      } catch (e) {
+        console.warn('Erro ao parsear adjusted_times:', e);
+      }
+    } else if (Array.isArray(s.adjusted_times)) {
+      adjustedTimes = s.adjusted_times;
+    }
 
-    const [sh, sm] = start.split(':').map(Number);
-    const [eh, em] = end.split(':').map(Number);
+    // Se temos horários ajustados, usar eles diretamente
+    if (adjustedTimes && adjustedTimes.length > 0) {
+      adjustedTimes.forEach(timeStr => {
+        if (!timeStr) return;
+        const [h, m] = timeStr.split(':').map(Number);
+        const sec = h * 3600 + m * 60;
 
-    const startSec = sh * 3600 + sm * 60;
-    const endSec   = eh * 3600 + em * 60;
-    if (endSec <= startSec || dosesPerDay <= 0) return;
-
-    const rangeSec = endSec - startSec;
-    const interval = rangeSec / dosesPerDay;
-
-    for (let i = 0; i < dosesPerDay; i++) {
-      const sec = Math.round(startSec + i * interval);
-      const h   = Math.floor(sec / 3600);
-      const m   = Math.floor((sec % 3600) / 60);
-      const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-
-      timers.push({
-        sortKey: sec,
-        time: timeStr,
-        pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
-        volume: volDose
+        timers.push({
+          sortKey: sec,
+          time: timeStr,
+          pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
+          volume: volDose
+        });
       });
+    } else {
+      // Fallback: calcular horários uniformemente (comportamento antigo)
+      const start = s.start_time || '00:00';
+      const end   = s.end_time   || '23:59';
+
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+
+      const startSec = sh * 3600 + sm * 60;
+      const endSec   = eh * 3600 + em * 60;
+      if (endSec <= startSec || dosesPerDay <= 0) return;
+
+      const rangeSec = endSec - startSec;
+      const interval = rangeSec / dosesPerDay;
+
+      for (let i = 0; i < dosesPerDay; i++) {
+        const sec = Math.round(startSec + i * interval);
+        const h   = Math.floor(sec / 3600);
+        const m   = Math.floor((sec % 3600) / 60);
+        const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+        timers.push({
+          sortKey: sec,
+          time: timeStr,
+          pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
+          volume: volDose
+        });
+      }
     }
   });
 
