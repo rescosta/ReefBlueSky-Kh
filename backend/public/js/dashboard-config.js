@@ -154,7 +154,7 @@ function updateAbortVisibility() {
   abortBtn.style.display = isRunningCycle ? 'flex' : 'none';
 }
 
-
+/*
 function updateIntervalLabel(v) {
   const n = parseInt(v, 10) || 1;
   intervalLabel.textContent = `${n} ${n === 1 ? 'hora' : 'horas'}`;
@@ -162,7 +162,7 @@ function updateIntervalLabel(v) {
 
 intervalRange.addEventListener('input', () => {
   updateIntervalLabel(intervalRange.value);
-});
+});*/
 
 // Helpers visuais
 function updateLevelBadge(el, on) {
@@ -553,11 +553,13 @@ async function loadConfigForSelected() {
   if (typeof cfg.khHealthYellowMaxDev === 'number') {
     khHealthYellowMaxDevInput.value = cfg.khHealthYellowMaxDev.toFixed(2);
   }
-
+/*
   if (typeof cfg.intervalHours === 'number') {
     intervalRange.value = cfg.intervalHours;
     updateIntervalLabel(cfg.intervalHours);
   }
+
+*/
 
   if (cfg.levels) {
     updateLevelBadge(levelAEl, !!cfg.levels.A);
@@ -810,9 +812,10 @@ async function initDashboardConfig() {
       console.error('Erro ao carregar lcdStatus na tela Config', e);
     }
   }
-  
+  /*
   updateIntervalLabel(intervalRange.value);
   await loadConfigForSelected();
+  */
 }
 
 // === Modal de Calibração de KH (assistente) ===
