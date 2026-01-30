@@ -2946,7 +2946,9 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
       .slice()
       .reverse()
       .map((r) => {
-        const t = new Date(r.ts).toISOString();
+        // [FIX] Converter BigInt para Number antes de criar Date
+        const timestamp = typeof r.ts === 'bigint' ? Number(r.ts) : r.ts;
+        const t = new Date(timestamp).toISOString();
         const lvl = r.level ? `[${r.level}]` : '';
         return `${t} ${lvl} ${r.message}`;
       });
