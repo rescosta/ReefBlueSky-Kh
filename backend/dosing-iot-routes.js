@@ -1,7 +1,7 @@
 
 //dosing-iot-routes.js
 
-const { mailTransporter, ALERT_FROM, sendTelegramForUser } =
+const { mailTransporter, ALERT_FROM, sendTelegramForUser, sendEmailForUser } =
   require('./alerts-helpers');
 const { getUserTimezone, getUserUtcOffsetSec } = require('./user-timezone');
 
@@ -212,7 +212,8 @@ router.post('/handshake', async (req, res) => {
           JSON_OBJECT(
             'id', s.id, 'enabled', s.enabled, 'days_mask', s.days_mask,
             'doses_per_day', s.doses_per_day, 'start_time', TIME_FORMAT(s.start_time, '%H:%i'),
-            'end_time', TIME_FORMAT(s.end_time, '%H:%i'), 'volume_per_day_ml', s.volume_per_day_ml
+            'end_time', TIME_FORMAT(s.end_time, '%H:%i'), 'volume_per_day_ml', s.volume_per_day_ml,
+            'min_gap_minutes', s.min_gap_minutes
           )
         ) as schedules
        FROM dosing_pumps p
@@ -539,6 +540,95 @@ router.post('/execution', async (req, res) => {
           WHERE id = ?`,
         [volume_ml, pump_id]
       );
+
+      // [NOVO] Enviar notificações se habilitado na agenda
+      if (origin === 'AUTO' && schedEpoch) {
+        try {
+          // Buscar pump e schedule info
+          const pumpInfo = await conn.query(
+            `SELECT dp.name as pump_name, dp.user_id,
+                    ds.id as schedule_id, ds.name as schedule_name,
+                    ds.notify_telegram, ds.notify_email
+             FROM dosing_pumps dp
+             LEFT JOIN dosing_schedules ds ON ds.pump_id = dp.id
+             WHERE dp.id = ?
+             LIMIT 1`,
+            [pump_id]
+          );
+
+          if (pumpInfo && pumpInfo.length > 0) {
+            const info = pumpInfo[0];
+            const userId = info.user_id;
+            const shouldNotifyTelegram = !!info.notify_telegram;
+            const shouldNotifyEmail = !!info.notify_email;
+
+            if (shouldNotifyTelegram || shouldNotifyEmail) {
+              // Buscar dados do usuário
+              const userRows = await conn.query(
+                `SELECT email, telegramChatId, telegramBotToken, telegramEnabled
+                 FROM users WHERE id = ? LIMIT 1`,
+                [userId]
+              );
+
+              if (userRows && userRows.length > 0) {
+                const user = userRows[0];
+                const message = `✅ Dosagem concluída!\n\n` +
+                  `Bomba: ${info.pump_name}\n` +
+                  `Agenda: ${info.schedule_name || 'N/A'}\n` +
+                  `Volume: ${volume_ml} mL\n` +
+                  `Horário: ${new Date(executedEpoch * 1000).toLocaleString('pt-BR')}`;
+
+                // Telegram
+                if (shouldNotifyTelegram && user.telegramEnabled && user.telegramChatId && user.telegramBotToken) {
+                  try {
+                    const telegramUrl = `https://api.telegram.org/bot${user.telegramBotToken}/sendMessage`;
+                    await fetch(telegramUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        chat_id: user.telegramChatId,
+                        text: message
+                      })
+                    });
+                    console.log(`[NOTIFY] Telegram enviado para user ${userId}`);
+                  } catch (err) {
+                    console.error('[NOTIFY] Erro ao enviar Telegram:', err);
+                  }
+                }
+
+                // Email
+                if (shouldNotifyEmail) {
+                  try {
+                    const emailSubject = '✅ Dosagem Concluída - ReefBlueSky';
+                    const emailBody = `
+                      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #22c55e;">✅ Dosagem Concluída com Sucesso!</h2>
+                        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                          <p style="margin: 10px 0;"><strong>Bomba:</strong> ${info.pump_name}</p>
+                          <p style="margin: 10px 0;"><strong>Agenda:</strong> ${info.schedule_name || 'N/A'}</p>
+                          <p style="margin: 10px 0;"><strong>Volume:</strong> ${volume_ml} mL</p>
+                          <p style="margin: 10px 0;"><strong>Horário:</strong> ${new Date(executedEpoch * 1000).toLocaleString('pt-BR')}</p>
+                        </div>
+                        <p style="color: #6b7280; font-size: 12px;">
+                          Esta é uma notificação automática do sistema ReefBlueSky.
+                        </p>
+                      </div>
+                    `;
+
+                    await sendEmailForUser(userId, emailSubject, emailBody);
+                    console.log(`[NOTIFY] Email enviado para user ${userId}`);
+                  } catch (err) {
+                    console.error('[NOTIFY] Erro ao enviar Email:', err);
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[NOTIFY] Erro ao processar notificações:', err);
+          // Não bloqueia o response principal
+        }
+      }
     }
 
     // Se falhou, log de erro

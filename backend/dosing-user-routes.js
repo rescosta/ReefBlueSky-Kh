@@ -469,7 +469,8 @@ router.get('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) => 
          s.id, s.enabled, s.days_mask, s.doses_per_day,
          TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
          TIME_FORMAT(s.end_time,   '%H:%i') AS end_time,
-         s.volume_per_day_ml, s.min_gap_minutes, s.adjusted_times
+         s.volume_per_day_ml, s.min_gap_minutes, s.adjusted_times,
+         s.notify_telegram, s.notify_email
        FROM dosing_schedules s
        WHERE s.pump_id = ?
        ORDER BY s.start_time ASC`,
@@ -508,7 +509,9 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
       end_time,
       volume_per_day,
       days_of_week,
-      min_gap_minutes = 30
+      min_gap_minutes = 30,
+      notify_telegram = false,
+      notify_email = false
     } = req.body;
 
     // ✅ valida e normaliza volume
@@ -556,8 +559,8 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
     const result = await conn.query(
       `INSERT INTO dosing_schedules
        (pump_id, enabled, days_mask, doses_per_day, start_time, end_time,
-        volume_per_day_ml, min_gap_minutes, adjusted_times)
-       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+        volume_per_day_ml, min_gap_minutes, adjusted_times, notify_telegram, notify_email)
+       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         pumpRow.id,
         daysMask,
@@ -566,7 +569,9 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
         validatedSchedule.end_time,
         validatedSchedule.volume_per_day_ml,
         validatedSchedule.min_gap_minutes,
-        JSON.stringify(validatedSchedule.adjusted_times)
+        JSON.stringify(validatedSchedule.adjusted_times),
+        notify_telegram ? 1 : 0,
+        notify_email ? 1 : 0
       ]
     );
 
@@ -595,7 +600,7 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
 
         const userId = req.user.userId;
         const { deviceId, pumpIndex, scheduleId } = req.params;
-        const { enabled, days_of_week, doses_per_day, start_time, end_time, volume_per_day_ml, min_gap_minutes } = req.body;
+        const { enabled, days_of_week, doses_per_day, start_time, end_time, volume_per_day_ml, min_gap_minutes, notify_telegram, notify_email } = req.body;
 
         conn = await pool.getConnection();
 
@@ -625,14 +630,18 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
 
             // Update completo
             const daysMask = convertDaysArrayToMask(validatedSchedule.days_of_week);
+
             await conn.query(
-                `UPDATE dosing_schedules SET 
+                `UPDATE dosing_schedules SET
                    enabled = ?, days_mask = ?, doses_per_day = ?, start_time = ?, end_time = ?,
-                   volume_per_day_ml = ?, min_gap_minutes = ?, adjusted_times = ?
+                   volume_per_day_ml = ?, min_gap_minutes = ?, adjusted_times = ?,
+                   notify_telegram = ?, notify_email = ?
                  WHERE id = ?`,
                 [enabled ? 1 : 0, daysMask, validatedSchedule.doses_per_day, validatedSchedule.start_time,
                  validatedSchedule.end_time, validatedSchedule.volume_per_day_ml, validatedSchedule.min_gap_minutes,
-                 JSON.stringify(validatedSchedule.adjusted_times), scheduleId]
+                 JSON.stringify(validatedSchedule.adjusted_times),
+                 notify_telegram ? 1 : 0, notify_email ? 1 : 0,
+                 scheduleId]
             );
 
             res.json({ data: { id: scheduleId, ...validatedSchedule } });
@@ -724,6 +733,9 @@ router.get('/devices/:deviceId/schedules', async (req, res) => {
          TIME_FORMAT(s.start_time, '%H:%i') AS start_time,
          TIME_FORMAT(s.end_time,   '%H:%i') AS end_time,
          s.volume_per_day_ml,
+         s.min_gap_minutes,
+         s.notify_telegram,
+         s.notify_email,
          s.created_at
        FROM dosing_schedules s
        JOIN dosing_pumps p   ON s.pump_id = p.id
