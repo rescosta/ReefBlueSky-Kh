@@ -10,7 +10,7 @@ const saveKhTargetBtn = document.getElementById('saveKhTargetBtn');
 
 const intervalRange = document.getElementById('intervalRange');
 const intervalLabel = document.getElementById('intervalLabel');
-//const saveIntervalBtn = document.getElementById('saveIntervalBtn');
+const saveIntervalBtn = document.getElementById('saveIntervalBtn');
 
 const levelAEl = document.getElementById('levelA');
 const levelBEl = document.getElementById('levelB');
@@ -154,7 +154,7 @@ function updateAbortVisibility() {
   abortBtn.style.display = isRunningCycle ? 'flex' : 'none';
 }
 
-/*
+
 function updateIntervalLabel(v) {
   const n = parseInt(v, 10) || 1;
   intervalLabel.textContent = `${n} ${n === 1 ? 'hora' : 'horas'}`;
@@ -162,7 +162,7 @@ function updateIntervalLabel(v) {
 
 intervalRange.addEventListener('input', () => {
   updateIntervalLabel(intervalRange.value);
-});*/
+});
 
 // Helpers visuais
 function updateLevelBadge(el, on) {
@@ -553,13 +553,13 @@ async function loadConfigForSelected() {
   if (typeof cfg.khHealthYellowMaxDev === 'number') {
     khHealthYellowMaxDevInput.value = cfg.khHealthYellowMaxDev.toFixed(2);
   }
-/*
+
   if (typeof cfg.intervalHours === 'number') {
     intervalRange.value = cfg.intervalHours;
     updateIntervalLabel(cfg.intervalHours);
   }
 
-*/
+
 
   if (cfg.levels) {
     updateLevelBadge(levelAEl, !!cfg.levels.A);
@@ -644,7 +644,6 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
 }
 
 
-/*
 saveIntervalBtn.addEventListener('click', async () => {
   const deviceId = DashboardCommon.getSelectedDeviceId();
   const hours = parseInt(intervalRange.value, 10);
@@ -657,7 +656,7 @@ saveIntervalBtn.addEventListener('click', async () => {
     alert('Erro ao salvar intervalo.');
   }
 });
-*/
+
 
 const saveKhHealthBtn = document.getElementById('btnSaveKhHealthRanges');
 
@@ -812,10 +811,10 @@ async function initDashboardConfig() {
       console.error('Erro ao carregar lcdStatus na tela Config', e);
     }
   }
-  /*
+  
   updateIntervalLabel(intervalRange.value);
   await loadConfigForSelected();
-  */
+  
 }
 
 // === Modal de Calibração de KH (assistente) ===
