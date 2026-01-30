@@ -411,6 +411,40 @@
             </span>
           </div>
         </div>
+
+
+        <!-- Card: Calibração bomba 4 -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Calibração bomba 4 (KH)</div>
+          </div>
+          <div class="card-subtitle">
+            A bomba 4 rodará continuamente por 60 segundos. Use um béquer graduado para medir o volume.
+          </div>
+
+          <div class="field-row">
+            <button id="pump4RunCalibBtn" class="btn-primary">Rodar calibração (60s)</button>
+            <div style="margin-top:8px;">
+              <div class="progress-bar">
+                <div id="pump4CalibProgressFill" class="progress-inner" style="width:0%;"></div>
+              </div>
+              <div id="pump4CalibProgressLabel" class="hint" style="margin-top:4px;">
+                Aguardando início da calibração.
+              </div>
+            </div>
+          </div>
+
+
+          <div class="field-row">
+            <label for="pump4CalibVolume">Volume medido (mL)</label>
+            <div class="inline">
+              <input id="pump4CalibVolume" type="number" min="1" max="2000" />
+              <button id="pump4SaveCalibBtn" class="btn-primary">Salvar calibração</button>
+            </div>
+            <div id="pump4CalibStatus" class="hint">
+              Informe o volume que saiu em 60 segundos para gravar a taxa em mL/s.
+            </div>
+          </div>
   
       </div>
     </div>
@@ -418,38 +452,6 @@
     <!-- Coluna direita -->
     <div style="display:flex; flex-direction:column; gap:16px;">
 
-      <!-- Card: Calibração bomba 4 -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Calibração bomba 4 (KH)</div>
-        </div>
-        <div class="card-subtitle">
-          A bomba 4 rodará continuamente por 60 segundos. Use um béquer graduado para medir o volume.
-        </div>
-
-        <div class="field-row">
-          <button id="pump4RunCalibBtn" class="btn-primary">Rodar calibração (60s)</button>
-          <div style="margin-top:8px;">
-            <div class="progress-bar">
-              <div id="pump4CalibProgressFill" class="progress-inner" style="width:0%;"></div>
-            </div>
-            <div id="pump4CalibProgressLabel" class="hint" style="margin-top:4px;">
-              Aguardando início da calibração.
-            </div>
-          </div>
-        </div>
-
-
-        <div class="field-row">
-          <label for="pump4CalibVolume">Volume medido (mL)</label>
-          <div class="inline">
-            <input id="pump4CalibVolume" type="number" min="1" max="2000" />
-            <button id="pump4SaveCalibBtn" class="btn-primary">Salvar calibração</button>
-          </div>
-          <div id="pump4CalibStatus" class="hint">
-            Informe o volume que saiu em 60 segundos para gravar a taxa em mL/s.
-          </div>
-        </div>
 
         <!-- Card: Modo Manutenção -->
         <div class="card">
