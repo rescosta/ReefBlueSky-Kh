@@ -7,11 +7,6 @@ const khTargetStatus = document.getElementById('khTargetStatus');
 const saveKhRefBtn    = document.getElementById('saveKhRefBtn');
 const saveKhTargetBtn = document.getElementById('saveKhTargetBtn');
 
-
-const intervalRange = document.getElementById('intervalRange');
-const intervalLabel = document.getElementById('intervalLabel');
-const saveIntervalBtn = document.getElementById('saveIntervalBtn');
-
 const levelAEl = document.getElementById('levelA');
 const levelBEl = document.getElementById('levelB');
 const levelCEl = document.getElementById('levelC');
@@ -154,16 +149,6 @@ function updateAbortVisibility() {
   abortBtn.style.display = isRunningCycle ? 'flex' : 'none';
 }
 
-
-function updateIntervalLabel(v) {
-  const n = parseInt(v, 10) || 1;
-  intervalLabel.textContent = `${n} ${n === 1 ? 'hora' : 'horas'}`;
-}
-
-intervalRange.addEventListener('input', () => {
-  updateIntervalLabel(intervalRange.value);
-});
-
 // Helpers visuais
 function updateLevelBadge(el, on) {
   el.className = 'badge-level ' + (on ? 'badge-level-on' : 'badge-level-off');
@@ -250,30 +235,6 @@ async function apiLoadDeviceConfig(deviceId) {
   } catch (err) {
     console.error('apiLoadDeviceConfig error', err);
     return null;
-  }
-}
-
-
-async function apiSetMeasurementInterval(deviceId, hours) {
-  // Futuro: POST /api/v1/user/devices/:deviceId/config/interval
-  console.log('SET interval', deviceId, hours);
-  try {
-    const res = await apiFetch(
-      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/config/interval`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ intervalHours: hours }),
-      },
-    );
-    const json = await res.json();
-    if (!res.ok || !json.success) {
-      console.error(json.message || 'Erro ao salvar intervalo');
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('apiSetMeasurementInterval error', err);
-    return false;
   }
 }
 
@@ -554,13 +515,6 @@ async function loadConfigForSelected() {
     khHealthYellowMaxDevInput.value = cfg.khHealthYellowMaxDev.toFixed(2);
   }
 
-  if (typeof cfg.intervalHours === 'number') {
-    intervalRange.value = cfg.intervalHours;
-    updateIntervalLabel(cfg.intervalHours);
-  }
-
-
-
   if (cfg.levels) {
     updateLevelBadge(levelAEl, !!cfg.levels.A);
     updateLevelBadge(levelBEl, !!cfg.levels.B);
@@ -642,21 +596,6 @@ async function apiSetKhConfig(deviceId, khReference, khTarget) {
     return false;
   }
 }
-
-
-saveIntervalBtn.addEventListener('click', async () => {
-  const deviceId = DashboardCommon.getSelectedDeviceId();
-  const hours = parseInt(intervalRange.value, 10);
-  if (!deviceId || Number.isNaN(hours)) return;
-
-  const ok = await apiSetMeasurementInterval(deviceId, hours);
-  if (ok) {
-    alert(`Intervalo atualizado para ${hours} ${hours === 1 ? 'hora' : 'horas'}.`);
-  } else {
-    alert('Erro ao salvar intervalo.');
-  }
-});
-
 
 const saveKhHealthBtn = document.getElementById('btnSaveKhHealthRanges');
 
@@ -811,10 +750,8 @@ async function initDashboardConfig() {
       console.error('Erro ao carregar lcdStatus na tela Config', e);
     }
   }
-  
-  updateIntervalLabel(intervalRange.value);
+
   await loadConfigForSelected();
-  
 }
 
 // === Modal de Calibração de KH (assistente) ===
