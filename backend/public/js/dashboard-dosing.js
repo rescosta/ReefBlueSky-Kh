@@ -549,6 +549,8 @@ async function saveEditScheduleModal() {
       return;
     }
 
+    const minGapMinutes = parseInt(document.getElementById('editMinGapMinutes').value, 10) || 30;
+
     const data = {
       enabled: true,
       days_of_week: activeDays,
@@ -557,6 +559,7 @@ async function saveEditScheduleModal() {
       end_time: document.getElementById('editEndTime').value,
       volume_per_day: volumeEdit,
       volume_per_day_ml: volumeEdit,
+      min_gap_minutes: minGapMinutes,
       notify_telegram: document.getElementById('editNotifyTelegram').checked,
       notify_email: document.getElementById('editNotifyEmail').checked
     };
