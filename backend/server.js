@@ -909,11 +909,23 @@ const authLimiter = rateLimit({
     skipSuccessfulRequests: true
 });
 
-// Rate limiting para sincronização (100 requisições por hora)
+// Rate limiting para sincronização (500 requisições por hora = ~8/min)
+// [FIX] Aumentado de 100 para 500 - dispositivos fazem sync + health + commands
 const syncLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
-    max: 100,
-    message: 'Limite de sincronização atingido'
+    max: 500,
+    message: 'Limite de sincronização atingido',
+    standardHeaders: true,
+    legacyHeaders: false,
+    // [FIX] Adiciona header Retry-After para o ESP saber quando tentar novamente
+    handler: (req, res) => {
+        res.set('Retry-After', '60');  // Tente novamente em 60 segundos
+        res.status(429).json({
+            success: false,
+            message: 'Limite de sincronização atingido',
+            retryAfter: 60
+        });
+    }
 });
 
 app.use(globalLimiter);
@@ -2479,33 +2491,45 @@ app.post('/api/v1/device/register',  /*authLimiter, */ async (req, res) => {
  */
 app.post('/api/v1/device/refresh-token', (req, res) => {
     console.log('[API] POST /api/v1/device/refresh-token');
-    
+
     const { refreshToken } = req.body;
-    
+
     if (!refreshToken) {
         return res.status(400).json({
             success: false,
             message: 'Refresh token não fornecido'
         });
     }
-    
+
     jwt.verify(refreshToken, JWT_REFRESH_SECRET, (err, decoded) => {
         if (err) {
+            console.log('[API] Refresh token inválido:', err.message);
+            // [FIX] Adicionar header Retry-After e distinguir tipo de erro
+            const isExpired = err.name === 'TokenExpiredError';
+            res.set('Retry-After', '300');  // 5 minutos
             return res.status(403).json({
                 success: false,
-                message: 'Refresh token inválido ou expirado'
+                message: isExpired ? 'Refresh token expirado - reautentique o dispositivo' : 'Refresh token inválido',
+                errorCode: isExpired ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+                retryAfter: 300
             });
         }
-        
 
-        // Gerar novo token
+        // [FIX] Gerar NOVO access token E NOVO refresh token
         const newToken = generateToken(decoded.userId, decoded.deviceId);
-        
+        const newRefreshToken = generateRefreshToken(decoded.userId, decoded.deviceId);
+
+        // [FIX] expiresIn deve refletir o tempo real (12h = 43200 segundos)
+        const expiresInSeconds = 12 * 60 * 60;  // 12 horas
+
+        console.log('[API] Tokens renovados para userId=%s deviceId=%s', decoded.userId, decoded.deviceId);
+
         res.json({
             success: true,
             data: {
                 token: newToken,
-                expiresIn: 3600
+                refreshToken: newRefreshToken,  // [FIX] Agora devolve novo refresh token!
+                expiresIn: expiresInSeconds
             }
         });
     });
@@ -2868,10 +2892,14 @@ app.post('/api/v1/device/sync', verifyToken, syncLimiter, async (req, res) => {
       errorMsg = 'Timeout ao conectar (MariaDB pode estar DOWN)';
     }
 
+    // [FIX] Adicionar header Retry-After para o ESP32 saber quando tentar novamente
+    res.set('Retry-After', '60');
+
     return res.status(statusCode).json({
       success: false,
       message: errorMsg,
       error: err.message,
+      retryAfter: 60,
     });
   } finally {
     if (conn) {
@@ -2942,12 +2970,31 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
 app.post('/api/v1/device/logs', verifyToken, async (req, res) => {
   const deviceId = req.user.deviceId;
   const userId   = req.user.userId || null;
-  const { lines } = req.body;
+  let { lines, logs } = req.body;
+
+  // Suporte para logs como string (parse automático)
+  if (typeof logs === 'string' && logs.length > 0) {
+    const parsedLines = [];
+    const logLines = logs.split('\n');
+    for (const line of logLines) {
+      if (!line.trim()) continue;
+      // Parse: [LEVEL] timestamp: message
+      const match = line.match(/\[(\w+)\]\s+(\d+):\s+(.+)/);
+      if (match) {
+        parsedLines.push({
+          level: match[1],
+          ts: parseInt(match[2], 10),
+          message: match[3]
+        });
+      }
+    }
+    lines = parsedLines;
+  }
 
   if (!Array.isArray(lines) || !lines.length) {
     return res.status(400).json({
       success: false,
-      message: 'lines deve ser um array não vazio',
+      message: 'lines deve ser um array não vazio ou logs como string',
     });
   }
 
@@ -3040,6 +3087,231 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
 });
 
 
+// [FIX] POST /api/v1/device/alert - Recebe alertas do ESP32 (calibração, erros, etc)
+app.post('/api/v1/device/alert', verifyToken, async (req, res) => {
+  console.log('[API] POST /api/v1/device/alert');
+
+  try {
+    const deviceId = req.user.deviceId;
+    const userId = req.user.userId;
+    const { type, message, severity } = req.body;
+
+    if (!type || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parâmetros obrigatórios: type, message'
+      });
+    }
+
+    console.log(`[ALERT] Device ${deviceId} - Tipo: ${type}, Severidade: ${severity || 'medium'}`);
+    console.log(`[ALERT] Mensagem: ${message}`);
+
+    // [FIX] Salvar alerta no banco de dados
+    const connAlert = await pool.getConnection();
+    await connAlert.query(
+      `INSERT INTO device_alerts (deviceId, userId, type, message, severity)
+       VALUES (?, ?, ?, ?, ?)`,
+      [deviceId, userId, type, message, severity || 'medium']
+    );
+    connAlert.release();
+    console.log('[ALERT] Alerta salvo no banco de dados');
+
+    // Buscar informações do usuário e device
+    const conn = await pool.getConnection();
+    const rows = await conn.query(
+      `SELECT u.email, u.telegram_enabled, u.telegram_bot_token, u.telegram_chat_id,
+              d.name as device_name
+       FROM users u
+       JOIN devices d ON d.userId = u.id
+       WHERE u.id = ? AND d.deviceId = ?
+       LIMIT 1`,
+      [userId, deviceId]
+    );
+    conn.release();
+
+    if (!rows || rows.length === 0) {
+      console.log('[ALERT] Usuário/device não encontrado');
+      return res.json({ success: true, message: 'Alerta registrado (sem envio)' });
+    }
+
+    const user = rows[0];
+    const deviceName = user.device_name || deviceId;
+
+    // Montar mensagem formatada
+    const severityEmoji = {
+      low: 'ℹ️',
+      medium: '⚠️',
+      high: '🚨',
+      critical: '🔴'
+    }[severity || 'medium'];
+
+    const alertMessage = `${severityEmoji} *Alerta: ${type}*\n\n` +
+                         `📱 Device: ${deviceName}\n` +
+                         `🆔 ID: ${deviceId}\n` +
+                         `📝 ${message}\n\n` +
+                         `🕐 ${new Date().toLocaleString('pt-BR')}`;
+
+    // Enviar via Telegram se habilitado
+    if (user.telegram_enabled && user.telegram_bot_token && user.telegram_chat_id) {
+      try {
+        await sendTelegramMessageTo(userId, alertMessage);
+        console.log(`[ALERT] Telegram enviado para usuário ${userId}`);
+      } catch (err) {
+        console.error('[ALERT] Erro ao enviar Telegram:', err.message);
+      }
+    }
+
+    // Enviar via Email
+    try {
+      await mailTransporter.sendMail({
+        from: ALERT_FROM,
+        to: user.email,
+        subject: `${severityEmoji} Alerta ReefBlueSky: ${type}`,
+        html: `
+          <h2>${severityEmoji} Alerta do Sistema</h2>
+          <p><strong>Tipo:</strong> ${type}</p>
+          <p><strong>Device:</strong> ${deviceName} (${deviceId})</p>
+          <p><strong>Severidade:</strong> ${severity || 'medium'}</p>
+          <hr>
+          <p>${message}</p>
+          <hr>
+          <p><small>Data/Hora: ${new Date().toLocaleString('pt-BR')}</small></p>
+        `
+      });
+      console.log(`[ALERT] Email enviado para ${user.email}`);
+    } catch (err) {
+      console.error('[ALERT] Erro ao enviar email:', err.message);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Alerta enviado com sucesso'
+    });
+
+  } catch (err) {
+    console.error('[ALERT] Erro ao processar alerta:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao processar alerta'
+    });
+  }
+});
+
+// [FIX] GET /api/v1/devices/:deviceId/alerts - Buscar histórico de alertas de um dispositivo
+app.get('/api/v1/devices/:deviceId/alerts', verifyToken, async (req, res) => {
+  console.log('[API] GET /api/v1/devices/:deviceId/alerts');
+
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+    const limit = parseInt(req.query.limit) || 50; // Padrão: últimos 50 alertas
+
+    // Verificar se o device pertence ao usuário
+    const conn = await pool.getConnection();
+    const deviceCheck = await conn.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+
+    if (!deviceCheck || deviceCheck.length === 0) {
+      conn.release();
+      return res.status(404).json({
+        success: false,
+        message: 'Dispositivo não encontrado ou sem permissão'
+      });
+    }
+
+    // Buscar alertas ordenados por data (mais recentes primeiro)
+    const alerts = await conn.query(
+      `SELECT id, deviceId, type, message, severity, created_at
+       FROM device_alerts
+       WHERE deviceId = ? AND userId = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      [deviceId, userId, limit]
+    );
+    conn.release();
+
+    return res.json({
+      success: true,
+      data: {
+        deviceId: deviceId,
+        alerts: alerts || [],
+        count: alerts ? alerts.length : 0
+      }
+    });
+
+  } catch (err) {
+    console.error('[ALERTS] Erro ao buscar alertas:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar alertas'
+    });
+  }
+});
+
+// [FIX] GET /api/v1/devices/:deviceId/export/measurements - Exportar medições em CSV
+app.get('/api/v1/devices/:deviceId/export/measurements', authUserMiddleware, async (req, res) => {
+  console.log('[API] GET /api/v1/devices/:deviceId/export/measurements');
+
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+
+    // Verificar permissão
+    const conn = await pool.getConnection();
+    const deviceCheck = await conn.query(
+      'SELECT id, name FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+
+    if (!deviceCheck || deviceCheck.length === 0) {
+      conn.release();
+      return res.status(404).json({
+        success: false,
+        message: 'Dispositivo não encontrado'
+      });
+    }
+
+    const deviceName = deviceCheck[0].name || deviceId;
+
+    // Buscar todas as medições
+    const measurements = await conn.query(
+      `SELECT timestamp, kh, temperature, status, confidence
+       FROM measurements
+       WHERE deviceId = ?
+       ORDER BY timestamp DESC`,
+      [deviceId]
+    );
+    conn.release();
+
+    // Gerar CSV
+    const csvHeader = 'Data/Hora,KH (dKH),Temperatura (°C),Status,Confiança\n';
+    const csvRows = measurements.map(m => {
+      const dateTime = m.timestamp ? new Date(Number(m.timestamp)).toLocaleString('pt-BR') : '--';
+      const kh = m.kh != null ? m.kh.toFixed(2) : '--';
+      const temp = m.temperature != null ? m.temperature.toFixed(1) : '--';
+      const status = m.status || '--';
+      const confidence = m.confidence != null ? m.confidence.toFixed(2) : '--';
+      return `"${dateTime}","${kh}","${temp}","${status}","${confidence}"`;
+    }).join('\n');
+
+    const csv = csvHeader + csvRows;
+
+    // Definir headers para download
+    const filename = `reefbluesky_${deviceId}_${Date.now()}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('\uFEFF' + csv); // BOM para Excel reconhecer UTF-8
+
+  } catch (err) {
+    console.error('[EXPORT] Erro ao exportar medições:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao exportar medições'
+    });
+  }
+});
 
 
 // GET /api/v1/device/kh-reference
@@ -3099,6 +3371,8 @@ function getOrCreateDeviceConfig(deviceId) {
     deviceConfigs.set(deviceId, {
       khReference: 8.0,
       intervalHours: 1,
+      phRef: null,      // [FIX] pH de referência (solução padrão)
+      tempRef: null,    // [FIX] Temperatura de referência (°C)
       levels: { A: true, B: true, C: false },
       pumps: {
         1: { running: false, direction: 'forward' },
@@ -3335,15 +3609,19 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'custom_1',
       'custom_2',
       'custom_3',
-      'test_mode', 
+      'test_mode',
       'abort',
       'pump4calibrate',
       'setpump4mlpersec',
       'khcorrection',
       'fake_measurement',
       'pump4abort',
-      'khcalibrate',     
- 
+      'khcalibrate',
+      // Modo Manutenção
+      'test_pump',
+      'fill_chamber',
+      'system_flush',
+
     ]);
 
     if (!allowed.has(type)) {
@@ -3456,6 +3734,48 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
 
         break;
 
+      // [FIX] Salvar pH de referência
+      case 'setphref':
+        dbType = 'setphref';
+        let phRef = req.body.value;
+        phRef = typeof phRef === 'string' ? parseFloat(phRef) : phRef;
+
+        if (!Number.isFinite(phRef) || phRef < 6.0 || phRef > 9.0) {
+          return res.status(400).json({
+            success: false,
+            message: 'value (pH) deve ser um número entre 6.0 e 9.0',
+          });
+        }
+
+        payload = { ph_ref: phRef };
+
+        // Atualizar também no config em memória
+        const cfgPh = getOrCreateDeviceConfig(deviceId);
+        cfgPh.phRef = phRef;
+
+        break;
+
+      // [FIX] Salvar Temperatura de referência
+      case 'settempref':
+        dbType = 'settempref';
+        let tempRef = req.body.value;
+        tempRef = typeof tempRef === 'string' ? parseFloat(tempRef) : tempRef;
+
+        if (!Number.isFinite(tempRef) || tempRef < 15.0 || tempRef > 35.0) {
+          return res.status(400).json({
+            success: false,
+            message: 'value (Temp °C) deve ser um número entre 15.0 e 35.0',
+          });
+        }
+
+        payload = { temp_ref: tempRef };
+
+        // Atualizar também no config em memória
+        const cfgTemp = getOrCreateDeviceConfig(deviceId);
+        cfgTemp.tempRef = tempRef;
+
+        break;
+
 
         case 'khcorrection':
           // firmware: cmd.action == "khcorrection"
@@ -3470,6 +3790,50 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
           }
 
           payload = { volume: value };
+          break;
+
+        // Modo Manutenção: testes individuais de bombas
+        case 'test_pump':
+          dbType = 'testpump';
+          const pumpNum = req.body.pump;
+          const pumpDuration = req.body.duration || 5;
+
+          if (!pumpNum || pumpNum < 1 || pumpNum > 4) {
+            return res.status(400).json({
+              success: false,
+              message: 'pump deve ser 1, 2, 3 ou 4'
+            });
+          }
+
+          if (pumpDuration < 1 || pumpDuration > 60) {
+            return res.status(400).json({
+              success: false,
+              message: 'duration deve ser entre 1 e 60 segundos'
+            });
+          }
+
+          payload = { pump: pumpNum, duration: pumpDuration };
+          break;
+
+        // Modo Manutenção: enchimento de câmaras individuais
+        case 'fill_chamber':
+          dbType = 'fillchamber';
+          const chamber = req.body.chamber;
+
+          if (!chamber || !['A', 'B', 'C'].includes(chamber)) {
+            return res.status(400).json({
+              success: false,
+              message: 'chamber deve ser A, B ou C'
+            });
+          }
+
+          payload = { chamber };
+          break;
+
+        // Modo Manutenção: ciclo de limpeza completo
+        case 'system_flush':
+          dbType = 'systemflush';
+          payload = {};
           break;
 
         default:
@@ -3490,6 +3854,59 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
   } catch (err) {
     console.error('POST /command error', err);
     return res.status(500).json({ success: false, message: 'Erro ao enviar comando' });
+  }
+});
+
+// GET /sensors - Busca leituras atuais dos sensores
+app.get('/api/v1/devices/:deviceId/sensors', authUserMiddleware, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const userId = req.user.userId;
+
+    // Verificar se o device pertence ao usuário
+    const chk = await pool.query(
+      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!chk.length) {
+      return res.status(404).json({ success: false, message: 'Device não encontrado' });
+    }
+
+    // Buscar a última medição para obter os níveis e valores dos sensores
+    const measurements = await pool.query(
+      `SELECT levelA, levelB, levelC, temperature, phsample
+       FROM measurements
+       WHERE deviceId = ?
+       ORDER BY timestamp DESC
+       LIMIT 1`,
+      [deviceId]
+    );
+
+    if (!measurements.length) {
+      // Sem medições ainda, retornar valores padrão
+      return res.json({
+        success: true,
+        levelA: null,
+        levelB: null,
+        levelC: null,
+        temperature: null,
+        ph: null,
+      });
+    }
+
+    const last = measurements[0];
+
+    return res.json({
+      success: true,
+      levelA: last.levelA,
+      levelB: last.levelB,
+      levelC: last.levelC,
+      temperature: last.temperature,
+      ph: last.phsample,
+    });
+  } catch (err) {
+    console.error('GET /sensors error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao buscar leituras dos sensores' });
   }
 });
 
@@ -3826,6 +4243,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         d.kh_health_yellow_max_dev,
         d.kh_auto_enabled,
         d.lcd_status,
+        d.test_mode,
         (
           SELECT MAX(
                    CASE
@@ -3863,6 +4281,7 @@ app.get('/api/v1/user/devices/:deviceId/kh-config', authUserMiddleware, async (r
         khHealthGreenMaxDev: cfg.kh_health_green_max_dev,
         khHealthYellowMaxDev: cfg.kh_health_yellow_max_dev,
         khAutoEnabled: !!cfg.kh_auto_enabled,
+        testMode: !!cfg.test_mode,
         lcdStatus:
           cfg.lcd_status === 'online' || cfg.lcd_status === 'offline'
             ? cfg.lcd_status
@@ -3913,6 +4332,12 @@ app.post('/api/v1/user/devices/:deviceId/test-mode', authUserMiddleware, async (
 
     const cmd = await enqueueDbCommand(deviceId, 'testmode', { enabled: !!enabled });
     console.log('[CMD] testmode enfileirado', deviceId, !!enabled);
+
+    // Salvar estado no banco imediatamente
+    await pool.query(
+      'UPDATE devices SET test_mode = ? WHERE deviceId = ? AND userId = ?',
+      [!!enabled, deviceId, userId]
+    );
 
     return res.json({ success: true, data: { commandId: cmd.id } });
   } catch (err) {
@@ -4482,6 +4907,69 @@ app.get('/api/v1/health', (req, res) => {
 
 // [BOOT] Inicialização do Servidor
 // ============================================================================
+// [FIX] Criar tabela de alertas se não existir
+async function ensureDeviceAlertsTable() {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS device_alerts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        deviceId VARCHAR(50) NOT NULL,
+        userId INT NOT NULL,
+        type VARCHAR(100) NOT NULL,
+        message TEXT NOT NULL,
+        severity ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_deviceId_created (deviceId, created_at DESC),
+        INDEX idx_userId (userId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('[DB] Tabela device_alerts verificada/criada');
+  } catch (err) {
+    console.error('[DB] Erro ao criar tabela device_alerts:', err);
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+async function ensureTestModeColumn() {
+  const conn = await pool.getConnection();
+  try {
+    // Adicionar coluna test_mode se não existir
+    await conn.query(`
+      ALTER TABLE devices
+      ADD COLUMN IF NOT EXISTS test_mode BOOLEAN DEFAULT FALSE
+    `);
+    console.log('[DB] Coluna test_mode verificada/criada na tabela devices');
+  } catch (err) {
+    // Ignorar erro se coluna já existir (em alguns DBs)
+    if (!err.message.includes('Duplicate column')) {
+      console.error('[DB] Erro ao adicionar coluna test_mode:', err.message);
+    }
+  } finally {
+    conn.release();
+  }
+}
+
+async function ensureDosingNotifyColumns() {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query(`
+      ALTER TABLE dosing_schedules
+      ADD COLUMN IF NOT EXISTS notify_telegram BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS notify_email BOOLEAN DEFAULT FALSE
+    `);
+    console.log('[DB] Colunas notify_telegram/notify_email verificadas');
+  } catch (err) {
+    if (!err.message.includes('Duplicate column')) {
+      console.error('[DB] Erro ao adicionar colunas notificação:', err.message);
+    }
+  } finally {
+    conn.release();
+  }
+}
+
 async function startServer() {
   try {
 
@@ -4492,6 +4980,16 @@ async function startServer() {
     // 1) Inicializar tabela OTA logs
     await initOtaLogsTable();
     console.log('[OTA] device_ota_events pronta');
+
+    // 2) Inicializar tabela de alertas
+    await ensureDeviceAlertsTable();
+    console.log('[ALERTS] device_alerts pronta');
+
+    // 3) Garantir coluna test_mode na tabela devices
+    await ensureTestModeColumn();
+
+    // 4) Garantir colunas notificação em dosing_schedules
+    await ensureDosingNotifyColumns();
 
     // 2) Iniciar servidor HTTP
     app.listen(PORT, () => {
