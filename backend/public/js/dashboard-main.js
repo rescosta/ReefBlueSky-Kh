@@ -37,6 +37,10 @@ const kh15dSpan = document.getElementById('kh15dSpan');
 const testModeToggle = document.getElementById('testModeToggle');
 const testNowBtn     = document.getElementById('testNowBtn');
 
+const intervalRange = document.getElementById('intervalRange');
+const intervalLabel = document.getElementById('intervalLabel');
+const saveIntervalBtn = document.getElementById('saveIntervalBtn');
+
 
 const testNowProgressWrapper = document.getElementById('testNowProgressWrapper');
 const testNowProgressFill   = document.getElementById('testNowProgressFill');
@@ -77,6 +81,58 @@ let testNowStep      = 0;
 let testNowTimerId   = null;
 
 let currentKhTarget = null;
+
+// Função para atualizar label do intervalo
+function updateIntervalLabel(v) {
+  const n = parseInt(v, 10) || 1;
+  intervalLabel.textContent = `${n} ${n === 1 ? 'hora' : 'horas'}`;
+}
+
+// Event listener para o range de intervalo
+if (intervalRange) {
+  intervalRange.addEventListener('input', () => {
+    updateIntervalLabel(intervalRange.value);
+  });
+}
+
+// Função API para salvar intervalo de medição
+async function apiSetMeasurementInterval(deviceId, hours) {
+  console.log('SET interval', deviceId, hours);
+  try {
+    const res = await apiFetch(
+      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/config/interval`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ intervalHours: hours }),
+      },
+    );
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      console.error(json.message || 'Erro ao salvar intervalo');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('apiSetMeasurementInterval error', err);
+    return false;
+  }
+}
+
+// Event listener para salvar intervalo
+if (saveIntervalBtn) {
+  saveIntervalBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    const hours = parseInt(intervalRange.value, 10);
+    if (!deviceId || Number.isNaN(hours)) return;
+
+    const ok = await apiSetMeasurementInterval(deviceId, hours);
+    if (ok) {
+      alert(`Intervalo atualizado para ${hours} ${hours === 1 ? 'hora' : 'horas'}.`);
+    } else {
+      alert('Erro ao salvar intervalo.');
+    }
+  });
+}
 
 
 function updateTestNowProgress() {
@@ -722,17 +778,30 @@ let khAutoEnabled = false;
 
 async function loadKhInfo(deviceId) {
   try {
-    const resp = await apiFetch(
-      `/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`,
-       );
+    const [khConfigResp, statusResp] = await Promise.all([
+      apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-config`),
+      apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/status`)
+    ]);
 
-    const json = await resp.json();
-    if (!resp.ok || !json.success) {
+    const json = await khConfigResp.json();
+    if (!khConfigResp.ok || !json.success) {
       console.error('Erro ao carregar KH config na tela principal', json.message || json.error);
       return;
     }
 
     const data = json.data || {};
+
+    // Carregar intervalHours do status
+    if (statusResp.ok) {
+      const statusJson = await statusResp.json();
+      if (statusJson.success && statusJson.data) {
+        const intervalHours = statusJson.data.intervalHours;
+        if (typeof intervalHours === 'number' && intervalRange) {
+          intervalRange.value = intervalHours;
+          updateIntervalLabel(intervalHours);
+        }
+      }
+    }
 
     if (DashboardCommon && typeof DashboardCommon.setLcdStatus === 'function') {
       DashboardCommon.setLcdStatus(data.lcdStatus);
@@ -981,6 +1050,11 @@ async function initDashboardMain() {
     dosingBtn.addEventListener('click', () => {
       window.location.href = 'dashboard-dosing.html';
     });
+  }
+
+  // Inicializar label do intervalo
+  if (intervalRange) {
+    updateIntervalLabel(intervalRange.value);
   }
 
   const devs = await DashboardCommon.loadDevicesCommon(); // usa a global
