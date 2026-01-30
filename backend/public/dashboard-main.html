@@ -430,6 +430,19 @@
           </span>
         </div>
 
+        <!-- Intervalo entre medições -->
+        <div class="measure-info" style="margin-top:12px; padding-top:12px; border-top:1px solid #1f2937;">
+          <label for="intervalRange" style="font-size:13px; color:#e5e7eb; margin-bottom:4px;">Intervalo entre medições (horas)</label>
+          <input id="intervalRange" type="range" min="1" max="24" value="1" style="width:100%; margin-top:4px;" />
+          <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <span id="intervalLabel" style="font-size:13px; color:#9ca3af;">1 hora</span>
+            <button id="saveIntervalBtn" class="btn-small">Salvar agendamento</button>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-top:4px;">
+            As medições são agendadas para a próxima hora redonda a partir do momento do salvamento.
+          </div>
+        </div>
+
     <!-- Progresso do teste manual + botão ABORT -->
         <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
           <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
