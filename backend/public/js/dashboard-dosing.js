@@ -499,6 +499,7 @@ function openEditScheduleModal(scheduleId) {
   const editMinGap = document.getElementById('editMinGapMinutes');
   if (editMinGap) {
     editMinGap.value = schedule.min_gap_minutes || 30;
+    console.log('[DEBUG] Carregando min_gap_minutes no modal:', schedule.min_gap_minutes, '-> campo:', editMinGap.value);
   }
 
   // demais campos
@@ -551,6 +552,9 @@ async function saveEditScheduleModal() {
 
     const minGapMinutes = parseInt(document.getElementById('editMinGapMinutes').value, 10) || 30;
 
+    // [DEBUG] Forçar log no console
+    alert('minGapMinutes = ' + minGapMinutes + ', campo existe? ' + !!document.getElementById('editMinGapMinutes'));
+
     const data = {
       enabled: true,
       days_of_week: activeDays,
@@ -564,7 +568,9 @@ async function saveEditScheduleModal() {
       notify_email: document.getElementById('editNotifyEmail').checked
     };
 
-    console.log('PUT data =>', data);
+    console.log('[DEBUG] PUT data enviando para backend:', data);
+    console.log('[DEBUG] Campo editMinGapMinutes.value:', document.getElementById('editMinGapMinutes').value);
+    console.log('[DEBUG] minGapMinutes parseado:', minGapMinutes);
 
     const result = await apiCall(
       `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/schedules/${editingScheduleId}`,
