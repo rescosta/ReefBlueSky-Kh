@@ -2949,10 +2949,18 @@ app.get('/api/v1/dev/device-console/:deviceId', authUserMiddleware, async (req, 
         // [FIX] Converter BigInt para Number antes de criar Date
         const timestamp = typeof r.ts === 'bigint' ? Number(r.ts) : r.ts;
 
-        // [FIX] Converter para horário do Brasil (GMT-3)
+        // [FIX] Converter para horário do Brasil (America/Sao_Paulo = GMT-3)
         const date = new Date(timestamp);
-        const brazilTime = new Date(date.getTime() - (3 * 60 * 60 * 1000)); // GMT-3
-        const t = brazilTime.toISOString().replace('T', ' ').substring(0, 19);
+        const t = date.toLocaleString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).replace(',', '');  // Remove vírgula entre data e hora
 
         const lvl = r.level ? `[${r.level}]` : '';
         return `${t} ${lvl} ${r.message}`;
