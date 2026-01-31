@@ -1097,9 +1097,7 @@ async function loadTestSchedule(deviceId) {
   if (!deviceId) return;
 
   try {
-    const res = await fetch(`/api/v1/user/devices/${deviceId}/test-schedule`, {
-      headers: DashboardCommon.headersAuth
-    });
+    const res = await apiFetch(`/api/v1/user/devices/${deviceId}/test-schedule`);
 
     if (!res.ok) {
       console.warn('Erro ao carregar test schedule:', res.status);
@@ -1273,9 +1271,8 @@ async function updateTestSchedule(deviceId, data) {
   if (!deviceId) return;
 
   try {
-    const res = await fetch(`/api/v1/user/devices/${deviceId}/test-schedule`, {
+    const res = await apiFetch(`/api/v1/user/devices/${deviceId}/test-schedule`, {
       method: 'PUT',
-      headers: DashboardCommon.headersAuth,
       body: JSON.stringify(data)
     });
 
