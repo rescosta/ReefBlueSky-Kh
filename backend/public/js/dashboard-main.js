@@ -42,8 +42,8 @@ const intervalLabel = document.getElementById('intervalLabel'); // LEGACY - não
 const saveIntervalBtn = document.getElementById('saveIntervalBtn'); // LEGACY - não usado mais
 
 // Novos elementos para test schedule
-const testIntervalSelect = document.getElementById('testIntervalSelect');
-const testAutoToggle     = document.getElementById('testAutoToggle');
+const testIntervalRange  = document.getElementById('testIntervalRange');
+const testIntervalLabel  = document.getElementById('testIntervalLabel');
 const testStatusSpan     = document.getElementById('testStatusSpan');
 const autoTestProgressWrapper = document.getElementById('autoTestProgressWrapper');
 const autoTestProgressFill    = document.getElementById('autoTestProgressFill');
@@ -1121,14 +1121,16 @@ async function loadTestSchedule(deviceId) {
 function updateTestScheduleUI(schedule) {
   if (!schedule) return;
 
-  // Atualizar select de intervalo
-  if (testIntervalSelect) {
-    testIntervalSelect.value = schedule.interval_hours.toString();
-  }
+  // Atualizar slider de intervalo
+  if (testIntervalRange && testIntervalLabel) {
+    // Se desativado ou intervalo > 24h, ajustar
+    let intervalValue = 0;
+    if (schedule.auto_enabled && schedule.interval_hours > 0) {
+      intervalValue = Math.min(schedule.interval_hours, 24);
+    }
 
-  // Atualizar toggle de auto
-  if (testAutoToggle) {
-    testAutoToggle.checked = !!schedule.auto_enabled;
+    testIntervalRange.value = intervalValue;
+    updateIntervalLabel(intervalValue);
   }
 
   // Atualizar próximo teste
@@ -1296,28 +1298,53 @@ async function updateTestSchedule(deviceId, data) {
 }
 
 /**
- * Event listener para mudança de intervalo
+ * Atualiza label do slider com o valor atual
  */
-if (testIntervalSelect) {
-  testIntervalSelect.addEventListener('change', async (e) => {
+function updateIntervalLabel(value) {
+  if (!testIntervalLabel) return;
+
+  if (value === 0) {
+    testIntervalLabel.textContent = 'Desativado';
+    testIntervalLabel.style.color = '#ef4444'; // vermelho
+  } else if (value === 1) {
+    testIntervalLabel.textContent = '1 hora';
+    testIntervalLabel.style.color = '#10b981'; // verde
+  } else {
+    testIntervalLabel.textContent = `${value} horas`;
+    testIntervalLabel.style.color = '#10b981'; // verde
+  }
+}
+
+/**
+ * Event listener para o slider de intervalo
+ */
+if (testIntervalRange) {
+  // Atualizar label enquanto arrasta
+  testIntervalRange.addEventListener('input', (e) => {
+    const value = parseInt(e.target.value, 10);
+    updateIntervalLabel(value);
+  });
+
+  // Salvar quando soltar
+  testIntervalRange.addEventListener('change', async (e) => {
     const deviceId = getSelectedDeviceId();
     if (!deviceId) return;
 
     const intervalHours = parseInt(e.target.value, 10);
-    await updateTestSchedule(deviceId, { interval_hours: intervalHours });
-  });
-}
 
-/**
- * Event listener para toggle de auto_enabled
- */
-if (testAutoToggle) {
-  testAutoToggle.addEventListener('change', async (e) => {
-    const deviceId = getSelectedDeviceId();
-    if (!deviceId) return;
-
-    const autoEnabled = e.target.checked;
-    await updateTestSchedule(deviceId, { auto_enabled: autoEnabled });
+    // Se valor = 0, desativar testes automáticos
+    // Se valor > 0, ativar e definir intervalo
+    if (intervalHours === 0) {
+      await updateTestSchedule(deviceId, {
+        auto_enabled: false,
+        interval_hours: 24 // manter intervalo padrão mas desativado
+      });
+    } else {
+      await updateTestSchedule(deviceId, {
+        auto_enabled: true,
+        interval_hours: intervalHours
+      });
+    }
   });
 }
 
