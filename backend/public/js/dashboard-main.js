@@ -37,10 +37,17 @@ const kh15dSpan = document.getElementById('kh15dSpan');
 const testModeToggle = document.getElementById('testModeToggle');
 const testNowBtn     = document.getElementById('testNowBtn');
 
-const intervalRange = document.getElementById('intervalRange');
-const intervalLabel = document.getElementById('intervalLabel');
-const saveIntervalBtn = document.getElementById('saveIntervalBtn');
+const intervalRange = document.getElementById('intervalRange'); // LEGACY - não usado mais
+const intervalLabel = document.getElementById('intervalLabel'); // LEGACY - não usado mais
+const saveIntervalBtn = document.getElementById('saveIntervalBtn'); // LEGACY - não usado mais
 
+// Novos elementos para test schedule
+const testIntervalSelect = document.getElementById('testIntervalSelect');
+const testAutoToggle     = document.getElementById('testAutoToggle');
+const testStatusSpan     = document.getElementById('testStatusSpan');
+const autoTestProgressWrapper = document.getElementById('autoTestProgressWrapper');
+const autoTestProgressFill    = document.getElementById('autoTestProgressFill');
+const autoTestProgressLabel   = document.getElementById('autoTestProgressLabel');
 
 const testNowProgressWrapper = document.getElementById('testNowProgressWrapper');
 const testNowProgressFill   = document.getElementById('testNowProgressFill');
@@ -1065,6 +1072,278 @@ async function initDashboardMain() {
   }
 
   await loadMeasurementsForSelected();
+
+  // [NEW] Carregar test schedule
+  const deviceId = DashboardCommon.getCurrentDeviceId();
+  if (deviceId) {
+    await loadTestSchedule(deviceId);
+    startTestSchedulePolling();
+  }
+}
+
+// ============================================================================
+// TEST SCHEDULE - Agendamento automático de testes
+// ============================================================================
+
+let testSchedulePollingTimer = null;
+let currentTestSchedule = null;
+
+/**
+ * Carrega configuração de agendamento de testes do backend
+ */
+async function loadTestSchedule(deviceId) {
+  if (!deviceId) return;
+
+  try {
+    const res = await fetch(`/api/v1/user/devices/${deviceId}/test-schedule`, {
+      headers: DashboardCommon.headersAuth
+    });
+
+    if (!res.ok) {
+      console.warn('Erro ao carregar test schedule:', res.status);
+      return;
+    }
+
+    const json = await res.json();
+    if (!json.success || !json.data) return;
+
+    currentTestSchedule = json.data;
+    updateTestScheduleUI(json.data);
+
+  } catch (err) {
+    console.error('Erro ao carregar test schedule:', err);
+  }
+}
+
+/**
+ * Atualiza UI com dados do test schedule
+ */
+function updateTestScheduleUI(schedule) {
+  if (!schedule) return;
+
+  // Atualizar select de intervalo
+  if (testIntervalSelect) {
+    testIntervalSelect.value = schedule.interval_hours.toString();
+  }
+
+  // Atualizar toggle de auto
+  if (testAutoToggle) {
+    testAutoToggle.checked = !!schedule.auto_enabled;
+  }
+
+  // Atualizar próximo teste
+  if (nextMeasureTimeEl && schedule.next_test_time) {
+    const nextDate = new Date(schedule.next_test_time);
+    const now = new Date();
+    const diffMs = nextDate - now;
+
+    if (diffMs < 0) {
+      nextMeasureTimeEl.textContent = 'Agora (processando)';
+    } else {
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (diffHours > 24) {
+        const days = Math.floor(diffHours / 24);
+        const hours = diffHours % 24;
+        nextMeasureTimeEl.textContent = `em ${days}d ${hours}h (${nextDate.toLocaleString('pt-BR')})`;
+      } else if (diffHours > 0) {
+        nextMeasureTimeEl.textContent = `em ${diffHours}h ${diffMins}min (${nextDate.toLocaleTimeString('pt-BR')})`;
+      } else {
+        nextMeasureTimeEl.textContent = `em ${diffMins} minutos (${nextDate.toLocaleTimeString('pt-BR')})`;
+      }
+    }
+  }
+
+  // Atualizar última medição
+  if (lastMeasureTimeEl && schedule.last_measurement) {
+    const lastDate = new Date(schedule.last_measurement.timestamp);
+    const now = new Date();
+    const diffMs = now - lastDate;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (diffHours > 24) {
+      const days = Math.floor(diffHours / 24);
+      lastMeasureTimeEl.textContent = `há ${days} dia(s) (${lastDate.toLocaleString('pt-BR')})`;
+    } else if (diffHours > 0) {
+      lastMeasureTimeEl.textContent = `há ${diffHours}h ${diffMins}min (${lastDate.toLocaleString('pt-BR')})`;
+    } else {
+      lastMeasureTimeEl.textContent = `há ${diffMins} minutos (${lastDate.toLocaleTimeString('pt-BR')})`;
+    }
+  } else if (lastMeasureTimeEl) {
+    lastMeasureTimeEl.textContent = 'Nenhuma medição registrada';
+  }
+
+  // Atualizar status do teste
+  updateTestStatus(schedule.last_test_status);
+
+  // Se teste estiver rodando, mostrar barra de progresso
+  if (schedule.last_test_status === 'running') {
+    showAutoTestProgress();
+  } else {
+    hideAutoTestProgress();
+  }
+
+  // Se houver erro, exibir
+  if (schedule.last_test_error && testStatusSpan) {
+    testStatusSpan.title = `Erro: ${schedule.last_test_error}`;
+  }
+}
+
+/**
+ * Atualiza badge de status do teste
+ */
+function updateTestStatus(status) {
+  if (!testStatusSpan) return;
+
+  switch (status) {
+    case 'pending':
+      testStatusSpan.textContent = 'Aguardando';
+      testStatusSpan.className = 'value badge-off';
+      break;
+    case 'running':
+      testStatusSpan.textContent = 'Executando';
+      testStatusSpan.className = 'value badge badge-on';
+      break;
+    case 'success':
+      testStatusSpan.textContent = 'Concluído';
+      testStatusSpan.className = 'value badge-ok';
+      break;
+    case 'error':
+      testStatusSpan.textContent = 'Erro';
+      testStatusSpan.className = 'value badge-error';
+      break;
+    default:
+      testStatusSpan.textContent = '--';
+      testStatusSpan.className = 'value badge-off';
+  }
+}
+
+/**
+ * Mostra barra de progresso do teste automático
+ */
+function showAutoTestProgress() {
+  if (!autoTestProgressWrapper) return;
+
+  autoTestProgressWrapper.style.display = 'block';
+
+  // Animação de progresso simulada (8 minutos = 480s)
+  let progress = 0;
+  const progressInterval = setInterval(() => {
+    progress += 2; // Incrementa 2% a cada ~10s (aprox. 8min total)
+    if (progress > 95) progress = 95; // Para em 95% até backend confirmar
+
+    if (autoTestProgressFill) {
+      autoTestProgressFill.style.width = `${progress}%`;
+    }
+
+    if (autoTestProgressLabel) {
+      const step = Math.floor(progress / 20) + 1;
+      if (step <= 5) {
+        autoTestProgressLabel.textContent = `Teste automático em andamento — etapa ${step} de 5`;
+      }
+    }
+
+    // Se não estiver mais running, para a animação
+    if (!currentTestSchedule || currentTestSchedule.last_test_status !== 'running') {
+      clearInterval(progressInterval);
+      hideAutoTestProgress();
+    }
+  }, 10000); // Atualiza a cada 10s
+}
+
+/**
+ * Esconde barra de progresso do teste automático
+ */
+function hideAutoTestProgress() {
+  if (!autoTestProgressWrapper) return;
+  autoTestProgressWrapper.style.display = 'none';
+  if (autoTestProgressFill) {
+    autoTestProgressFill.style.width = '0%';
+  }
+}
+
+/**
+ * Salva configuração de test schedule no backend
+ */
+async function updateTestSchedule(deviceId, data) {
+  if (!deviceId) return;
+
+  try {
+    const res = await fetch(`/api/v1/user/devices/${deviceId}/test-schedule`, {
+      method: 'PUT',
+      headers: DashboardCommon.headersAuth,
+      body: JSON.stringify(data)
+    });
+
+    if (!res.ok) {
+      console.error('Erro ao atualizar test schedule:', res.status);
+      alert('Erro ao salvar configuração de testes');
+      return;
+    }
+
+    const json = await res.json();
+    if (json.success) {
+      console.log('Test schedule atualizado com sucesso');
+      // Recarregar para atualizar UI
+      await loadTestSchedule(deviceId);
+    }
+
+  } catch (err) {
+    console.error('Erro ao atualizar test schedule:', err);
+    alert('Erro ao salvar configuração de testes');
+  }
+}
+
+/**
+ * Event listener para mudança de intervalo
+ */
+if (testIntervalSelect) {
+  testIntervalSelect.addEventListener('change', async (e) => {
+    const deviceId = DashboardCommon.getCurrentDeviceId();
+    if (!deviceId) return;
+
+    const intervalHours = parseInt(e.target.value, 10);
+    await updateTestSchedule(deviceId, { interval_hours: intervalHours });
+  });
+}
+
+/**
+ * Event listener para toggle de auto_enabled
+ */
+if (testAutoToggle) {
+  testAutoToggle.addEventListener('change', async (e) => {
+    const deviceId = DashboardCommon.getCurrentDeviceId();
+    if (!deviceId) return;
+
+    const autoEnabled = e.target.checked;
+    await updateTestSchedule(deviceId, { auto_enabled: autoEnabled });
+  });
+}
+
+/**
+ * Inicia polling de test schedule (atualiza a cada 10s)
+ */
+function startTestSchedulePolling() {
+  stopTestSchedulePolling();
+
+  testSchedulePollingTimer = setInterval(async () => {
+    const deviceId = DashboardCommon.getCurrentDeviceId();
+    if (deviceId) {
+      await loadTestSchedule(deviceId);
+    }
+  }, 10000); // 10 segundos
+}
+
+/**
+ * Para polling de test schedule
+ */
+function stopTestSchedulePolling() {
+  if (testSchedulePollingTimer) {
+    clearInterval(testSchedulePollingTimer);
+    testSchedulePollingTimer = null;
+  }
 }
 
 // Quando o DOM estiver pronto, inicializa
@@ -1073,5 +1352,11 @@ document.addEventListener('DOMContentLoaded', initDashboardMain);
 // Reage à troca de device no topo
 window.addEventListener('deviceChanged', async () => {
   await loadMeasurementsForSelected();
+
+  // Recarregar test schedule para o novo device
+  const deviceId = DashboardCommon.getCurrentDeviceId();
+  if (deviceId) {
+    await loadTestSchedule(deviceId);
+  }
 });
 
