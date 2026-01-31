@@ -1134,26 +1134,33 @@ function updateTestScheduleUI(schedule) {
   }
 
   // Atualizar próximo teste
-  if (nextMeasureTimeEl && schedule.next_test_time) {
-    const nextDate = new Date(schedule.next_test_time);
-    const now = new Date();
-    const diffMs = nextDate - now;
+  if (nextMeasureTimeEl) {
+    // Se testes automáticos estão desativados, não mostrar próximo teste
+    if (!schedule.auto_enabled) {
+      nextMeasureTimeEl.textContent = '--';
+    } else if (schedule.next_test_time) {
+      const nextDate = new Date(schedule.next_test_time);
+      const now = new Date();
+      const diffMs = nextDate - now;
 
-    if (diffMs < 0) {
-      nextMeasureTimeEl.textContent = 'Agora (processando)';
-    } else {
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-      if (diffHours > 24) {
-        const days = Math.floor(diffHours / 24);
-        const hours = diffHours % 24;
-        nextMeasureTimeEl.textContent = `em ${days}d ${hours}h (${nextDate.toLocaleString('pt-BR')})`;
-      } else if (diffHours > 0) {
-        nextMeasureTimeEl.textContent = `em ${diffHours}h ${diffMins}min (${nextDate.toLocaleTimeString('pt-BR')})`;
+      if (diffMs < 0) {
+        nextMeasureTimeEl.textContent = 'Agora (processando)';
       } else {
-        nextMeasureTimeEl.textContent = `em ${diffMins} minutos (${nextDate.toLocaleTimeString('pt-BR')})`;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (diffHours > 24) {
+          const days = Math.floor(diffHours / 24);
+          const hours = diffHours % 24;
+          nextMeasureTimeEl.textContent = `em ${days}d ${hours}h (${nextDate.toLocaleString('pt-BR')})`;
+        } else if (diffHours > 0) {
+          nextMeasureTimeEl.textContent = `em ${diffHours}h ${diffMins}min (${nextDate.toLocaleTimeString('pt-BR')})`;
+        } else {
+          nextMeasureTimeEl.textContent = `em ${diffMins} minutos (${nextDate.toLocaleTimeString('pt-BR')})`;
+        }
       }
+    } else {
+      nextMeasureTimeEl.textContent = '--';
     }
   }
 
