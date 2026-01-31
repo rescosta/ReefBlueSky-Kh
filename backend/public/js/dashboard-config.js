@@ -1133,7 +1133,84 @@ function updateMaintPumpStatus(pumpId, running, direction) {
   }
 }
 
-// Atualizar leituras dos sensores
+// ============================================================================
+// [FIX] Atualização automática de sensores em tempo real
+// ============================================================================
+
+let sensorUpdateInterval = null;
+let temperatureCounter = 0;  // Contador para atualizar temperatura a cada 5s
+
+// Função para atualizar leituras dos sensores
+async function updateSensorReadings() {
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (!deviceId) return;
+
+  try {
+    const res = await apiFetch(`/api/v1/devices/${deviceId}/sensors`);
+    if (res.ok) {
+      const data = await res.json();
+
+      // Atualizar níveis e pH a cada 1 segundo
+      sensorLevelA.textContent = data.levelA != null ? (data.levelA ? 'ALTO' : 'BAIXO') : '--';
+      sensorLevelA.style.color = data.levelA ? '#4ade80' : '#f97373';
+
+      sensorLevelB.textContent = data.levelB != null ? (data.levelB ? 'ALTO' : 'BAIXO') : '--';
+      sensorLevelB.style.color = data.levelB ? '#4ade80' : '#f97373';
+
+      sensorLevelC.textContent = data.levelC != null ? (data.levelC ? 'ALTO' : 'BAIXO') : '--';
+      sensorLevelC.style.color = data.levelC ? '#4ade80' : '#f97373';
+
+      sensorPH.textContent = data.ph != null
+        ? data.ph.toFixed(2)
+        : '--';
+
+      // Atualizar temperatura apenas a cada 5 segundos
+      temperatureCounter++;
+      if (temperatureCounter >= 5) {
+        sensorTemp.textContent = data.temperature != null
+          ? `${data.temperature.toFixed(1)}°C`
+          : '--';
+        temperatureCounter = 0;
+      }
+
+      sensorReadStatus.textContent = `Atualizado: ${new Date().toLocaleTimeString('pt-BR')}`;
+    } else {
+      sensorReadStatus.textContent = 'Erro ao buscar leituras dos sensores.';
+    }
+  } catch (err) {
+    console.error('Erro ao buscar sensores:', err);
+    sensorReadStatus.textContent = 'Erro de conexão.';
+  }
+}
+
+// Iniciar atualizações automáticas
+function startSensorAutoUpdate() {
+  // Parar intervalo anterior se existir
+  if (sensorUpdateInterval) clearInterval(sensorUpdateInterval);
+
+  // Resetar contador de temperatura
+  temperatureCounter = 0;
+
+  // Atualizar sensores a cada 1 segundo
+  // (níveis e pH sempre, temperatura a cada 5 iterações)
+  sensorUpdateInterval = setInterval(updateSensorReadings, 1000);
+
+  // Atualização imediata
+  updateSensorReadings();
+
+  console.log('[Sensores] Atualização automática iniciada (Níveis/pH: 1s, Temperatura: 5s)');
+}
+
+// Parar atualizações automáticas
+function stopSensorAutoUpdate() {
+  if (sensorUpdateInterval) {
+    clearInterval(sensorUpdateInterval);
+    sensorUpdateInterval = null;
+  }
+  console.log('[Sensores] Atualização automática parada');
+}
+
+// Botão manual de atualização
 if (refreshSensorsBtn) {
   refreshSensorsBtn.addEventListener('click', async () => {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
@@ -1142,40 +1219,13 @@ if (refreshSensorsBtn) {
     refreshSensorsBtn.disabled = true;
     sensorReadStatus.textContent = 'Solicitando leituras atualizadas...';
 
-    try {
-      const res = await apiFetch(`/api/v1/devices/${deviceId}/sensors`);
-      if (res.ok) {
-        const data = await res.json();
-
-        // Atualizar displays dos sensores
-        sensorLevelA.textContent = data.levelA != null ? (data.levelA ? 'ALTO' : 'BAIXO') : '--';
-        sensorLevelA.style.color = data.levelA ? '#4ade80' : '#f97373';
-
-        sensorLevelB.textContent = data.levelB != null ? (data.levelB ? 'ALTO' : 'BAIXO') : '--';
-        sensorLevelB.style.color = data.levelB ? '#4ade80' : '#f97373';
-
-        sensorLevelC.textContent = data.levelC != null ? (data.levelC ? 'ALTO' : 'BAIXO') : '--';
-        sensorLevelC.style.color = data.levelC ? '#4ade80' : '#f97373';
-
-        sensorTemp.textContent = data.temperature != null
-          ? `${data.temperature.toFixed(1)}°C`
-          : '--';
-
-        sensorPH.textContent = data.ph != null
-          ? data.ph.toFixed(2)
-          : '--';
-
-        sensorReadStatus.textContent = 'Leituras atualizadas com sucesso.';
-      } else {
-        sensorReadStatus.textContent = 'Erro ao buscar leituras dos sensores.';
-      }
-    } catch (err) {
-      console.error('Erro ao buscar sensores:', err);
-      sensorReadStatus.textContent = 'Erro ao buscar leituras dos sensores.';
-    }
+    await updateSensorReadings();
 
     refreshSensorsBtn.disabled = false;
   });
+
+  // [FIX] Iniciar atualização automática quando a página carregar
+  startSensorAutoUpdate();
 }
 
 // Testes de enchimento de câmaras
