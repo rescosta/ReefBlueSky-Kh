@@ -408,55 +408,66 @@
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Medição</div>
+          <div class="card-title">Agendamento de Testes</div>
         </div>
         <div class="measure-info">
-          <span><span class="label">Última:</span> <span id="lastMeasureTime" class="value">--</span></span>
-          <span><span class="label">Próxima estimada:</span> <span id="nextMeasureTime" class="value">--</span></span>
-          <span><span class="label">Calibração:</span> <span id="calibrationDate" class="value">--</span></span>
+          <span><span class="label">Última medição:</span> <span id="lastMeasureTime" class="value">--</span></span>
+          <span><span class="label">Próximo teste:</span> <span id="nextMeasureTime" class="value">--</span></span>
+          <span><span class="label">Status:</span> <span id="testStatusSpan" class="value badge-off">--</span></span>
+        </div>
+
+        <div class="measure-info" style="margin-top:12px;">
+          <span>
+            <span class="label">Intervalo entre testes:</span>
+            <select id="testIntervalSelect" style="margin-top:4px; width:100%; padding:6px 8px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb; font-size:13px;">
+              <option value="1">1 hora</option>
+              <option value="3">3 horas</option>
+              <option value="6">6 horas</option>
+              <option value="12">12 horas</option>
+              <option value="24" selected>24 horas (padrão)</option>
+              <option value="48">48 horas (2 dias)</option>
+              <option value="72">72 horas (3 dias)</option>
+              <option value="168">168 horas (1 semana)</option>
+            </select>
+          </span>
+          <span style="margin-top:8px;">
+            <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="testAutoToggle" />
+              <span class="label">Testes automáticos ativados</span>
+            </label>
+          </span>
         </div>
 
         <div class="measure-info" style="margin-top:8px;">
-          <span style="display:flex; align-items:center; gap:8px;">
-            <span class="label">Teste automático:</span>
-            <button id="testModeToggle" class="toggle-btn" data-state="off">
-              <span class="toggle-label">OFF</span>
-            </button>
-          </span>
           <span>
-            <button id="testNowBtn" class="btn-small" style="margin-top:4px;" disabled>
-              Iniciar teste agora
+            <button id="testNowBtn" class="btn-small" style="margin-top:4px;">
+              Iniciar teste manual agora
             </button>
           </span>
         </div>
 
-        <!-- Intervalo entre medições -->
-        <div class="measure-info" style="margin-top:12px; padding-top:12px; border-top:1px solid #1f2937;">
-          <label for="intervalRange" style="font-size:13px; color:#e5e7eb; margin-bottom:4px;">Intervalo entre medições (horas)</label>
-          <input id="intervalRange" type="range" min="1" max="24" value="1" style="width:100%; margin-top:4px;" />
-          <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-            <span id="intervalLabel" style="font-size:13px; color:#9ca3af;">1 hora</span>
-            <button id="saveIntervalBtn" class="btn-small">Salvar agendamento</button>
-          </div>
-          <div style="font-size:11px; color:#6b7280; margin-top:4px;">
-            As medições são agendadas para a próxima hora redonda a partir do momento do salvamento.
+        <!-- Progresso do teste automático -->
+        <div id="autoTestProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
+          <div class="progress-label" id="autoTestProgressLabel">Teste automático em andamento...</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="autoTestProgressFill"></div>
           </div>
         </div>
 
-    <!-- Progresso do teste manual + botão ABORT -->
+        <!-- Progresso do teste manual -->
         <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
-          <div class="progress-label" id="testNowProgressLabel">Teste em andamento...</div>
-            <div class="progress-bar">
-              <div class="progress-fill" id="testNowProgressFill"></div>
-            </div>
+          <div class="progress-label" id="testNowProgressLabel">Teste manual em andamento...</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="testNowProgressFill"></div>
           </div>
+        </div>
 
-          <div id="abortArea" style="display:none; margin-top:8px;">
-            <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
-              ABORTAR teste/dose
-            </button>
+        <div id="abortArea" style="display:none; margin-top:8px;">
+          <button id="abortBtn" class="btn-small" style="background:#7f1d1d; border:1px solid #b91c1c;">
+            ABORTAR teste/dose
+          </button>
           <div id="abortStatusText" class="muted" style="margin-top:4px;">&nbsp;</div>
-        </div> 
+        </div>
       </div>
 
     <div class="card">
