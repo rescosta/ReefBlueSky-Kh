@@ -602,7 +602,9 @@ function updateMeasurementsView(measures) {
   }
 
   // Calibração ainda será plugada por API futura
-  calibrationDateEl.textContent = '--';
+  if (calibrationDateEl) {
+    calibrationDateEl.textContent = '--';
+  }
 
   // Status (100%, amarelo, vermelho) também baseado na janela 24h
   const stats = computeStats(windowMeasures);
@@ -1074,7 +1076,7 @@ async function initDashboardMain() {
   await loadMeasurementsForSelected();
 
   // [NEW] Carregar test schedule
-  const deviceId = DashboardCommon.getCurrentDeviceId();
+  const deviceId = getSelectedDeviceId();
   if (deviceId) {
     await loadTestSchedule(deviceId);
     startTestSchedulePolling();
@@ -1301,7 +1303,7 @@ async function updateTestSchedule(deviceId, data) {
  */
 if (testIntervalSelect) {
   testIntervalSelect.addEventListener('change', async (e) => {
-    const deviceId = DashboardCommon.getCurrentDeviceId();
+    const deviceId = getSelectedDeviceId();
     if (!deviceId) return;
 
     const intervalHours = parseInt(e.target.value, 10);
@@ -1314,7 +1316,7 @@ if (testIntervalSelect) {
  */
 if (testAutoToggle) {
   testAutoToggle.addEventListener('change', async (e) => {
-    const deviceId = DashboardCommon.getCurrentDeviceId();
+    const deviceId = getSelectedDeviceId();
     if (!deviceId) return;
 
     const autoEnabled = e.target.checked;
@@ -1329,7 +1331,7 @@ function startTestSchedulePolling() {
   stopTestSchedulePolling();
 
   testSchedulePollingTimer = setInterval(async () => {
-    const deviceId = DashboardCommon.getCurrentDeviceId();
+    const deviceId = getSelectedDeviceId();
     if (deviceId) {
       await loadTestSchedule(deviceId);
     }
@@ -1354,7 +1356,7 @@ window.addEventListener('deviceChanged', async () => {
   await loadMeasurementsForSelected();
 
   // Recarregar test schedule para o novo device
-  const deviceId = DashboardCommon.getCurrentDeviceId();
+  const deviceId = getSelectedDeviceId();
   if (deviceId) {
     await loadTestSchedule(deviceId);
   }
