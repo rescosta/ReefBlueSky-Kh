@@ -295,8 +295,11 @@ module.exports = (pool, verifyToken, authUserMiddleware) => {
    * ESP32 busca próximo teste agendado
    */
   router.get('/api/v1/device/next-test', verifyToken, async (req, res) => {
-    const deviceId = req.device.deviceId;
-
+    const deviceId = req.user && req.user.deviceId;
+    if (!deviceId) {
+      console.error('[NEXT-TEST] deviceId ausente no token', { user: req.user || null });
+      return res.status(401).json({ success: false, message: 'Invalid device token' });
+    }
     try {
       const schedules = await pool.query(
         `SELECT
@@ -372,101 +375,119 @@ module.exports = (pool, verifyToken, authUserMiddleware) => {
     }
   });
 
-  /**
-   * POST /api/v1/device/test-result
-   * ESP32 reporta resultado do teste (sucesso ou erro)
-   */
-  router.post('/api/v1/device/test-result', verifyToken, async (req, res) => {
-    const deviceId = req.device.deviceId;
-    const { success, error, timestamp, kh, phref, phsample, temperature, confidence } = req.body;
 
-    try {
-      const schedules = await pool.query(
-        'SELECT interval_hours FROM kh_test_schedule WHERE deviceId = ?',
-        [deviceId]
+/**
+ * POST /api/v1/device/test-result
+ * ESP32 reporta resultado do teste (sucesso ou erro)
+ */
+router.post('/api/v1/device/test-result', verifyToken, async (req, res) => {
+  const deviceId = req.user && req.user.deviceId;
+  if (!deviceId) {
+    console.error('[TEST-RESULT] deviceId ausente no token', { user: req.user || null });
+    return res.status(401).json({ success: false, message: 'Invalid device token' });
+  }
+
+  const {
+    success,
+    error,
+    timestamp,
+    kh,
+    phref,
+    phsample,
+    temperature,
+    confidence
+  } = req.body;
+
+  try {
+    const schedules = await pool.query(
+      'SELECT interval_hours FROM kh_test_schedule WHERE deviceId = ?',
+      [deviceId]
+    );
+
+    if (schedules.length === 0) {
+      return res.status(404).json({ success: false, message: 'Test schedule not found' });
+    }
+
+    const intervalHours = schedules[0].interval_hours;
+    const testTime = timestamp || Date.now();
+
+    if (success) {
+      // Teste bem-sucedido
+
+      // Calcular próximo teste
+      const nextTest = testTime + (intervalHours * 60 * 60 * 1000);
+
+      // Atualizar agendamento
+      await pool.query(
+        `UPDATE kh_test_schedule
+         SET last_test_time = ?,
+             next_test_time = ?,
+             last_test_status = 'success',
+             last_test_error = NULL
+         WHERE deviceId = ?`,
+        [testTime, nextTest, deviceId]
       );
 
-      if (schedules.length === 0) {
-        return res.status(404).json({ success: false, message: 'Test schedule not found' });
+      // Se veio com dados da medição, inserir no banco
+      if (kh !== undefined) {
+        await pool.query(
+          `INSERT INTO measurements
+           (deviceId, timestamp, kh, phref, phsample, temperature, status, confidence)
+           VALUES (?, ?, ?, ?, ?, ?, 'ok', ?)`,
+          [deviceId, testTime, kh, phref || null, phsample || null, temperature || null, confidence || 1.0]
+        );
       }
 
-      const intervalHours = schedules[0].interval_hours;
-      const testTime = timestamp || Date.now();
-
-      if (success) {
-        // Teste bem-sucedido
-
-        // Calcular próximo teste
-        const nextTest = testTime + (intervalHours * 60 * 60 * 1000);
-
-        // Atualizar agendamento
-        await pool.query(
-          `UPDATE kh_test_schedule
-           SET last_test_time = ?,
-               next_test_time = ?,
-               last_test_status = 'success',
-               last_test_error = NULL
-           WHERE deviceId = ?`,
-          [testTime, nextTest, deviceId]
-        );
-
-        // Se veio com dados da medição, inserir no banco
-        if (kh !== undefined) {
-          await pool.query(
-            `INSERT INTO measurements
-             (deviceId, timestamp, kh, phref, phsample, temperature, status, confidence)
-             VALUES (?, ?, ?, ?, ?, ?, 'ok', ?)`,
-            [deviceId, testTime, kh, phref || null, phsample || null, temperature || null, confidence || 1.0]
-          );
+      return res.json({
+        success: true,
+        message: 'Test result recorded successfully',
+        data: {
+          next_test_time: nextTest,
+          interval_hours: intervalHours
         }
+      });
 
-        res.json({
-          success: true,
-          message: 'Test result recorded successfully',
-          data: {
-            next_test_time: nextTest,
-            interval_hours: intervalHours
-          }
-        });
+    } else {
+      // Teste falhou
 
-      } else {
-        // Teste falhou
+      // Reagendar para daqui 1 hora (retry rápido em caso de erro)
+      const nextTest = Date.now() + (1 * 60 * 60 * 1000);
 
-        // Reagendar para daqui 1 hora (retry rápido em caso de erro)
-        const nextTest = Date.now() + (1 * 60 * 60 * 1000);
+      await pool.query(
+        `UPDATE kh_test_schedule
+         SET last_test_status = 'error',
+             last_test_error = ?,
+             next_test_time = ?
+         WHERE deviceId = ?`,
+        [error || 'Unknown error', nextTest, deviceId]
+      );
 
-        await pool.query(
-          `UPDATE kh_test_schedule
-           SET last_test_status = 'error',
-               last_test_error = ?,
-               next_test_time = ?
-           WHERE deviceId = ?`,
-          [error || 'Unknown error', nextTest, deviceId]
-        );
-
-        res.json({
-          success: true,
-          message: 'Error recorded, test rescheduled',
-          data: {
-            next_test_time: nextTest,
-            retry_in_hours: 1
-          }
-        });
-      }
-
-    } catch (error) {
-      console.error('Error recording test result:', error);
-      res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.json({
+        success: true,
+        message: 'Error recorded, test rescheduled',
+        data: {
+          next_test_time: nextTest,
+          retry_in_hours: 1
+        }
+      });
     }
-  });
+
+  } catch (error) {
+    console.error('Error recording test result:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
 
   /**
    * GET /api/v1/device/config
    * ESP32 busca configurações do device (incluindo testMode)
    */
   router.get('/api/v1/device/config', verifyToken, async (req, res) => {
-    const deviceId = req.device.deviceId;
-
+      const deviceId = req.user && req.user.deviceId;
+      if (!deviceId) {
+        console.error('[DEVICE-CONFIG] deviceId ausente no token', { user: req.user || null });
+        return res.status(401).json({ success: false, message: 'Invalid device token' });
+      }
     try {
       const devices = await pool.query(
         'SELECT testMode FROM devices WHERE deviceId = ?',
