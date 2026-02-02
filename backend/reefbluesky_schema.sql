@@ -3,7 +3,7 @@
 --
 -- Host: localhost    Database: reefbluesky
 -- ------------------------------------------------------
--- Server version	10.11.14-MariaDB-0+deb12u2
+-- Server version	10.11.14-MariaDB-0ubuntu0.24.04.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -475,6 +475,7 @@ CREATE TABLE `users` (
   `telegram_chat_id` bigint(20) DEFAULT NULL,
   `telegram_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `telegram_bot_token` varchar(100) DEFAULT NULL,
+  `email_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `name` varchar(191) DEFAULT NULL,
   `timezone` varchar(64) DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -529,4 +530,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-01-31 18:58:34
+-- Dump completed on 2026-02-02 14:27:39
