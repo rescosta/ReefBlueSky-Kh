@@ -8,7 +8,7 @@
 
 #define MAX_PUMPS      6
 #define MAX_SCHEDULES 10
-#define MAX_DOSE_JOBS (MAX_PUMPS * 5)
+#define MAX_DOSE_JOBS 300  // [FIX] Suporta 24 doses/dia × 6 bombas × 2 dias = 288 jobs + margem
 #define MAX_ACTIVE_RUNS MAX_PUMPS
 
 struct PumpConfig {
@@ -32,7 +32,13 @@ struct Schedule {
   uint16_t minGapMinutes;
   uint32_t startSecSinceMidnight;
   uint32_t endSecSinceMidnight;
-  uint8_t  pumpIndex;   
+  uint8_t  pumpIndex;
+  // Horários ajustados pelo backend (em segundos desde meia-noite)
+  uint32_t adjustedTimes[24];  // Máximo 24 doses por dia
+  uint8_t  adjustedTimesCount;
+  // [FIX] Volumes individuais por dose (backend calcula para garantir total exato)
+  uint16_t doseVolumes[24];  // Volume específico de cada dose
+  uint8_t  doseVolumesCount;
 };
 
 
@@ -43,6 +49,7 @@ struct DoseJob {
   uint16_t volumeMl;
   bool     executed;
   uint8_t  retries;
+  uint16_t minGapSec;  // [NOVO] Intervalo mínimo entre bombas (segundos)
 };
 
 struct ManualRun {
@@ -126,6 +133,7 @@ private:
   void     startAutoRun(uint8_t pumpIdx, uint32_t durationMs,
                         uint32_t pumpId, uint32_t scheduleId, uint16_t volumeMl);
   void     processActiveRuns(uint32_t nowMs, time_t nowSec);
+  void     resolveTimeConflicts();  // [NOVO] Escalonar jobs com horários conflitantes
 
   void     saveConfigToFile(const JsonDocument& config);
 };

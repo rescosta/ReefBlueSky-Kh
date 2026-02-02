@@ -119,13 +119,57 @@ void DoserControl::loadFromServer(const JsonDocument& config) {
 
         sched.minGapMinutes  = schedObj["min_gap_minutes"] | 0;
 
-
         String startStr = schedObj["start_time"].as<String>();
         String endStr   = schedObj["end_time"].as<String>();
 
-
         sched.startSecSinceMidnight = parseTimeToSeconds(startStr);
         sched.endSecSinceMidnight   = parseTimeToSeconds(endStr);
+
+        // Ler horários ajustados do backend (se existir)
+        sched.adjustedTimesCount = 0;
+        if (schedObj.containsKey("adjusted_times") && !schedObj["adjusted_times"].isNull()) {
+          JsonArrayConst adjTimes = schedObj["adjusted_times"].as<JsonArrayConst>();
+          uint8_t idx = 0;
+          for (JsonVariantConst timeVar : adjTimes) {
+            if (idx >= 24) break;  // Máximo 24 horários
+            String timeStr = timeVar.as<String>();
+            if (timeStr.length() > 0) {
+              sched.adjustedTimes[idx] = parseTimeToSeconds(timeStr);
+              idx++;
+            }
+          }
+          sched.adjustedTimesCount = idx;
+          Serial.printf("[DoserControl]   Schedule %d tem %d horários ajustados pelo backend:\n",
+                        scheduleCount, sched.adjustedTimesCount);
+          for (uint8_t i = 0; i < idx; i++) {
+            uint32_t sec = sched.adjustedTimes[i];
+            uint8_t h = sec / 3600;
+            uint8_t m = (sec % 3600) / 60;
+            uint8_t s = sec % 60;
+            Serial.printf("[DoserControl]     [%d] %02d:%02d:%02d (%lu sec)\n",
+                          i, h, m, s, (unsigned long)sec);
+          }
+        }
+
+        // [FIX] Ler volumes individuais por dose do backend (garantem total exato)
+        sched.doseVolumesCount = 0;
+        if (schedObj.containsKey("dose_volumes") && !schedObj["dose_volumes"].isNull()) {
+          JsonArrayConst doseVols = schedObj["dose_volumes"].as<JsonArrayConst>();
+          uint8_t idx = 0;
+          for (JsonVariantConst volVar : doseVols) {
+            if (idx >= 24) break;
+            sched.doseVolumes[idx] = volVar.as<uint16_t>();
+            idx++;
+          }
+          sched.doseVolumesCount = idx;
+          Serial.printf("[DoserControl]   Schedule %d tem %d volumes individuais: ",
+                        scheduleCount, sched.doseVolumesCount);
+          for (uint8_t i = 0; i < idx; i++) {
+            Serial.printf("%u", sched.doseVolumes[i]);
+            if (i < idx - 1) Serial.print(", ");
+          }
+          Serial.println(" ml");
+        }
 
         uint16_t volumePerDose = (sched.dosesPerDay > 0)
                                 ? (sched.volumePerDayMl / sched.dosesPerDay)
@@ -230,16 +274,32 @@ void DoserControl::rebuildJobs(time_t now) {
                     (unsigned long)intervalPerDose,
                     (unsigned int)volumePerDose);
 
+      // Usar horários ajustados do backend se disponível
+      bool useAdjustedTimes = (sched.adjustedTimesCount > 0);
+      if (useAdjustedTimes) {
+        Serial.printf("[DoserControl]   Usando %d horários ajustados pelo backend\n",
+                      sched.adjustedTimesCount);
+      }
+
       // 1) Doses HOJE (se hoje é válido e horário ainda não passou)
       if (todayValid) {
-        for (uint8_t d = 0; d < sched.dosesPerDay; d++) {
-          if (doseJobCount >= MAX_DOSE_JOBS) break;
+        uint8_t numDoses = useAdjustedTimes ? sched.adjustedTimesCount : sched.dosesPerDay;
+        for (uint8_t d = 0; d < numDoses; d++) {
+          if (doseJobCount >= MAX_DOSE_JOBS) {
+            Serial.printf("[DoserControl] ⚠️  ERRO: Limite de %d jobs atingido!\n", MAX_DOSE_JOBS);
+            Serial.printf("[DoserControl] ⚠️  Bomba %s (ID:%lu) Schedule ID:%lu não foi agendada\n",
+                          pumps[p].name.c_str(), pumps[p].id, (unsigned long)sched.id);
+            Serial.println("[DoserControl] ⚠️  Reduza o número de doses diárias ou desative agendamentos desnecessários");
+            break;
+          }
 
-          uint32_t secSinceMidnight =
-              sched.startSecSinceMidnight + (d * intervalPerDose);
+          // Usar horário ajustado ou calcular
+          uint32_t secSinceMidnight = useAdjustedTimes
+              ? sched.adjustedTimes[d]
+              : (sched.startSecSinceMidnight + (d * intervalPerDose));
 
-          // precisa estar pelo menos 30s no futuro
-          if (secSinceMidnight <= nowSec + 30) {
+          // Só pular se o horário já passou (está no passado)
+          if (secSinceMidnight < nowSec) {
             continue;
           }
 
@@ -262,13 +322,20 @@ void DoserControl::rebuildJobs(time_t now) {
                         (unsigned long)whenEpoch);
 
 
+          // [FIX] Usar volume individual do backend se disponível, senão calcula
+          uint16_t doseVolume = volumePerDose;
+          if (sched.doseVolumesCount > 0 && d < sched.doseVolumesCount) {
+            doseVolume = sched.doseVolumes[d];
+          }
+
           DoseJob& job   = doseJobs[doseJobCount];
           job.pumpId     = pumps[p].id;
           job.scheduleId = sched.id;
-          job.volumeMl   = volumePerDose;
+          job.volumeMl   = doseVolume;
           job.whenEpoch  = whenEpoch;
           job.executed   = false;
           job.retries    = 0;
+          job.minGapSec  = sched.minGapMinutes * 60;  // [NOVO] Converter minutos para segundos
           doseJobCount++;
         }
       }
@@ -285,11 +352,20 @@ void DoserControl::rebuildJobs(time_t now) {
 
       uint32_t baseMidnight = todayMidnight + (uint32_t)daysAhead * 86400u;
 
-      for (uint8_t d = 0; d < sched.dosesPerDay; d++) {
-        if (doseJobCount >= MAX_DOSE_JOBS) break;
+      uint8_t numDosesNextDay = useAdjustedTimes ? sched.adjustedTimesCount : sched.dosesPerDay;
+      for (uint8_t d = 0; d < numDosesNextDay; d++) {
+        if (doseJobCount >= MAX_DOSE_JOBS) {
+          Serial.printf("[DoserControl] ⚠️  ERRO: Limite de %d jobs atingido!\n", MAX_DOSE_JOBS);
+          Serial.printf("[DoserControl] ⚠️  Bomba %s (ID:%lu) Schedule ID:%lu (NEXTDAY) não foi agendada\n",
+                        pumps[p].name.c_str(), pumps[p].id, (unsigned long)sched.id);
+          Serial.println("[DoserControl] ⚠️  Reduza o número de doses diárias ou desative agendamentos desnecessários");
+          break;
+        }
 
-        uint32_t secSinceMidnight =
-            sched.startSecSinceMidnight + (d * intervalPerDose);
+        // Usar horário ajustado ou calcular
+        uint32_t secSinceMidnight = useAdjustedTimes
+            ? sched.adjustedTimes[d]
+            : (sched.startSecSinceMidnight + (d * intervalPerDose));
 
         uint32_t whenEpoch = baseMidnight + secSinceMidnight;
         time_t tWhen = (time_t)whenEpoch;
@@ -303,20 +379,30 @@ void DoserControl::rebuildJobs(time_t now) {
                       (unsigned long)whenEpoch,
                       daysAhead);
 
+        // [FIX] Usar volume individual do backend se disponível, senão calcula
+        uint16_t doseVolume = volumePerDose;
+        if (sched.doseVolumesCount > 0 && d < sched.doseVolumesCount) {
+          doseVolume = sched.doseVolumes[d];
+        }
 
         DoseJob& job   = doseJobs[doseJobCount];
         job.pumpId     = pumps[p].id;
         job.scheduleId = sched.id;
-        job.volumeMl   = volumePerDose;
+        job.volumeMl   = doseVolume;
         job.whenEpoch  = whenEpoch;
         job.executed   = false;
         job.retries    = 0;
+        job.minGapSec  = sched.minGapMinutes * 60;  // [NOVO] Converter minutos para segundos
         doseJobCount++;
       }
     }
   }
 
   Serial.printf("[DoserControl] Rebuilt %d dose job(s) (futuro)\n", doseJobCount);
+
+  // [REMOVIDO] Conflitos agora são resolvidos no backend
+  // resolveTimeConflicts();
+
   lastJobsRebuild = millis();
 }
 
@@ -556,14 +642,14 @@ void DoserControl::buildPumpsStatusJson(JsonDocument& outDoc) const {
 
   for (uint8_t i = 0; i < pumpCount; i++) {
     JsonObject obj = arr.createNestedObject();
-    obj["id"]             = pumps[i].id;
-    obj["name"]           = pumps[i].name;
-    obj["enabled"]        = pumps[i].enabled;
-    obj["currentVolume"]  = pumps[i].currentVolumeMl;
-    obj["containerVolume"] = pumps[i].containerVolumeMl;
-    obj["volumePercent"]  = (pumps[i].containerVolumeMl > 0)
-                            ? (pumps[i].currentVolumeMl * 100) / pumps[i].containerVolumeMl
-                            : 0;
+    obj["id"]                 = pumps[i].id;
+    obj["name"]               = pumps[i].name;
+    obj["enabled"]            = pumps[i].enabled;
+    obj["current_volume_ml"]  = pumps[i].currentVolumeMl;  // [FIX] Backend espera current_volume_ml
+    obj["container_volume_ml"] = pumps[i].containerVolumeMl;
+    obj["volume_percent"]     = (pumps[i].containerVolumeMl > 0)
+                                ? (pumps[i].currentVolumeMl * 100) / pumps[i].containerVolumeMl
+                                : 0;
   }
 }
 
@@ -575,5 +661,55 @@ uint32_t DoserControl::parseTimeToSeconds(const String& timeStr) {
   int minutes = timeStr.substring(colonPos + 1).toInt();
 
   return (hours * 3600) + (minutes * 60);
+}
+
+// [NOVO] Resolver conflitos de horário entre jobs
+// Quando múltiplas bombas têm o mesmo horário agendado, escalonar automaticamente
+// usando o intervalo mínimo configurado
+void DoserControl::resolveTimeConflicts() {
+  if (doseJobCount <= 1) return;  // Nada a fazer se houver 0 ou 1 job
+
+  // Ordenar jobs por whenEpoch (bubble sort simples - poucos jobs)
+  for (uint8_t i = 0; i < doseJobCount - 1; i++) {
+    for (uint8_t j = i + 1; j < doseJobCount; j++) {
+      if (doseJobs[j].whenEpoch < doseJobs[i].whenEpoch) {
+        DoseJob temp = doseJobs[i];
+        doseJobs[i] = doseJobs[j];
+        doseJobs[j] = temp;
+      }
+    }
+  }
+
+  // Detectar e resolver conflitos
+  uint8_t conflictsResolved = 0;
+  for (uint8_t i = 0; i < doseJobCount - 1; i++) {
+    // Se o próximo job tem o mesmo horário
+    if (doseJobs[i].whenEpoch == doseJobs[i + 1].whenEpoch) {
+      // Usar o minGapSec do job atual (ou 30s se não configurado)
+      uint16_t gapSec = (doseJobs[i].minGapSec > 0) ? doseJobs[i].minGapSec : 30;
+
+      // Ajustar o próximo job
+      uint32_t oldEpoch = doseJobs[i + 1].whenEpoch;
+      doseJobs[i + 1].whenEpoch = doseJobs[i].whenEpoch + gapSec;
+
+      time_t tOld = (time_t)oldEpoch;
+      time_t tNew = (time_t)doseJobs[i + 1].whenEpoch;
+      char bufOld[20], bufNew[20];
+      strftime(bufOld, sizeof(bufOld), "%Y-%m-%d %H:%M:%S", localtime(&tOld));
+      strftime(bufNew, sizeof(bufNew), "%Y-%m-%d %H:%M:%S", localtime(&tNew));
+
+      Serial.printf("[DoserControl] [CONFLICT] PumpId=%lu escalonado: %s -> %s (+%us)\n",
+                    doseJobs[i + 1].pumpId, bufOld, bufNew, gapSec);
+
+      conflictsResolved++;
+
+      // Reordenar após ajuste (para manter cronológico)
+      // Simples: apenas continue, próxima iteração tratará cascata se necessário
+    }
+  }
+
+  if (conflictsResolved > 0) {
+    Serial.printf("[DoserControl] %u conflito(s) de horário resolvido(s)\n", conflictsResolved);
+  }
 }
 

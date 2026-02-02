@@ -39,8 +39,14 @@ bool CloudAuthDoser::performRegistration() {
     return false;
   }
 
+  // [FIX] Verificar backoff antes de tentar
+  if (!backoff.shouldRetry()) {
+    Serial.println("[CloudAuth] Aguardando backoff para registration");
+    return false;
+  }
+
   HTTPClient http;
-  String url = serverUrl + "/device/register";
+  String url = serverUrl + "/device/register";  // serverUrl já inclui /api/v1
 
   DynamicJsonDocument payload(512);
   payload["deviceId"] = espUid;
@@ -52,7 +58,8 @@ bool CloudAuthDoser::performRegistration() {
   serializeJson(payload, jsonPayload);
 
   WiFiClient client;
-  http.begin(client, url);                   
+  http.begin(client, url);
+  http.setTimeout(HTTP_TIMEOUT_MS);  // [FIX] Adicionar timeout
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(jsonPayload);
@@ -61,6 +68,7 @@ bool CloudAuthDoser::performRegistration() {
 
   if (httpCode != 200 && httpCode != 201) {
     Serial.printf("[CloudAuth] Registration failed: %d\n%s\n", httpCode, response.c_str());
+    backoff.recordFailure();  // [FIX] Registrar falha
     return false;
   }
 
@@ -70,6 +78,7 @@ bool CloudAuthDoser::performRegistration() {
 
   if (!doc.containsKey("data")) {
     Serial.println("[CloudAuth] Resposta sem campo data");
+    backoff.recordFailure();  // [FIX] Registrar falha
     return false;
   }
 
@@ -77,6 +86,7 @@ bool CloudAuthDoser::performRegistration() {
 
   if (!data.containsKey("token")) {
     Serial.println("[CloudAuth] No token in response");
+    backoff.recordFailure();  // [FIX] Registrar falha
     return false;
   }
 
@@ -87,53 +97,28 @@ bool CloudAuthDoser::performRegistration() {
                     : 0;
 
   saveCredentials();
+  backoff.recordSuccess();  // [FIX] Registrar sucesso
   Serial.printf("[CloudAuth] ✓ Registered: %s\n", espUid.c_str());
   return true;
 
 }
 
-bool CloudAuthDoser::performLogin() {
-  HTTPClient http;
-  String url = serverUrl + "/auth/login";
-
-  DynamicJsonDocument payload(256);
-  payload["username"] = username;
-  payload["password"] = userPassword;
-
-  String jsonPayload;
-  serializeJson(payload, jsonPayload);
-
-  
-  WiFiClient client; 
-  http.begin(client, url);   
-  http.addHeader("Content-Type", "application/json");
-
-  int httpCode = http.POST(jsonPayload);
-  String response = http.getString();
-  http.end();
-
-  if (httpCode != 200) {
-    Serial.printf("[CloudAuth] Login failed: %d\n", httpCode);
-    return false;
-  }
-
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, response);
-
-  accessToken = doc["accessToken"].as<String>();
-  refreshToken = doc.containsKey("refreshToken") ? doc["refreshToken"].as<String>() : "";
-
-  saveCredentials();
-  return true;
-}
+// [FIX] performLogin removido - devices não fazem login, só registration
 
 bool CloudAuthDoser::refreshAccessToken() {
   if (refreshToken.length() == 0) {
-    return performLogin();
+    Serial.println("[CloudAuth] Sem refresh token, fazendo novo registro");
+    return performRegistration();
+  }
+
+  // [FIX] Verificar backoff antes de tentar
+  if (!backoff.shouldRetry()) {
+    Serial.println("[CloudAuth] Aguardando backoff para refresh");
+    return false;
   }
 
   HTTPClient http;
-  String url = serverUrl + "/auth/refresh";
+  String url = serverUrl + "/device/refresh-token";  // serverUrl já inclui /api/v1
 
   DynamicJsonDocument payload(256);
   payload["refreshToken"] = refreshToken;
@@ -141,8 +126,9 @@ bool CloudAuthDoser::refreshAccessToken() {
   String jsonPayload;
   serializeJson(payload, jsonPayload);
 
-  WiFiClient client; 
-  http.begin(client, url);   
+  WiFiClient client;
+  http.begin(client, url);
+  http.setTimeout(HTTP_TIMEOUT_MS);  // [FIX] Adicionar timeout
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(jsonPayload);
@@ -150,19 +136,50 @@ bool CloudAuthDoser::refreshAccessToken() {
   http.end();
 
   if (httpCode != 200) {
-    Serial.printf("[CloudAuth] Refresh failed: %d, doing login\n", httpCode);
-    return performLogin();
+    Serial.printf("[CloudAuth] Refresh failed: %d, fazendo novo registro\n", httpCode);
+    backoff.recordFailure();  // [FIX] Registrar falha
+    return performRegistration();
   }
 
   DynamicJsonDocument doc(1024);
-  deserializeJson(doc, response);
+  DeserializationError err = deserializeJson(doc, response);
+  if (err) {
+    Serial.printf("[CloudAuth] JSON parse error: %s\n", err.c_str());
+    backoff.recordFailure();
+    return false;
+  }
 
-  accessToken = doc["accessToken"].as<String>();
-  if (doc.containsKey("refreshToken")) {
-    refreshToken = doc["refreshToken"].as<String>();
+  // [FIX] Parse conforme formato correto do servidor
+  if (!doc.containsKey("success") || !doc["success"].as<bool>()) {
+    Serial.println("[CloudAuth] Refresh response: success != true");
+    backoff.recordFailure();
+    return false;
+  }
+
+  JsonObject data = doc["data"];
+  if (!data.containsKey("token")) {
+    Serial.println("[CloudAuth] Refresh response: sem token");
+    backoff.recordFailure();
+    return false;
+  }
+
+  accessToken = data["token"].as<String>();
+
+  // [FIX] Salvar novo refresh token se vier na resposta
+  if (data.containsKey("refreshToken")) {
+    refreshToken = data["refreshToken"].as<String>();
+    Serial.println("[CloudAuth] Novo refresh token recebido e salvo");
+  }
+
+  // [FIX] Atualizar tokenExpiresAt com o novo tempo de expiração
+  if (data.containsKey("expiresIn")) {
+    tokenExpiresAt = millis() + (data["expiresIn"].as<uint32_t>() * 1000);
+    Serial.printf("[CloudAuth] Token expira em %lu segundos\n", data["expiresIn"].as<uint32_t>());
   }
 
   saveCredentials();
+  backoff.recordSuccess();  // [FIX] Registrar sucesso
+  Serial.println("[CloudAuth] ✓ Token refreshed");
   return true;
 }
 
@@ -182,12 +199,12 @@ bool CloudAuthDoser::fetchDoserConfig(JsonDocument& outConfig) {
   if (!isAuthenticated()) return false;
 
   HTTPClient http;
-  String url = serverUrl + "/iot/dosing/handshake"; 
+  String url = serverUrl + "/iot/dosing/handshake";
 
   DynamicJsonDocument payload(256);
   payload["esp_uid"] = espUid;
   payload["hw_type"] = HW_TYPE;
-  payload["firmware_version"] = FW_VERSION;     
+  payload["firmware_version"] = FW_VERSION;
 
   String jsonPayload;
   serializeJson(payload, jsonPayload);
@@ -196,6 +213,7 @@ bool CloudAuthDoser::fetchDoserConfig(JsonDocument& outConfig) {
 
   WiFiClient client;
   http.begin(client, url);
+  http.setTimeout(HTTP_TIMEOUT_MS);  // [FIX] Adicionar timeout
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(jsonPayload);
@@ -244,8 +262,9 @@ bool CloudAuthDoser::sendDoserStatus(uint32_t uptime, int8_t rssi, const JsonDoc
   String jsonPayload;
   serializeJson(payload, jsonPayload);
 
-  WiFiClient client; 
-  http.begin(client, url);   
+  WiFiClient client;
+  http.begin(client, url);
+  http.setTimeout(HTTP_TIMEOUT_MS);  // [FIX] Adicionar timeout
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", getAuthHeader());
 
@@ -283,8 +302,9 @@ bool CloudAuthDoser::reportDosingExecution(
   Serial.print("[DosingExec] JSON: ");
   Serial.println(jsonPayload);
 
-  WiFiClient client; 
-  http.begin(client, url);   
+  WiFiClient client;
+  http.begin(client, url);
+  http.setTimeout(HTTP_TIMEOUT_MS);  // [FIX] Adicionar timeout
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", getAuthHeader());
 
@@ -302,8 +322,8 @@ bool CloudAuthDoser::fetchCommands(JsonDocument& outDoc) {
   if (!isAuthenticated()) return false;
 
   HTTPClient http;
-  String url = serverUrl + "/iot/dosing/commands"; 
- 
+  String url = serverUrl + "/iot/dosing/commands";
+
   DynamicJsonDocument payload(128);
   payload["esp_uid"] = espUid;
 
@@ -312,6 +332,7 @@ bool CloudAuthDoser::fetchCommands(JsonDocument& outDoc) {
 
   WiFiClient client;
   http.begin(client, url);
+  http.setTimeout(HTTP_TIMEOUT_MS);  // [FIX] Adicionar timeout
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(jsonPayload);

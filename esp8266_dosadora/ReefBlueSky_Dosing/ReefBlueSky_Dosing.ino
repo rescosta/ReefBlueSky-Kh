@@ -5,7 +5,7 @@
 #include "OtaUpdate.h"
 
 const char* FW_DEVICE_TYPE = "DOSER";
-const char* FW_VERSION     = "RBS_DOSER_260130.bin";
+const char* FW_VERSION     = "RBS_DOSER_260131.bin";
 
 #ifdef ESP8266
   #include <ESP8266WiFi.h>
@@ -110,7 +110,7 @@ void setup() {
 
   // 6. DoserControl init
   doser = new DoserControl();
-  doser->initPins(PUMP_PINS);
+  doser->initPins(DOSER_PUMP_PINS);  // [FIX] Usar constante correta (6 bombas)
   doser->onExecution([](uint32_t pumpId, uint16_t volumeMl,
                         uint32_t scheduleId, uint32_t whenEpoch,
                         const char* status, const char* origin) {
