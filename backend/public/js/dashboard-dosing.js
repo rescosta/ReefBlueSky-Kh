@@ -426,6 +426,12 @@ function openEditModal(index) {
     document.getElementById('editModal').style.display = 'flex';
 }
 
+// [NOVO] Preencher volume atual = capacidade do reservatório
+function fillToMaxVolume() {
+    const containerSize = parseInt(document.getElementById('editContainerSize').value) || 0;
+    document.getElementById('editCurrentVolume').value = containerSize;
+}
+
 function closeEditModal() {
     document.getElementById('editModal').style.display = 'none';
 }
@@ -1049,16 +1055,21 @@ function generateTimersForToday() {
 
     // Se temos horários ajustados, usar eles diretamente
     if (adjustedTimes && adjustedTimes.length > 0) {
-      adjustedTimes.forEach(timeStr => {
+      adjustedTimes.forEach((timeStr, idx) => {
         if (!timeStr) return;
-        const [h, m] = timeStr.split(':').map(Number);
+        // [FIX] Arredondar minutos para evitar dízimas
+        const [h, m] = timeStr.split(':').map(v => Math.round(parseFloat(v)));
         const sec = h * 3600 + m * 60;
+        const cleanTimeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 
         timers.push({
           sortKey: sec,
-          time: timeStr,
+          time: cleanTimeStr,
           pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
-          volume: volDose
+          volume: volDose,
+          doseNumber: idx + 1,
+          totalDoses: dosesPerDay,
+          scheduleId: s.id
         });
       });
     } else {
@@ -1086,7 +1097,10 @@ function generateTimersForToday() {
           sortKey: sec,
           time: timeStr,
           pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
-          volume: volDose
+          volume: volDose,
+          doseNumber: i + 1,
+          totalDoses: dosesPerDay,
+          scheduleId: s.id
         });
       }
     }
@@ -1103,11 +1117,13 @@ function generateTimersForToday() {
     <div class="timers-grid">
       ${timers.map(t => {
         const volStr = t.volume.toFixed(2).replace('.', ',');
+        const doseInfo = t.doseNumber && t.totalDoses ? `Dose ${t.doseNumber}/${t.totalDoses}` : '';
         return `
           <div class="timer-card">
             <div>
               <div class="timer-time">${t.time}</div>
               <div class="timer-pump">${t.pumpName}</div>
+              ${doseInfo ? `<div class="timer-dose-number" style="font-size:11px; color:#9ca3af; margin-top:2px;">${doseInfo}</div>` : ''}
             </div>
             <div class="timer-volume">${volStr} ml</div>
           </div>

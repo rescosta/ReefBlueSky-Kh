@@ -1379,6 +1379,85 @@ function stopTestSchedulePolling() {
   }
 }
 
+// ============================================================================
+// [SIMULAÇÃO] Modo Teste de Hardware - Toggle
+// ============================================================================
+
+const toggleTestModeBtn = document.getElementById('toggleTestModeBtn');
+const testModeStatus = document.getElementById('testModeStatus');
+
+if (toggleTestModeBtn) {
+  toggleTestModeBtn.addEventListener('click', async () => {
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) {
+      alert('Selecione um device primeiro');
+      return;
+    }
+
+    const currentState = toggleTestModeBtn.getAttribute('data-state');
+    const newState = currentState === 'on' ? 'off' : 'on';
+    const enabled = newState === 'on';
+
+    try {
+      toggleTestModeBtn.disabled = true;
+
+      // Enviar comando para o device via backend
+      const res = await apiFetch(`/api/v1/device/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: deviceId,
+          action: 'testmode',
+          params: { enabled: enabled }
+        })
+      });
+
+      if (res.ok) {
+        // Atualizar UI
+        toggleTestModeBtn.setAttribute('data-state', newState);
+        toggleTestModeBtn.querySelector('.toggle-label').textContent = enabled ? 'Desativar' : 'Ativar';
+        testModeStatus.textContent = enabled ? 'Ativado' : 'Desativado';
+        testModeStatus.className = enabled ? 'value badge-on' : 'value badge-off';
+
+        // Sucesso - modo teste alterado
+        console.log(`Modo teste ${enabled ? 'ativado' : 'desativado'} com sucesso`);
+      } else {
+        const error = await res.json();
+        alert(`Erro ao alterar modo teste: ${error.message || 'Erro desconhecido'}`);
+      }
+    } catch (err) {
+      console.error('Erro ao toggle modo teste:', err);
+      alert('Erro ao comunicar com o servidor');
+    } finally {
+      toggleTestModeBtn.disabled = false;
+    }
+  });
+}
+
+// Carregar estado inicial do modo teste quando trocar device
+async function loadTestModeStatus(deviceId) {
+  try {
+    const res = await apiFetch(`/api/v1/devices/${deviceId}/status`);
+    if (res.ok) {
+      const data = await res.json();
+      const testModeEnabled = data.testMode || false;
+
+      if (toggleTestModeBtn) {
+        const state = testModeEnabled ? 'on' : 'off';
+        toggleTestModeBtn.setAttribute('data-state', state);
+        toggleTestModeBtn.querySelector('.toggle-label').textContent = testModeEnabled ? 'Desativar' : 'Ativar';
+      }
+
+      if (testModeStatus) {
+        testModeStatus.textContent = testModeEnabled ? 'Ativado' : 'Desativado';
+        testModeStatus.className = testModeEnabled ? 'value badge-on' : 'value badge-off';
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao carregar status do modo teste:', err);
+  }
+}
+
 // Quando o DOM estiver pronto, inicializa
 document.addEventListener('DOMContentLoaded', initDashboardMain);
 
@@ -1390,6 +1469,7 @@ window.addEventListener('deviceChanged', async () => {
   const deviceId = getSelectedDeviceId();
   if (deviceId) {
     await loadTestSchedule(deviceId);
+    await loadTestModeStatus(deviceId);  // [SIMULAÇÃO] Carregar status do modo teste
   }
 });
 

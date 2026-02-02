@@ -179,17 +179,17 @@ function updateLevelsFromDevice(device) {
   const c = device.levelC;
 
   if (levelAEl) {
-    levelAEl.textContent = a ? 'COM água (Ativado)' : 'SEM água (Desativado)';
+    levelAEl.textContent = a ? 'Ativo' : 'Baixo';
     levelAEl.className = a ? 'badge badge-green' : 'badge badge-gray';
   }
 
   if (levelBEl) {
-    levelBEl.textContent = b ? 'COM água (Ativado)' : 'SEM água (Desativado)';
+    levelBEl.textContent = b ? 'Ativo' : 'Baixo';
     levelBEl.className = b ? 'badge badge-green' : 'badge badge-gray';
   }
 
   if (levelCEl) {
-    levelCEl.textContent = c ? 'COM água (Ativado)' : 'SEM água (Desativado)';
+    levelCEl.textContent = c ? 'Ativo' : 'Baixo';
     levelCEl.className = c ? 'badge badge-green' : 'badge badge-gray';
   }
 }
@@ -1151,13 +1151,13 @@ async function updateSensorReadings() {
       const data = await res.json();
 
       // Atualizar níveis e pH a cada 1 segundo
-      sensorLevelA.textContent = data.levelA != null ? (data.levelA ? 'ALTO' : 'BAIXO') : '--';
+      sensorLevelA.textContent = data.levelA != null ? (data.levelA ? 'Ativo' : 'Baixo') : '--';
       sensorLevelA.style.color = data.levelA ? '#4ade80' : '#f97373';
 
-      sensorLevelB.textContent = data.levelB != null ? (data.levelB ? 'ALTO' : 'BAIXO') : '--';
+      sensorLevelB.textContent = data.levelB != null ? (data.levelB ? 'Ativo' : 'Baixo') : '--';
       sensorLevelB.style.color = data.levelB ? '#4ade80' : '#f97373';
 
-      sensorLevelC.textContent = data.levelC != null ? (data.levelC ? 'ALTO' : 'BAIXO') : '--';
+      sensorLevelC.textContent = data.levelC != null ? (data.levelC ? 'Ativo' : 'Baixo') : '--';
       sensorLevelC.style.color = data.levelC ? '#4ade80' : '#f97373';
 
       sensorPH.textContent = data.ph != null
