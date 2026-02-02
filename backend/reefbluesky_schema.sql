@@ -56,7 +56,7 @@ CREATE TABLE `device_commands` (
   `processed` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_device_status` (`deviceId`,`status`,`createdAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=462 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=463 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -98,7 +98,7 @@ CREATE TABLE `device_health` (
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_dev_user` (`deviceId`,`userId`,`updatedAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=7410 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7757 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -119,7 +119,7 @@ CREATE TABLE `device_logs` (
   PRIMARY KEY (`id`),
   KEY `idx_device_ts` (`deviceId`,`ts` DESC),
   KEY `idx_user_ts` (`userId`,`ts` DESC)
-) ENGINE=InnoDB AUTO_INCREMENT=1547 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1907 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -239,7 +239,7 @@ CREATE TABLE `devices` (
   KEY `idx_devices_userId` (`userId`),
   KEY `idx_devices_mainDeviceId` (`mainDeviceId`),
   CONSTRAINT `fk_devices_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=848 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=849 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -345,9 +345,10 @@ CREATE TABLE `dosing_executions` (
   KEY `idx_pump_scheduled` (`pump_id`,`scheduled_at`),
   KEY `idx_pump_status` (`pump_id`,`status`,`created_at`),
   KEY `idx_dosing_exec_pump_date` (`pump_id`,`scheduled_at` DESC),
+  KEY `idx_dosing_executions_sched_date` (`schedule_id`,`executed_at`),
   CONSTRAINT `fk_exec_pump` FOREIGN KEY (`pump_id`) REFERENCES `dosing_pumps` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_exec_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `dosing_schedules` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=140 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=143 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -403,7 +404,7 @@ CREATE TABLE `dosing_schedules` (
   PRIMARY KEY (`id`),
   KEY `idx_pump_enabled` (`pump_id`,`enabled`),
   CONSTRAINT `fk_schedule_pump` FOREIGN KEY (`pump_id`) REFERENCES `dosing_pumps` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=62 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=68 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -454,7 +455,7 @@ CREATE TABLE `measurements` (
   `finishedAt` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_measurements_device_ts` (`deviceId`,`timestamp`)
-) ENGINE=InnoDB AUTO_INCREMENT=161 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=162 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -532,4 +533,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-02-02 17:08:21
+-- Dump completed on 2026-02-02 17:41:28

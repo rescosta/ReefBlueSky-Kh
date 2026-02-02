@@ -512,6 +512,7 @@ router.post('/execution', async (req, res) => {
     const {
       esp_uid,
       pump_id,
+      schedule_id,  
       scheduled_at,  // epoch em segundos
       executed_at,   // epoch em segundos (ou null)
       volume_ml,
@@ -537,15 +538,16 @@ router.post('/execution', async (req, res) => {
     // Registrar execução (epoch direto → FROM_UNIXTIME)
     await conn.query(
       `INSERT INTO dosing_executions 
-         (pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
+         (pump_id, schedule_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
        VALUES (
-         ?, 
+         ?, ?, 
          ${schedEpoch    != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
          ${executedEpoch != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
          ?, ?, ?, ?
        )`,
       [
         pump_id,
+        schedule_id || null,
         ...(schedEpoch    != null ? [schedEpoch]    : []),
         ...(executedEpoch != null ? [executedEpoch] : []),
         volume_ml,
@@ -554,6 +556,7 @@ router.post('/execution', async (req, res) => {
         error_code || null
       ]
     );
+
 
     // Se executou com sucesso, descontar do reservatório
     if (status === 'OK') {
@@ -594,10 +597,14 @@ router.post('/execution', async (req, res) => {
                 const todayExecutions = await conn.query(
                   `SELECT COUNT(*) as count FROM dosing_executions
                    WHERE pump_id = ? AND schedule_id = ?
-                   AND DATE(FROM_UNIXTIME(executed_at/1000)) = CURDATE()`,
+                   AND DATE(executed_at) = CURDATE()`,
                   [pump_id, info.schedule_id]
                 );
-                doseNumber = (todayExecutions[0]?.count || 0);
+
+                // +1 para a dose atual
+                doseNumber = (todayExecutions[0]?.count || 0) + 1;
+
+
               } catch (err) {
                 console.error('[NOTIFY] Erro ao contar doses:', err);
               }
