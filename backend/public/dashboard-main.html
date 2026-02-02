@@ -522,6 +522,34 @@
         </div>
       </div>
 
+      <!-- Modo Teste de Hardware -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🔧 Modo Teste de Hardware</div>
+        </div>
+        <div class="card-subtitle" style="margin-bottom:12px;">
+          Simula sensores de nível durante calibração e testes (sem hardware físico instalado)
+        </div>
+
+        <div class="measure-info">
+          <span>
+            <span class="label">Status:</span>
+            <span id="testModeStatus" class="value badge-off">Desativado</span>
+          </span>
+        </div>
+
+        <div class="measure-info" style="margin-top:12px;">
+          <button id="toggleTestModeBtn" class="toggle-btn" data-state="off">
+            <span class="toggle-label">Ativar</span>
+          </button>
+        </div>
+
+        <div class="hint" style="margin-top:12px; font-size:11px; color:#6b7280;">
+          ⚠️ Quando ativado, os sensores de nível serão simulados automaticamente durante testes e calibrações.
+          Bombas em sentido normal = nível detectado após 5s. Reverso = sem nível após 5s.
+        </div>
+      </div>
+
     <div class="card">
       <div class="card-header">
         <div class="card-title">Últimas medições</div>
