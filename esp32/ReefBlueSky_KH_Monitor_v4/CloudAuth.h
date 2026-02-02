@@ -55,6 +55,13 @@ struct SystemHealth {
     int failed_sync_attempts;
     unsigned long uptime;
     float voltage_supply;
+
+    // [FIX] Dados dos sensores em tempo real
+    int level_a;
+    int level_b;
+    int level_c;
+    float temperature;
+    float ph;
 };
 
 struct Command {
@@ -74,10 +81,10 @@ struct Command {
 class RateLimiter {
 private:
     unsigned long lastRequestTime = 0;
-    unsigned long minIntervalMs = 1000;  // Mínimo 1 segundo entre requisições
+    unsigned long minIntervalMs = 500;  // Mínimo 500ms entre requisições
     int requestCount = 0;
     unsigned long windowStart = 0;
-    static constexpr int MAX_REQUESTS_PER_MINUTE = 200;
+    static constexpr int MAX_REQUESTS_PER_MINUTE = 60;
     
 public:
     bool canMakeRequest() {
@@ -104,11 +111,71 @@ public:
         requestCount++;
         return true;
     }
+
+    int getRequestCount() const { return requestCount; }
+    int getMaxRequests() const { return MAX_REQUESTS_PER_MINUTE; }
+};
+
+// ============================================================================
+// [SEGURANÇA] Exponential Backoff para Retentativas
+// ============================================================================
+
+class ExponentialBackoff {
+private:
+    int failureCount = 0;
+    unsigned long nextRetryTime = 0;
+    unsigned long baseDelayMs = 2000;      // 2 segundos inicial
+    unsigned long maxDelayMs = 300000;     // 5 minutos máximo
+
+public:
+    bool shouldRetry() {
+        unsigned long now = millis();
+        if (now < nextRetryTime) {
+            return false;
+        }
+        return true;
+    }
+
+    void recordFailure() {
+        failureCount++;
+        // Exponential backoff: 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 300s (max)
+        unsigned long delayMs = baseDelayMs * (1UL << min(failureCount - 1, 8));
+        if (delayMs > maxDelayMs) {
+            delayMs = maxDelayMs;
+        }
+        nextRetryTime = millis() + delayMs;
+        Serial.printf("[Backoff] Falha #%d, próxima tentativa em %lu ms\n", failureCount, delayMs);
+    }
+
+    void recordSuccess() {
+        if (failureCount > 0) {
+            Serial.printf("[Backoff] Sucesso após %d falhas, resetando backoff\n", failureCount);
+        }
+        failureCount = 0;
+        nextRetryTime = 0;
+    }
+
+    void reset() {
+        failureCount = 0;
+        nextRetryTime = 0;
+    }
+
+    int getFailureCount() const { return failureCount; }
+    unsigned long getNextRetryTime() const { return nextRetryTime; }
+
+    unsigned long getTimeUntilRetry() const {
+        unsigned long now = millis();
+        if (now >= nextRetryTime) return 0;
+        return nextRetryTime - now;
+    }
 };
 
 // ============================================================================
 // [SEGURANÇA] Validador de Comandos com Whitelist
 // ============================================================================
+
+
+
 
 class CommandValidator {
 private:
@@ -135,7 +202,10 @@ private:
         "setkhtarget",
         "fake_measurement",
         "otaupdate",
-        "khcalibrate"         
+        "khcalibrate", 
+        "testpump",   
+        "systemflush",    
+        "fillchamber"
     };
     static constexpr int ALLOWED_COUNT = 
         sizeof(ALLOWED_COMMANDS) / sizeof(ALLOWED_COMMANDS[0]);
@@ -267,6 +337,11 @@ private:
     CommandValidator commandValidator;
     ReplayProtection replayProtection;
     IncrementalSync incrementalSync;
+    ExponentialBackoff authBackoff;        // Backoff para falhas de autenticação
+    ExponentialBackoff syncBackoff;        // Backoff para falhas de sincronização
+
+    // [CONFIG] Timeout HTTP em milissegundos
+    static constexpr int HTTP_TIMEOUT_MS = 10000;  // 10 segundos
     
     // [SEGURANÇA] Fila de medições offline
     std::queue<Measurement> offlineMeasurementQueue;
@@ -289,7 +364,8 @@ public:
 
     bool storeTokenSecurely(const String& token, const String& refreshTok, unsigned long expiry);
     bool loadTokenSecurely(String& token, String& refreshTok, unsigned long& expiry);
-    
+    void clearAllTokens();  // Limpar todos os tokens (RAM + NVS)
+
     void setDeviceId(const String& id) { deviceId = id; }
 
     CloudAuth(const char* url, const char* devId);
@@ -331,6 +407,24 @@ public:
     // [SEGURANÇA] Obter estatísticas de sincronização
     int getQueueSize() const { return offlineMeasurementQueue.size(); }
     unsigned long getLastSyncTime() const { return incrementalSync.getLastSyncedTimestamp(); }
+
+    // [BACKOFF] Métodos para controle de retentativas
+    bool shouldRetryAuth() { return authBackoff.shouldRetry(); }
+    bool shouldRetrySync() { return syncBackoff.shouldRetry(); }
+    void resetAuthBackoff() { authBackoff.reset(); }
+    void resetSyncBackoff() { syncBackoff.reset(); }
+    int getAuthFailureCount() const { return authBackoff.getFailureCount(); }
+    int getSyncFailureCount() const { return syncBackoff.getFailureCount(); }
+
+    // [TEST SCHEDULE] Agendamento automático de testes
+    // Verifica se deve executar teste agendado
+    bool checkNextScheduledTest(bool& shouldTestNow, unsigned long& nextTestTime, int& intervalHours);
+
+    // Reporta resultado do teste para o backend
+    bool reportTestResult(bool success, const String& error, const Measurement* measurement = nullptr);
+
+    // [DEVICE CONFIG] Buscar configurações do device (testMode, etc)
+    bool fetchDeviceConfig(bool& testMode);
 };
 
 #endif // CLOUDAUTH_H

@@ -48,10 +48,10 @@ private:
 
         CAL_B3_PREP_EMPTY_C,
         CAL_B3_FLUSHING,
-        CAL_B3_FILL_A,
-        CAL_B3_WAIT_A_FULL,
-        CAL_B3_FILL_B,
-        CAL_B3_WAIT_B_FULL,
+        CAL_B3_ENSURE_B_FULL,      // [FIX] Novo: Garantir B cheio antes de calibrar C
+        CAL_B3_WAIT_B_FULL,        // [FIX] Novo: Aguardar B ficar cheio
+        CAL_B3_FILL_C,             // [FIX] Renomeado: Encher C a partir de B
+        CAL_B3_WAIT_C_FULL,        // [FIX] Renomeado: Aguardar C ficar cheio (150mL)
         CAL_B3_DONE,
 
         CAL_SAVE,
@@ -61,6 +61,14 @@ private:
 
     static constexpr unsigned long MAX_FILL_MS  = 30000UL;
     static constexpr const char*   CAL_FILE     = "/kh_calib.json";
+
+    // [FIX] Ranges esperados de vazão para sanity checks (mL/s)
+    static constexpr float MIN_FLOW_RATE = 0.1f;   // mínimo 0.1 mL/s (bomba muito lenta)
+    static constexpr float MAX_FLOW_RATE = 10.0f;  // máximo 10 mL/s (vazão muito alta suspeita)
+    static constexpr float MIN_PH_REF    = 6.0f;   // pH mínimo esperado
+    static constexpr float MAX_PH_REF    = 9.0f;   // pH máximo esperado
+    static constexpr float MIN_TEMP      = 15.0f;  // Temperatura mínima (°C)
+    static constexpr float MAX_TEMP      = 35.0f;  // Temperatura máxima (°C)
 
     PumpControl*   _pc;
     SensorManager* _sm;
@@ -81,6 +89,12 @@ private:
     bool stepCalibB3();
 
     bool saveCalibrationToSPIFFS();
+
+    // [FIX] Validações (sanity checks)
+    bool validateFlowRate(float mlps, const char* pump_name);
+    bool validatePHReference(float ph);
+    bool validateTemperature(float temp);
+    void sendCalibrationAlert(const String& message);
 };
 
 #endif

@@ -51,6 +51,11 @@ float SensorManager::getTemperature() {
 int SensorManager::getLevelA() {
     if (!_levelAEnabled) return 0;
 
+    // [SIMULAÇÃO] Retornar valor simulado se modo teste ativo
+    if (_levelSimulationEnabled) {
+        return _simulatedLevelA;
+    }
+
     static int stableStatusA = 0;
     static int lastLogicalA  = -1;
     static int sameCountA    = 0;
@@ -77,6 +82,11 @@ int SensorManager::getLevelA() {
 int SensorManager::getLevelB() {
     if (!_levelBEnabled) return 0;
 
+    // [SIMULAÇÃO] Retornar valor simulado se modo teste ativo
+    if (_levelSimulationEnabled) {
+        return _simulatedLevelB;
+    }
+
     static int stableStatusB = 0;
     static int lastLogicalB  = -1;
     static int sameCountB    = 0;
@@ -102,6 +112,11 @@ int SensorManager::getLevelB() {
 
 int SensorManager::getLevelC() {
     if (!_levelCEnabled) return 0;
+
+    // [SIMULAÇÃO] Retornar valor simulado se modo teste ativo
+    if (_levelSimulationEnabled) {
+        return _simulatedLevelC;
+    }
 
     static int stableStatusC = 0;
     static int lastLogicalC  = -1;
@@ -240,3 +255,25 @@ void SensorManager::setLevelCEnabled(bool enabled) {
 bool SensorManager::isLevelAEnabled() const { return _levelAEnabled; }
 bool SensorManager::isLevelBEnabled() const { return _levelBEnabled; }
 bool SensorManager::isLevelCEnabled() const { return _levelCEnabled; }
+
+// [SIMULAÇÃO] Métodos para modo teste
+void SensorManager::setSimulatedLevelA(int value) {
+    _simulatedLevelA = value;
+}
+
+void SensorManager::setSimulatedLevelB(int value) {
+    _simulatedLevelB = value;
+}
+
+void SensorManager::setSimulatedLevelC(int value) {
+    _simulatedLevelC = value;
+}
+
+void SensorManager::enableLevelSimulation(bool enable) {
+    _levelSimulationEnabled = enable;
+    Serial.printf("[SensorManager] Simulação de níveis: %s\n", enable ? "ATIVADA" : "DESATIVADA");
+}
+
+bool SensorManager::isLevelSimulationEnabled() const {
+    return _levelSimulationEnabled;
+}

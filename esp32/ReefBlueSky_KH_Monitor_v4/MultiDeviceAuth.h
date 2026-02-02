@@ -31,6 +31,7 @@ bool isValidEmail(const String& email);
 bool getCredentialsFromSerial();
 bool performLogin(String email, String password);
 bool sendMeasurements(float kh, float phRef, float phSample, float temp);
+bool sendAlert(const String& type, const String& message, const String& severity = "medium");
 void printConfigMenu();
 void handleSerialInput();
 bool initMultiDeviceAuth();

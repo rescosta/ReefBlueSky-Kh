@@ -97,6 +97,13 @@ public:
     bool isLevelBEnabled() const;
     bool isLevelCEnabled() const;
 
+    // [SIMULAÇÃO] Métodos para modo teste
+    void setSimulatedLevelA(int value);
+    void setSimulatedLevelB(int value);
+    void setSimulatedLevelC(int value);
+    void enableLevelSimulation(bool enable);
+    bool isLevelSimulationEnabled() const;
+
 private:
     // Pinos
     int _ph_pin;
@@ -137,6 +144,12 @@ private:
     bool _levelCEnabled = true;
 
     bool _tempSensorOk = true;
+
+    // [SIMULAÇÃO] Modo teste
+    bool _levelSimulationEnabled = false;
+    int _simulatedLevelA = 0;
+    int _simulatedLevelB = 0;
+    int _simulatedLevelC = 0;
 
 };
 

@@ -1,9 +1,25 @@
 //KH_Analyzer.cpp
 
 #include "KH_Analyzer.h"
-#include "Safety.h"  
+#include "Safety.h"
 #include <ArduinoJson.h>
 #include "TimeProvider.h"  // ou o arquivo correto onde getCurrentEpochMs está
+
+// [SIMULAÇÃO] Declarações externas para modo teste
+extern void registerPumpActivation(int pumpIndex, bool forward);
+extern void registerPumpDeactivation(int pumpIndex);
+extern bool testModeEnabled;
+
+// [SIMULAÇÃO] Macros helper para registro de bombas (apenas em modo teste)
+#define SIM_PUMP_A_FILL() if(testModeEnabled) registerPumpActivation(0, true)
+#define SIM_PUMP_A_DISCHARGE() if(testModeEnabled) registerPumpActivation(0, false)
+#define SIM_PUMP_A_STOP() if(testModeEnabled) registerPumpDeactivation(0)
+#define SIM_PUMP_B_FILL() if(testModeEnabled) registerPumpActivation(1, true)
+#define SIM_PUMP_B_DISCHARGE() if(testModeEnabled) registerPumpActivation(1, false)
+#define SIM_PUMP_B_STOP() if(testModeEnabled) registerPumpDeactivation(1)
+#define SIM_PUMP_C_FILL() if(testModeEnabled) registerPumpActivation(2, true)
+#define SIM_PUMP_C_DISCHARGE() if(testModeEnabled) registerPumpActivation(2, false)
+#define SIM_PUMP_C_STOP() if(testModeEnabled) registerPumpDeactivation(2)
 
 static constexpr unsigned long KH_MAX_FILL_MS = 30000UL;  // 30 s
 
@@ -286,6 +302,7 @@ bool KH_Analyzer::phase1_clean(int level_a, int level_b) {
             if (_phase1_step_start_ms == 0) {
                 Serial.println("[F1] Iniciando descarte inicial: A -> aquário (pumpA_discharge)");
                 _pc->pumpA_discharge();         // A -> aquário
+                SIM_PUMP_A_DISCHARGE();         // [SIMULAÇÃO]
                 _phase1_step_start_ms = now;
                 return false;
             }
@@ -296,6 +313,7 @@ bool KH_Analyzer::phase1_clean(int level_a, int level_b) {
             if (elapsed >= _phase1_r1_max_ms) {
                 Serial.printf("[F1] Descarte inicial A->aquário concluído após %lu ms. Parando bomba A.\n", elapsed);
                 _pc->pumpA_stop();
+                SIM_PUMP_A_STOP();  // [SIMULAÇÃO]
                 _phase1_state         = F1_TRANSFER_B_TO_A;
                 _phase1_step_start_ms = 0;
             }

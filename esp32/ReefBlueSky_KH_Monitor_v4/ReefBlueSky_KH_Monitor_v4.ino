@@ -41,7 +41,7 @@ void wifiFactoryReset();
 
 
 const char* FW_DEVICE_TYPE = "KH";
-const char* FW_VERSION     = "RBS_KH_260125.bin";
+const char* FW_VERSION     = "RBS_KH_260126.bin";
 
 extern CloudAuth cloudAuth;
 
@@ -101,7 +101,7 @@ void sendOtaLogSuccess() {
   WiFiClient client;
   HTTPClient http;
 
-  String url = String(CLOUD_BASE_URL) + "/api/device/ota-log";
+  String url = String(CLOUD_BASE_URL) + "/device/ota-log";  // [FIX] URL correta
 
   String body = "{";
   body += "\"device_type\":\"" + String(FW_DEVICE_TYPE) + "\",";
@@ -145,14 +145,23 @@ void markOtaReported() {
 
 void onCloudAuthOk() {
   Serial.println("[DBG] onCloudAuthOk() ENTER");
-  const String jwt = cloudAuth.getDeviceJwt();
   Serial.println("[CLOUD] Auth OK, JWT valido.");
 
-  // loga FW que será enviado
-  Serial.printf("[FW] onCloudAuthOk -> FWVERSION=%s\n", FW_VERSION);
+  // Aguardar deviceToken ser preenchido
+  if (deviceToken.length() == 0) {
+    Serial.println("[CLOUD] Aguardando deviceToken ser preenchido...");
+    delay(500);
+  }
 
-  // envia FW atual assim que tiver JWT válido
-  reportFirmwareVersion(String(CLOUD_BASE_URL), jwt);
+  // loga FW que será enviado
+  Serial.printf("[FW] onCloudAuthOk -> FWVERSION=%s, tokenLen=%d\n", FW_VERSION, deviceToken.length());
+
+  // [FIX] Usar deviceToken global em vez de cloudAuth.getDeviceJwt()
+  if (deviceToken.length() > 0) {
+    reportFirmwareVersion(String(CLOUD_BASE_URL), deviceToken);
+  } else {
+    Serial.println("[FW] ERRO: deviceToken vazio, não reportando firmware");
+  }
 
   if (shouldReportOta()) {
     Serial.println("[DBG] shouldReportOta() == true, chamando sendOtaLogSuccess");
@@ -183,11 +192,20 @@ const int   daylightOffset_sec = 0;     // sem horário de verão
 
 //
 
-const unsigned long CMD_INTERVAL_MS  = 1000;   // 1 s
-const unsigned long SYNC_INTERVAL_MS = 10000;  // 10 s
+// [FIX] Intervalos ajustados para reduzir requisições
+const unsigned long CMD_INTERVAL_MS  = 5000;   // 5 s (era 1s - muito frequente)
+const unsigned long SYNC_INTERVAL_MS = 30000;  // 30 s (era 10s)
+const unsigned long TEST_SCHEDULE_CHECK_MS = 30000; // 30 s - polling de teste agendado
+const unsigned long DEVICE_CONFIG_CHECK_MS = 30000; // 30 s - polling de configurações (testMode)
 
 static unsigned long lastCmdPoll  = 0;
 static unsigned long lastSyncTry  = 0;
+static unsigned long lastTestScheduleCheck = 0;
+static unsigned long lastDeviceConfigCheck = 0;
+
+// [TEST SCHEDULE] Flag para indicar teste agendado em andamento
+static bool isScheduledTestRunning = false;
+static Measurement lastScheduledTestResult;
 
 float khTarget = 8.0f;  // default
 
@@ -286,6 +304,195 @@ enum SystemState {
 
 SystemState systemState = STARTUP;
 
+// =================================================================================
+// Sistema de Logging para Debug de Offline
+// =================================================================================
+
+#define LOG_BUFFER_SIZE 50        // Máximo de logs na RAM
+#define LOG_FILE_PATH "/debug_log.txt"
+#define LOG_MAX_FILE_SIZE 10240   // 10KB máximo no SPIFFS
+
+struct LogEntry {
+  unsigned long long timestamp;  // [FIX] 64 bits para epoch em ms
+  char level[8];                 // DEBUG, INFO, WARN, ERROR
+  char message[128];             // Mensagem do log
+};
+
+class DebugLogger {
+private:
+  LogEntry buffer[LOG_BUFFER_SIZE];
+  int bufferIndex = 0;
+  int bufferCount = 0;
+  unsigned long lastSyncToServer = 0;
+  const unsigned long SYNC_INTERVAL = 60000; // Enviar logs a cada 60s
+
+public:
+  void log(const char* level, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    LogEntry& entry = buffer[bufferIndex];
+
+    // [FIX] Usar epoch timestamp se NTP estiver sincronizado
+    unsigned long long epochMs = getCurrentEpochMs();
+    if (epochMs > 0 && epochMs > 1000000000000ULL) {  // Validar que é epoch real (> ano 2001)
+      entry.timestamp = epochMs;
+    } else {
+      // Fallback: millis() se NTP não estiver pronto
+      entry.timestamp = millis();
+    }
+
+    strncpy(entry.level, level, sizeof(entry.level) - 1);
+    vsnprintf(entry.message, sizeof(entry.message), format, args);
+
+    va_end(args);
+
+    // Print to Serial for real-time monitoring
+    Serial.printf("[%s] %llu: %s\n", level, entry.timestamp, entry.message);
+
+    // Update circular buffer
+    bufferIndex = (bufferIndex + 1) % LOG_BUFFER_SIZE;
+    if (bufferCount < LOG_BUFFER_SIZE) bufferCount++;
+
+    // Auto-save to SPIFFS on ERROR
+    if (strcmp(level, "ERROR") == 0) {
+      saveToSPIFFS();
+    }
+  }
+
+  void saveToSPIFFS() {
+    if (!SPIFFS.begin(true)) return;
+
+    // Open file in append mode
+    File f = SPIFFS.open(LOG_FILE_PATH, FILE_APPEND);
+    if (!f) {
+      Serial.println("[Logger] Falha ao abrir arquivo de log");
+      return;
+    }
+
+    // Check file size and rotate if needed
+    if (f.size() > LOG_MAX_FILE_SIZE) {
+      f.close();
+      SPIFFS.remove(LOG_FILE_PATH);
+      f = SPIFFS.open(LOG_FILE_PATH, FILE_WRITE);
+    }
+
+    // Write buffer to file
+    for (int i = 0; i < bufferCount; i++) {
+      int idx = (bufferIndex - bufferCount + i + LOG_BUFFER_SIZE) % LOG_BUFFER_SIZE;
+      LogEntry& entry = buffer[idx];
+      f.printf("[%s] %llu: %s\n", entry.level, entry.timestamp, entry.message);  // [FIX] %llu
+    }
+
+    f.close();
+    Serial.printf("[Logger] %d logs salvos no SPIFFS\n", bufferCount);
+  }
+
+  String getLogsAsString() {
+    String result = "";
+    for (int i = 0; i < bufferCount; i++) {
+      int idx = (bufferIndex - bufferCount + i + LOG_BUFFER_SIZE) % LOG_BUFFER_SIZE;
+      LogEntry& entry = buffer[idx];
+      result += "[" + String(entry.level) + "] " + String(entry.timestamp) + ": " + String(entry.message) + "\n";
+    }
+    return result;
+  }
+
+  void syncToServer() {
+    if (WiFi.status() != WL_CONNECTED || deviceToken.length() == 0) return;
+    if (millis() - lastSyncToServer < SYNC_INTERVAL) return;
+    if (bufferCount == 0) return;
+
+    String logs = getLogsAsString();
+    if (sendLogsToCloud(logs)) {
+      Serial.println("[Logger] Logs enviados ao servidor com sucesso");
+      lastSyncToServer = millis();
+      bufferCount = 0; // Clear buffer after successful send
+      bufferIndex = 0;
+    }
+  }
+
+  void loadFromSPIFFS() {
+    if (!SPIFFS.begin(true)) return;
+    if (!SPIFFS.exists(LOG_FILE_PATH)) return;
+
+    File f = SPIFFS.open(LOG_FILE_PATH, FILE_READ);
+    if (!f) return;
+
+    Serial.println("[Logger] Logs salvos no SPIFFS:");
+    while (f.available()) {
+      String line = f.readStringUntil('\n');
+      Serial.println(line);
+    }
+    f.close();
+  }
+
+  bool sendLogsToCloud(const String& logs) {
+    WiFiClient client;
+    HTTPClient http;
+    String url = "http://iot.reefbluesky.com.br/api/v1/device/logs";
+
+    if (!http.begin(client, url)) return false;
+
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + deviceToken);
+
+    DynamicJsonDocument doc(2048);
+    doc["deviceId"] = deviceId;
+    doc["logs"] = logs;
+    doc["timestamp"] = millis();
+
+    String payload;
+    serializeJson(doc, payload);
+
+    int code = http.POST(payload);
+    http.end();
+
+    return (code == 200 || code == 201);
+  }
+
+  // [NOVO] Enviar logs como alerta por email/Telegram após boot
+  void sendLogsAsAlert() {
+    if (!SPIFFS.begin(true)) return;
+    if (!SPIFFS.exists(LOG_FILE_PATH)) return;
+
+    File f = SPIFFS.open(LOG_FILE_PATH, FILE_READ);
+    if (!f) return;
+
+    // Ler últimas 10 linhas do log (ou todas se forem menos)
+    String logContent = "";
+    int lineCount = 0;
+    const int MAX_LINES = 10;
+
+    // Ler todas as linhas primeiro
+    String allLines[50]; // Buffer temporário
+    int totalLines = 0;
+    while (f.available() && totalLines < 50) {
+      allLines[totalLines++] = f.readStringUntil('\n');
+    }
+    f.close();
+
+    // Pegar as últimas MAX_LINES
+    int startIdx = (totalLines > MAX_LINES) ? (totalLines - MAX_LINES) : 0;
+    for (int i = startIdx; i < totalLines; i++) {
+      logContent += allLines[i] + "\n";
+    }
+
+    if (logContent.length() > 0) {
+      // Truncar se muito grande (limite de 1000 chars para alertas)
+      if (logContent.length() > 1000) {
+        logContent = logContent.substring(logContent.length() - 1000);
+      }
+
+      String alertMsg = "🔄 BOOT DETECTED - Últimos logs:\n\n" + logContent;
+      sendAlert("Device Boot", alertMsg, "medium");
+      Serial.println("[Logger] Logs enviados por email/Telegram após boot");
+    }
+  }
+};
+
+DebugLogger debugLog;
+
 // Watchdog de WiFi e Cloud
 unsigned long lastWifiOkMs      = 0;
 unsigned long firstNoTokenTime  = 0;
@@ -297,12 +504,22 @@ const unsigned long MAX_NO_TOKEN_MS  = 5UL  * 60UL * 1000UL; // 5 min sem Cloud/
 unsigned long lastMeasurementTime = 0;
 unsigned long measurementInterval = 3600000;  // 1 hora em ms
 unsigned long lastResetButtonCheck = 0;
-const unsigned long HEALTH_INTERVAL_MS = 120UL * 1000UL; // 120 segundos
+const unsigned long HEALTH_INTERVAL_MS = 5UL * 1000UL; // 5 segundos (para atualização rápida dos sensores)
 unsigned long lastHealthSent = 0;
 
 bool resetButtonPressed = false;
 
-bool testModeEnabled = true;   
+bool testModeEnabled = false;  // [FIX] Default false - só ativa se carregar do backend/SPIFFS
+
+// 🔥 SIMULAÇÃO DE SENSORES DE NÍVEL (MODO TESTE)
+struct PumpSimulation {
+  bool active = false;
+  bool forward = true;  // true = normal, false = reverso
+  unsigned long startTime = 0;
+};
+
+PumpSimulation pumpSim[4];  // Para bombas 1, 2, 3, 4
+const unsigned long LEVEL_SIMULATION_DELAY_MS = 5000;  // 5 segundos
 
 // 🔥 COMPRESSOR NON-BLOCKING
 bool compressorActive = false;
@@ -320,6 +537,7 @@ void tryNtpOnceNonBlocking() {
   if (!ntpInitialized) {
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
     Serial.printf("[NTP] configTime chamado, servidor=%s\n", ntpServer);
+    debugLog.log("INFO", "NTP init: server=%s", ntpServer);
     ntpInitialized = true;
     ntpLastAttempt = millis();
     return;
@@ -332,12 +550,16 @@ void tryNtpOnceNonBlocking() {
   if (getLocalTime(&timeinfo)) {
     ntpSynced = true;
     Serial.println("[NTP] NTP sincronizado com sucesso.");
+    debugLog.log("INFO", "NTP sync OK: %04d-%02d-%02d %02d:%02d:%02d",
+                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   } else {
     static int retries = 0;
     retries++;
     Serial.println("[NTP] Aguardando sincronizar...");
     if (retries >= 15) {
       Serial.println("[NTP] Falha ao sincronizar (timeout), seguindo sem NTP.");
+      debugLog.log("WARN", "NTP sync FAILED after 15 retries");
       ntpSynced = false; // segue vida, tenta de novo mais tarde se quiser
     }
   }
@@ -391,51 +613,183 @@ bool forceImmediateMeasurement = false;
 // Estado da conexão com a nuvem
 bool cloudConnected = true;
 unsigned long lastReconnectAttemptMs = 0;
-String accessToken;  
-String refreshToken; 
+String accessToken;
+String refreshToken;
 
-const unsigned long RECONNECT_INTERVAL_MS = 30UL * 1000UL; // ex: 30s
+// [FIX] Backoff para reconexão - começa em 5s, máximo 5min
+unsigned long reconnectDelayMs = 5000;
+const unsigned long RECONNECT_MIN_DELAY_MS = 5000;      // 5 segundos
+const unsigned long RECONNECT_MAX_DELAY_MS = 300000;    // 5 minutos
+int reconnectFailureCount = 0;
+
+// [FIX] Watchdog mais tolerante - 15 minutos em vez de 5
+const unsigned long MAX_NO_TOKEN_GRACEFUL_MS = 15UL * 60UL * 1000UL;  // 15 min antes de reboot
 
 void handleCloudReconnect(unsigned long now) {
-  // Se já estamos conectados à nuvem, nada a fazer
+  // Se já estamos conectados à nuvem, reseta tudo
   if (cloudAuth.isConnected()) {
-    cloudConnected    = true;
-    firstNoTokenTime  = 0;    // zera watchdog
+    cloudConnected = true;
+    firstNoTokenTime = 0;
+    // Reset backoff on success
+    if (reconnectFailureCount > 0) {
+      Serial.printf("[Cloud] Reconectado após %d falhas, resetando backoff\n", reconnectFailureCount);
+    }
+    reconnectDelayMs = RECONNECT_MIN_DELAY_MS;
+    reconnectFailureCount = 0;
+    cloudAuth.resetAuthBackoff();
     return;
   }
 
-  // Sem WiFi, nem tenta
+  // Sem WiFi, não tenta e não conta tempo
   if (!WiFi.isConnected()) {
-    cloudConnected    = false;
-    firstNoTokenTime  = 0;    // não conta tempo sem WiFi
+    cloudConnected = false;
+    firstNoTokenTime = 0;  // não penaliza por falta de WiFi
     return;
   }
 
-  // Respeita intervalo mínimo entre tentativas
-  if (now - lastReconnectAttemptMs < RECONNECT_INTERVAL_MS) {
+  // [FIX] Verificar backoff do CloudAuth
+  if (!cloudAuth.shouldRetryAuth()) {
+    // Ainda em backoff, apenas loga de vez em quando
+    static unsigned long lastBackoffLog = 0;
+    if (now - lastBackoffLog > 30000) {  // Log a cada 30s
+      Serial.printf("[Cloud] Em backoff, falhas: %d, aguardando...\n",
+                    cloudAuth.getAuthFailureCount());
+      lastBackoffLog = now;
+    }
+    return;
+  }
+
+  // Respeita intervalo mínimo entre tentativas com backoff exponencial
+  if (now - lastReconnectAttemptMs < reconnectDelayMs) {
     return;
   }
   lastReconnectAttemptMs = now;
 
-  Serial.println("[Cloud] Tentando (re)autenticar device via CloudAuth::init()...");
+  Serial.printf("[Cloud] Tentando (re)autenticar (tentativa #%d, delay atual: %lu ms)...\n",
+                reconnectFailureCount + 1, reconnectDelayMs);
+  debugLog.log("INFO", "Cloud auth attempt #%d, delay=%lu ms",
+               reconnectFailureCount + 1, reconnectDelayMs);
 
   if (cloudAuth.init()) {
     Serial.println("[Cloud] Device autenticado, token disponível.");
-    cloudConnected    = true;
-    firstNoTokenTime  = 0;    // reset watchdog
+    debugLog.log("INFO", "Cloud auth SUCCESS, token acquired");
+    cloudConnected = true;
+    firstNoTokenTime = 0;
+    reconnectDelayMs = RECONNECT_MIN_DELAY_MS;
+    reconnectFailureCount = 0;
     onCloudAuthOk();
   } else {
     Serial.println("[Cloud] Ainda sem token válido (aguardando registro ou erro).");
+    debugLog.log("WARN", "Cloud auth FAILED, attempt #%d", reconnectFailureCount + 1);
     cloudConnected = false;
+    reconnectFailureCount++;
 
-    // Watchdog: WiFi OK mas servidor/token ruim por muito tempo
+    // [FIX] Exponential backoff para reconexão
+    reconnectDelayMs = min(reconnectDelayMs * 2, RECONNECT_MAX_DELAY_MS);
+    Serial.printf("[Cloud] Próxima tentativa em %lu ms\n", reconnectDelayMs);
+
+    // [FIX] Watchdog mais gracioso - permite operação offline por mais tempo
     if (firstNoTokenTime == 0) {
       firstNoTokenTime = now;
-    } else if (now - firstNoTokenTime > MAX_NO_TOKEN_MS) {
-      Serial.println("[Cloud][WDT] Sem conexão/token Cloud por muito tempo. Reiniciando device...");
-      delay(2000);
-      ESP.restart();
+      Serial.println("[Cloud][WDT] Iniciando contagem de watchdog (15 min)");
+    } else {
+      unsigned long elapsedNoToken = now - firstNoTokenTime;
+      unsigned long remainingMs = MAX_NO_TOKEN_GRACEFUL_MS > elapsedNoToken ?
+                                  MAX_NO_TOKEN_GRACEFUL_MS - elapsedNoToken : 0;
+
+      // Log a cada 1 minuto
+      static unsigned long lastWdtLog = 0;
+      if (now - lastWdtLog > 60000) {
+        Serial.printf("[Cloud][WDT] Sem token há %lu s, reboot em %lu s\n",
+                      elapsedNoToken / 1000, remainingMs / 1000);
+        lastWdtLog = now;
+      }
+
+      if (elapsedNoToken > MAX_NO_TOKEN_GRACEFUL_MS) {
+        Serial.println("[Cloud][WDT] Tempo máximo sem token excedido. Reiniciando device...");
+        debugLog.log("ERROR", "Cloud WDT timeout! No token for %lu s, RESTART!",
+                     elapsedNoToken / 1000);
+        debugLog.saveToSPIFFS();
+        delay(2000);
+        ESP.restart();
+      }
     }
+  }
+}
+
+// ============================================================================
+// [TEST SCHEDULE] Verificar e executar teste agendado
+// ============================================================================
+
+void checkScheduledTest() {
+  if (!cloudAuth.isConnected()) {
+    // Sem conexão, não faz polling
+    return;
+  }
+
+  // Se já estiver executando um teste agendado, aguardar completar
+  if (isScheduledTestRunning) {
+    Serial.println("[TestSchedule] Teste agendado ainda em execução, aguardando...");
+    return;
+  }
+
+  bool shouldTestNow = false;
+  unsigned long nextTestTime = 0;
+  int intervalHours = 24;
+
+  // Buscar próximo teste agendado do backend
+  if (cloudAuth.checkNextScheduledTest(shouldTestNow, nextTestTime, intervalHours)) {
+    Serial.printf("[TestSchedule] should_test_now=%d, next=%lu, interval=%dh\n",
+                 shouldTestNow, nextTestTime, intervalHours);
+
+    if (shouldTestNow) {
+      Serial.println("[TestSchedule] ⏰ Hora do teste agendado! Iniciando medição...");
+      debugLog.log("INFO", "Teste agendado iniciando (interval=%dh)", intervalHours);
+
+      // Marcar teste agendado em andamento
+      isScheduledTestRunning = true;
+      memset(&lastScheduledTestResult, 0, sizeof(Measurement));
+
+      // Executar medição de KH (bloqueante)
+      performMeasurement();
+
+      // Reportar resultado para o backend
+      if (lastScheduledTestResult.kh > 0) {
+        // Teste bem-sucedido com dados
+        Serial.printf("[TestSchedule] ✓ Teste concluído com sucesso: KH=%.2f\n",
+                     lastScheduledTestResult.kh);
+
+        cloudAuth.reportTestResult(true, "", &lastScheduledTestResult);
+        debugLog.log("INFO", "Teste agendado concluído: KH=%.2f", lastScheduledTestResult.kh);
+      } else {
+        // Teste falhou
+        Serial.println("[TestSchedule] ✗ Teste falhou (sem dados de KH)");
+        cloudAuth.reportTestResult(false, "Measurement failed - no KH data");
+        debugLog.log("ERROR", "Teste agendado falhou");
+      }
+
+      // Resetar flag
+      isScheduledTestRunning = false;
+
+    } else {
+      // Ainda não é hora - apenas informativo no debug
+      static unsigned long lastInfoLog = 0;
+      unsigned long now = millis();
+
+      // Log a cada 5 minutos para não poluir
+      if (now - lastInfoLog > 300000) {
+        if (nextTestTime > now) {
+          unsigned long remainingMs = nextTestTime - now;
+          unsigned long remainingHours = remainingMs / (1000 * 60 * 60);
+          unsigned long remainingMins = (remainingMs % (1000 * 60 * 60)) / (1000 * 60);
+          Serial.printf("[TestSchedule] Próximo teste em %luh %lumin\n",
+                       remainingHours, remainingMins);
+        }
+        lastInfoLog = now;
+      }
+    }
+  } else {
+    Serial.println("[TestSchedule] Erro ao buscar próximo teste agendado");
   }
 }
 
@@ -451,17 +805,27 @@ void setup() {
 
   Serial.printf("[FW] DeviceType=%s, FWVERSION=%s\n", FW_DEVICE_TYPE, FW_VERSION);
 
+  // [LOG] Boot info
+  debugLog.log("INFO", "BOOT: FW=%s, Heap=%d, ResetReason=%d",
+               FW_VERSION, ESP.getFreeHeap(), esp_reset_reason());
+
+  // Carregar logs salvos do boot anterior (exibe no Serial)
+  debugLog.loadFromSPIFFS();
+
   // 1️⃣ RESET botão (OK)
   //pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
 
   // 2️⃣ WIFI PRIMEIRO (CRÍTICO!)
-    Serial.println("[Main] Iniciando WiFiSetup...");
+  Serial.println("[Main] Iniciando WiFiSetup...");
+  debugLog.log("INFO", "Iniciando WiFiSetup");
   bool wifiOk = wifiSetup.begin();
 
   if (wifiOk && WiFi.isConnected()) {  // ← + WiFi.isConnected()!
     Serial.println("[Main] WiFi STA conectado!");
+    debugLog.log("INFO", "WiFi conectado, SSID=%s, RSSI=%d, IP=%s",
+                 WiFi.SSID().c_str(), WiFi.RSSI(), WiFi.localIP().toString().c_str());
     lastWifiOkMs = millis();
-    
+
     // Auth só com STA
     initMultiDeviceAuth();
     Serial.println("✓ Auth OK");
@@ -470,13 +834,31 @@ void setup() {
 
     // <<< AQUI inicializa OTA com a base URL dos firmwares >>>
     otaInit("http://iot.reefbluesky.com.br");
-    
+
     //WiFi.softAPdisconnect(true);  // Desliga AP do setup
     //WiFi.mode(WIFI_STA);
 
-    setupWebServer();  
+    // [NOVO] Buscar config do backend (testMode e intervalHours)
+    Serial.println("[Config] Tentando buscar config do backend...");
+    debugLog.log("INFO", "Setup: Fetching config from backend");
+    bool backendOk = fetchConfigFromBackend();
+    if (backendOk) {
+      fetchIntervalFromBackendStatus();  // Buscar intervalHours do /status
+    } else {
+      Serial.println("[Config] Falha ao buscar do backend, carregando do SPIFFS...");
+      debugLog.log("WARN", "Setup: Backend fetch failed, loading from SPIFFS");
+      loadConfigFromSPIFFS();
+    }
+
+    // [NOVO] Enviar logs salvos por email/Telegram após boot
+    delay(2000);  // Aguardar 2s para garantir que auth está estável
+    debugLog.sendLogsAsAlert();
+
+    setupWebServer();
   } else {
     Serial.println("[Main] AP mode ativo. Configure WiFi em 192.168.4.1");
+    // [IMPORTANTE] Sem WiFi, não carrega config - testMode fica false (não roda automático)
+    Serial.println("[Config] Sem WiFi, testMode=false (não roda teste automático)");
   }
 
   // 4️⃣ HARDWARE DEPOIS auth (1x SÓ!)
@@ -516,6 +898,74 @@ void setup() {
   initAiPumpControl();
 }
 
+// =================================================================================
+// [SIMULAÇÃO] Funções para Modo Teste de Sensores de Nível
+// =================================================================================
+
+// Registrar ativação de bomba (chamado quando bomba é ligada)
+void registerPumpActivation(int pumpIndex, bool forward) {
+  if (pumpIndex < 0 || pumpIndex >= 4) return;
+
+  pumpSim[pumpIndex].active = true;
+  pumpSim[pumpIndex].forward = forward;
+  pumpSim[pumpIndex].startTime = millis();
+
+  Serial.printf("[SIMULATION] Bomba %d ativada (sentido: %s)\n",
+                pumpIndex + 1, forward ? "NORMAL" : "REVERSO");
+}
+
+// Registrar desativação de bomba
+void registerPumpDeactivation(int pumpIndex) {
+  if (pumpIndex < 0 || pumpIndex >= 4) return;
+  pumpSim[pumpIndex].active = false;
+  Serial.printf("[SIMULATION] Bomba %d desativada\n", pumpIndex + 1);
+}
+
+// Atualizar simulação dos sensores baseado no estado das bombas
+void updateLevelSimulation() {
+  if (!testModeEnabled) {
+    // Desabilitar simulação se testMode não estiver ativo
+    if (sensorManager.isLevelSimulationEnabled()) {
+      sensorManager.enableLevelSimulation(false);
+    }
+    return;
+  }
+
+  // Habilitar simulação quando testMode ativo
+  if (!sensorManager.isLevelSimulationEnabled()) {
+    sensorManager.enableLevelSimulation(true);
+  }
+
+  unsigned long now = millis();
+
+  // Bomba 1 → Câmara A
+  if (pumpSim[0].active) {
+    unsigned long elapsed = now - pumpSim[0].startTime;
+    if (elapsed >= LEVEL_SIMULATION_DELAY_MS) {
+      // Após 5s: normal=1 (enche), reverso=0 (esvazia)
+      int level = pumpSim[0].forward ? 1 : 0;
+      sensorManager.setSimulatedLevelA(level);
+    }
+  }
+
+  // Bomba 2 → Câmara B
+  if (pumpSim[1].active) {
+    unsigned long elapsed = now - pumpSim[1].startTime;
+    if (elapsed >= LEVEL_SIMULATION_DELAY_MS) {
+      int level = pumpSim[1].forward ? 1 : 0;
+      sensorManager.setSimulatedLevelB(level);
+    }
+  }
+
+  // Bomba 3 → Câmara C
+  if (pumpSim[2].active) {
+    unsigned long elapsed = now - pumpSim[2].startTime;
+    if (elapsed >= LEVEL_SIMULATION_DELAY_MS) {
+      int level = pumpSim[2].forward ? 1 : 0;
+      sensorManager.setSimulatedLevelC(level);
+    }
+  }
+}
 
 // =================================================================================
 // Loop Principal
@@ -532,6 +982,8 @@ void loop() {
   if (nowConnected && !lastWifiConnected) {
     Serial.printf("[Main] WiFi reconectado (auto). STA IP=%s\n",
                   staIp.toString().c_str());
+    debugLog.log("INFO", "WiFi reconectado: IP=%s, RSSI=%d",
+                 staIp.toString().c_str(), WiFi.RSSI());
 
     // Só fecha portal se o IP NÃO for 0.0.0.0 e NÃO for 192.168.4.1
     if (staIp != IPAddress(0,0,0,0) && staIp != IPAddress(192,168,4,1)) {
@@ -542,6 +994,13 @@ void loop() {
     }
   }
 
+  // [LOG] Detectar desconexão WiFi
+  if (!nowConnected && lastWifiConnected) {
+    debugLog.log("WARN", "WiFi desconectado! Uptime=%lu, Heap=%d",
+                 now, ESP.getFreeHeap());
+    debugLog.saveToSPIFFS(); // Salvar imediatamente
+  }
+
   lastWifiConnected = nowConnected;
 
   // Watchdog de WiFi: se ficar muito tempo OFF, reinicia
@@ -550,6 +1009,8 @@ void loop() {
   } else {
     if (lastWifiOkMs > 0 && (now - lastWifiOkMs) > MAX_WIFI_DOWN_MS) {
       Serial.println("[WDT] WiFi OFF por muito tempo, reiniciando device...");
+      debugLog.log("ERROR", "WiFi OFF > %lu ms, RESTART!", MAX_WIFI_DOWN_MS);
+      debugLog.saveToSPIFFS();
       delay(2000);
       ESP.restart();
     }
@@ -628,7 +1089,34 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
   
   if (now - lastSyncTry >= SYNC_INTERVAL_MS) {
     lastSyncTry = now;
+    int queueSize = cloudAuth.getQueueSize();
+    if (queueSize > 0) {
+      debugLog.log("DEBUG", "Syncing %d measurements to cloud", queueSize);
+    }
     cloudAuth.syncOfflineMeasurements();
+  }
+
+  // 🔥 2.5 TEST SCHEDULE - Polling de teste agendado
+  if (now - lastTestScheduleCheck >= TEST_SCHEDULE_CHECK_MS) {
+    lastTestScheduleCheck = now;
+    checkScheduledTest();
+  }
+
+  // 🔥 2.6 DEVICE CONFIG - Polling de configurações (testMode)
+  if (now - lastDeviceConfigCheck >= DEVICE_CONFIG_CHECK_MS) {
+    lastDeviceConfigCheck = now;
+    bool serverTestMode = false;
+    if (cloudAuth.fetchDeviceConfig(serverTestMode)) {
+      if (serverTestMode != testModeEnabled) {
+        testModeEnabled = serverTestMode;
+        Serial.printf("[CONFIG] Modo teste %s pelo servidor\n", testModeEnabled ? "ATIVADO" : "DESATIVADO");
+        if (testModeEnabled) {
+          sensorManager.enableLevelSimulation(true);
+        } else {
+          sensorManager.enableLevelSimulation(false);
+        }
+      }
+    }
   }
 
   // 🔥 3. WEB SERVER
@@ -659,8 +1147,10 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
     case IDLE:
       if (forceImmediateMeasurement) {
         forceImmediateMeasurement = false;
+        debugLog.log("INFO", "Manual measurement triggered");
         systemState = MEASURING;
       } else if (testModeEnabled && shouldMeasure()) {
+        debugLog.log("INFO", "Auto measurement triggered (testMode ON, interval reached)");
         systemState = MEASURING;
       }
       break;
@@ -718,41 +1208,50 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
       break;
   }
 
-  // 🔥 6. DEBUG & HEALTH
+  // 🔥 6. DEBUG & HEALTH & LOG SYNC
   if (now - lastHealthSent >= HEALTH_INTERVAL_MS) {
     sendHealthToCloud();
     lastHealthSent = now;
   }
 
+  // Periodic log sync (independent of health)
+  debugLog.syncToServer();
+
+  // [SIMULAÇÃO] Atualizar simulação de sensores de nível (modo teste)
+  updateLevelSimulation();
 
   static unsigned long lastDebug = 0;
   if (now - lastDebug > 6000) {
     lastDebug = now;
-      Serial.printf("[DEBUG] PH=%.2f Temp=%.1f State=%d\n", 
+      Serial.printf("[DEBUG] PH=%.2f Temp=%.1f State=%d\n",
               sensorManager.getPH(), sensorManager.getTemperature(),
               (int)systemState);
   }
 
-/*
   static unsigned long lastLevelDebug = 0;
   if (now - lastLevelDebug > 4000) {
     lastLevelDebug = now;
     Serial.printf("[LEVEL] A=%d B=%d C=%d\n",
-                  sensorManager.getLevelA(), sensorManager.getLevelB(), 
+                  sensorManager.getLevelA(), sensorManager.getLevelB(),
                   sensorManager.getLevelC());
   }
 
-  */
-
-  // 🔥 7. DIAG WiFi GERAL (a cada 30s)
+  // 🔥 7. DIAG WiFi GERAL + MEMORY (a cada 30s)
   static unsigned long lastDiag = 0;
   if (now - lastDiag > 30000) {
 
     Serial.printf("[MAIN DIAG] WiFi.status=%s | SSID='%s' | IP=%s | RSSI=%d\n",
-                  statusName(WiFi.status()), 
+                  statusName(WiFi.status()),
                   WiFi.SSID().c_str(),
-                  WiFi.localIP().toString().c_str(), 
+                  WiFi.localIP().toString().c_str(),
                   WiFi.RSSI());
+
+    // [LOG] Memory check - warn if low
+    size_t freeHeap = ESP.getFreeHeap();
+    if (freeHeap < 50000) {  // Alerta se menos de 50KB livre
+      debugLog.log("WARN", "LOW HEAP! Free=%d bytes", freeHeap);
+    }
+
     lastDiag = now;
   }
 
@@ -773,6 +1272,10 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
         KH_Calibrator::Result res = khCalibrator.getResult();
         if (khCalibrator.hasError()) {
           Serial.printf("[KH_Calib] ERRO: %s\n", res.error.c_str());
+          debugLog.log("ERROR", "KH Calibration FAILED: %s", res.error.c_str());
+
+          // [FIX] Enviar alerta de falha de calibração (Telegram/Email)
+          sendAlert("Falha na Calibração", res.error, "high");
         } else {
           Serial.printf("[KH_Calib] OK: kh_ref=%.2f ph_ref=%.2f temp=%.2f b1=%.4f b2=%.4f b3=%.4f\n",
                         res.kh_ref_user,
@@ -801,6 +1304,8 @@ void factoryReset() {
   Serial.println("\n[RESET] ===================================");
   Serial.println("[RESET] Iniciando RESET DE FÁBRICA");
   Serial.println("[RESET] ===================================\n");
+  debugLog.log("WARN", "FACTORY RESET initiated!");
+  debugLog.saveToSPIFFS();
 
   // Parar qualquer ciclo em andamento
   khAnalyzer.stopMeasurement();
@@ -828,6 +1333,8 @@ void wifiFactoryReset() {
   Serial.println("\n[WiFiReset] ===================================");
   Serial.println("[WiFiReset] Reset de Wi‑Fi + Credenciais Cloud");
   Serial.println("[WiFiReset] ===================================\n");
+  debugLog.log("WARN", "WIFI FACTORY RESET - clearing credentials");
+  debugLog.saveToSPIFFS();
 
   // 1) Limpa NVS 'wifi' (já existe na task)
   nvs_handle_t nvs;
@@ -966,6 +1473,7 @@ void handleTestMode() {
   }
   String v = webServer.arg("enabled");
   testModeEnabled = (v == "1" || v == "true");
+  saveConfigToSPIFFS();  // [NOVO] Salvar no SPIFFS para persistir após reboot
   webServer.send(200, "application/json",
                  String("{\"success\":true,\"testModeEnabled\":") +
                  (testModeEnabled ? "true" : "false") + "}");
@@ -1086,21 +1594,34 @@ void sendHealthToCloud() {
   h.wifi_signal_strength = wifiPercent;  // ← agora é % em vez de dBm
   h.uptime               = uptime;
 
+  // [FIX] Coletar dados dos sensores e adicionar ao health
   int lvlA = sensorManager.getLevelA();
   int lvlB = sensorManager.getLevelB();
   int lvlC = sensorManager.getLevelC();
+  float temp = sensorManager.getTemperature();  // Ler temperatura ativa
+  float ph = sensorManager.getPH();             // Ler pH ativo
 
-  StaticJsonDocument<512> doc;
+  h.level_a     = lvlA;
+  h.level_b     = lvlB;
+  h.level_c     = lvlC;
+  h.temperature = temp;
+  h.ph          = ph;
 
-  doc["level_a"] = lvlA;
-  doc["level_b"] = lvlB;
-  doc["level_c"] = lvlC;
+  Serial.printf("[Health] Sensores: LevelA=%d LevelB=%d LevelC=%d Temp=%.1f pH=%.2f\n",
+                lvlA, lvlB, lvlC, temp, ph);
 
   if (!cloudAuth.sendHealthMetrics(h)) {
     Serial.println("[Health] Falha ao enviar métricas via CloudAuth.");
+    debugLog.log("ERROR", "Health send FAILED! WiFi=%d%%, Heap=%d",
+                 wifiPercent, ESP.getFreeHeap());
   } else {
     Serial.println("[Health] Métricas enviadas com sucesso.");
+    debugLog.log("DEBUG", "Health OK: Heap=%.1f%%, WiFi=%d%%, RSSI=%d",
+                 heapPercent, wifiPercent, rssi);
   }
+
+  // [NOVO] Sincronizar logs com servidor após health
+  debugLog.syncToServer();
 }
 
 void sendFirmwareVersionToCloud() {
@@ -1220,11 +1741,16 @@ void processCloudCommand() {
 
   Serial.printf("[CMD] Recebido comando %s (id=%s)\n",
                 cmd.action.c_str(), cmd.command_id.c_str());
+  debugLog.log("INFO", "CMD received: action=%s, id=%s",
+               cmd.action.c_str(), cmd.command_id.c_str());
 
   bool ok = true;
   String errorMsg = "";
 
   if (cmd.action == "restart") {
+    debugLog.log("WARN", "CMD restart - device restarting NOW!");
+    debugLog.saveToSPIFFS();
+    delay(500);
     ESP.restart();
 
   } else if (cmd.action == "factoryreset") {
@@ -1235,9 +1761,15 @@ void processCloudCommand() {
 
   } else if (cmd.action == "ota_update") {
     Serial.println("[CMD] ota_update recebido, iniciando OTA...");
+    debugLog.log("WARN", "OTA update START");
+    debugLog.saveToSPIFFS();  // Save before OTA attempt
     ok = otaUpdateKh();             // DOSER/LCD: troca para otaUpdateDoser/Lcd
     if (!ok) {
       errorMsg = "OTA failed";
+      debugLog.log("ERROR", "OTA update FAILED");
+    } else {
+      debugLog.log("INFO", "OTA update SUCCESS - device will restart");
+      debugLog.saveToSPIFFS();
     }
 
   } else if (cmd.action == "testnow") {
@@ -1448,6 +1980,9 @@ void processCloudCommand() {
           unsigned long ms = (unsigned long)minutes * 60UL * 1000UL;
           measurementInterval = ms;
           Serial.printf("[CMD] setintervalminutes: %d min (interval=%lu ms)\n", minutes, ms);
+          debugLog.log("INFO", "Interval changed: %d minutes (%lu hours)",
+                       minutes, minutes / 60);
+          saveConfigToSPIFFS();  // [NOVO] Salvar no SPIFFS para persistir após reboot
         }
       }
     }
@@ -1473,6 +2008,8 @@ void processCloudCommand() {
       bool enabled = cmd.params["enabled"] | false;
       testModeEnabled = enabled;
       Serial.printf("[CMD] testmode: %s\n", enabled ? "ON" : "OFF");
+      debugLog.log("INFO", "Test mode changed: %s", enabled ? "ON" : "OFF");
+      saveConfigToSPIFFS();  // [NOVO] Salvar no SPIFFS para persistir após reboot
     }
 
   } else if (cmd.action == "abort") {
@@ -1496,6 +2033,13 @@ void processCloudCommand() {
 
   String statusStr = ok ? "done" : "error";
   cloudAuth.confirmCommandExecution(cmd.command_id, statusStr, errorMsg);
+
+  // [LOG] Log command completion
+  if (ok) {
+    debugLog.log("DEBUG", "CMD %s completed OK", cmd.action.c_str());
+  } else {
+    debugLog.log("ERROR", "CMD %s FAILED: %s", cmd.action.c_str(), errorMsg.c_str());
+  }
 }
 
 bool shouldMeasure() {
@@ -1503,6 +2047,7 @@ bool shouldMeasure() {
 }
 void performMeasurement() {
   Serial.println("Main Iniciando ciclo de medição...");
+  debugLog.log("INFO", "Measurement cycle START");
 
   currentCycleStartMs = getCurrentEpochMs();
   if (currentCycleStartMs == 0) {
@@ -1521,6 +2066,8 @@ void performMeasurement() {
 
     // ===== IGNORAR is_valid SÓ PARA TESTE =====
     Serial.printf("[Main] Medição concluída (forçada): KH=%.2f dKH\n", result.kh_value);
+    debugLog.log("INFO", "Measurement COMPLETE: KH=%.2f, pH_ref=%.2f, pH_sample=%.2f, temp=%.1f",
+                 result.kh_value, result.ph_reference, result.ph_sample, result.temperature);
 
     MeasurementHistory::Measurement mh;
     mh.kh         = result.kh_value;
@@ -1547,18 +2094,31 @@ void performMeasurement() {
     mc.is_valid     = mh.is_valid;
     mc.confidence   = 0.9f;
 
+    // [TEST SCHEDULE] Salvar resultado se for teste agendado
+    if (isScheduledTestRunning) {
+      lastScheduledTestResult = mc;
+      Serial.println("[TestSchedule] Resultado da medição agendada salvo");
+    }
+
     if (deviceToken.length() > 0) {
       cloudAuth.queueMeasurement(mc);
-      cloudAuth.syncOfflineMeasurements();
-      // opcional: logs
-      // sendLogsToCloud("log de teste do ESP", "INFO");
+      debugLog.log("DEBUG", "Measurement queued for sync, queue size=%d",
+                   cloudAuth.getQueueSize());
+      // [FIX] Removida chamada imediata de sync - deixar apenas sync periódico (a cada 30s)
+      // para evitar rate limiting. O sync periódico no loop principal já cuida disso.
+      // cloudAuth.syncOfflineMeasurements();
+    } else {
+      debugLog.log("WARN", "Measurement not synced - no token");
     }
     // ===== FIM BLOCO FORÇADO =====
 
   } else {
     Serial.println("[Main] ERRO: Falha ao iniciar ciclo de medição");
+    debugLog.log("ERROR", "Measurement cycle FAILED to start!");
     if (khAnalyzer.hasError()) {
-      Serial.println("[Main] " + khAnalyzer.getErrorMessage());
+      String errMsg = khAnalyzer.getErrorMessage();
+      Serial.println("[Main] " + errMsg);
+      debugLog.log("ERROR", "KH Analyzer error: %s", errMsg.c_str());
     }
   }
 }
@@ -1624,6 +2184,188 @@ void loadPump4CalibrationFromSPIFFS() {
   } else {
     Serial.println("[Pump4] Calibração inválida em arquivo, mantendo default");
   }
+}
+
+// =================================================================================
+// Persistência de testMode e intervalHours (SPIFFS)
+// =================================================================================
+
+void saveConfigToSPIFFS() {
+  if (!SPIFFS.begin(true)) {
+    Serial.println("[Config] Erro ao montar SPIFFS para salvar config");
+    return;
+  }
+
+  File f = SPIFFS.open("/kh_config.json", FILE_WRITE);
+  if (!f) {
+    Serial.println("[Config] Erro ao abrir /kh_config.json para escrita");
+    return;
+  }
+
+  DynamicJsonDocument doc(256);
+  doc["testMode"] = testModeEnabled;
+  doc["intervalHours"] = measurementInterval / (60UL * 60UL * 1000UL);  // ms -> horas
+
+  if (serializeJson(doc, f) == 0) {
+    Serial.println("[Config] Erro ao serializar config JSON");
+  } else {
+    Serial.printf("[Config] Config salva: testMode=%d, intervalHours=%lu\n",
+                  testModeEnabled, measurementInterval / (60UL * 60UL * 1000UL));
+  }
+  f.close();
+}
+
+void loadConfigFromSPIFFS() {
+  if (!SPIFFS.begin(true)) {
+    Serial.println("[Config] Erro ao montar SPIFFS para ler config");
+    return;
+  }
+
+  if (!SPIFFS.exists("/kh_config.json")) {
+    Serial.println("[Config] Arquivo /kh_config.json não existe, usando defaults");
+    return;
+  }
+
+  File f = SPIFFS.open("/kh_config.json", FILE_READ);
+  if (!f) {
+    Serial.println("[Config] Erro ao abrir /kh_config.json para leitura");
+    return;
+  }
+
+  DynamicJsonDocument doc(256);
+  DeserializationError err = deserializeJson(doc, f);
+  f.close();
+
+  if (err) {
+    Serial.printf("[Config] Erro JSON config: %s\n", err.c_str());
+    return;
+  }
+
+  testModeEnabled = doc["testMode"] | false;
+  unsigned long hours = doc["intervalHours"] | 1;
+  measurementInterval = hours * 60UL * 60UL * 1000UL;  // horas -> ms
+
+  Serial.printf("[Config] Config carregada do SPIFFS: testMode=%d, intervalHours=%lu\n",
+                testModeEnabled, hours);
+  debugLog.log("INFO", "Config loaded from SPIFFS: testMode=%d, interval=%lu h",
+               testModeEnabled, hours);
+}
+
+// Busca config do backend (testMode e intervalHours)
+bool fetchConfigFromBackend() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[Config] WiFi não conectado, não pode buscar config do backend");
+    debugLog.log("WARN", "Config fetch skipped - no WiFi");
+    return false;
+  }
+
+  if (deviceToken.length() == 0) {
+    Serial.println("[Config] Sem deviceToken, não pode buscar config");
+    debugLog.log("WARN", "Config fetch skipped - no token");
+    return false;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+  String url = String("http://iot.reefbluesky.com.br/api/v1/user/devices/") +
+               deviceId + "/kh-config";
+
+  Serial.printf("[Config] Buscando config do backend: %s\n", url.c_str());
+  debugLog.log("INFO", "Fetching config from backend");
+
+  if (!http.begin(client, url)) {
+    Serial.println("[Config] http.begin falhou");
+    debugLog.log("ERROR", "Config fetch: http.begin FAILED");
+    return false;
+  }
+
+  http.addHeader("Authorization", "Bearer " + deviceToken);
+  int code = http.GET();
+
+  if (code != 200) {
+    Serial.printf("[Config] GET config falhou com código %d\n", code);
+    debugLog.log("ERROR", "Config fetch FAILED: HTTP %d", code);
+    http.end();
+    return false;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  DynamicJsonDocument doc(2048);
+  DeserializationError err = deserializeJson(doc, payload);
+  if (err) {
+    Serial.printf("[Config] Erro ao parsear JSON: %s\n", err.c_str());
+    return false;
+  }
+
+  if (!doc["success"].as<bool>()) {
+    Serial.println("[Config] Backend retornou success=false");
+    return false;
+  }
+
+  JsonObject data = doc["data"];
+  if (data.isNull()) {
+    Serial.println("[Config] Backend sem campo 'data'");
+    return false;
+  }
+
+  // Ler testMode
+  if (data.containsKey("testMode")) {
+    testModeEnabled = data["testMode"].as<bool>();
+    Serial.printf("[Config] testMode do backend: %d\n", testModeEnabled);
+  }
+
+  // Ler intervalHours (via endpoint /status - mas vamos tentar aqui também)
+  // Se não vier neste endpoint, buscar de /status separadamente
+
+  // Salvar no SPIFFS para próximo boot
+  saveConfigToSPIFFS();
+
+  Serial.println("[Config] ✓ Config do backend carregada e salva no SPIFFS");
+  debugLog.log("INFO", "Config loaded from backend: testMode=%d", testModeEnabled);
+  return true;
+}
+
+// Busca intervalHours do endpoint /status
+bool fetchIntervalFromBackendStatus() {
+  if (WiFi.status() != WL_CONNECTED || deviceToken.length() == 0) {
+    return false;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+  String url = String("http://iot.reefbluesky.com.br/api/v1/user/devices/") +
+               deviceId + "/status";
+
+  if (!http.begin(client, url)) return false;
+  http.addHeader("Authorization", "Bearer " + deviceToken);
+  int code = http.GET();
+
+  if (code != 200) {
+    http.end();
+    return false;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  DynamicJsonDocument doc(1024);
+  if (deserializeJson(doc, payload)) return false;
+  if (!doc["success"].as<bool>()) return false;
+
+  JsonObject data = doc["data"];
+  if (data.containsKey("intervalHours")) {
+    unsigned long hours = data["intervalHours"].as<unsigned long>();
+    if (hours > 0 && hours <= 24) {
+      measurementInterval = hours * 60UL * 60UL * 1000UL;
+      Serial.printf("[Config] intervalHours do backend: %lu\n", hours);
+      saveConfigToSPIFFS();  // Salvar no SPIFFS
+      return true;
+    }
+  }
+
+  return false;
 }
 
 int rssiToPercent(int rssi) {

@@ -407,6 +407,50 @@ bool sendMeasurements(float kh, float phRef, float phSample, float temp) {
 }
 
 // ============================================================================
+// Enviar alerta: POST /api/v1/device/alert
+// ============================================================================
+bool sendAlert(const String& type, const String& message, const String& severity) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[Alert] Erro: WiFi não conectado");
+    return false;
+  }
+
+  if (deviceToken.length() == 0) {
+    Serial.println("[Alert] Erro: Device token não disponível");
+    return false;
+  }
+
+  HTTPClient http;
+  String url = serverUrl + "/device/alert";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + deviceToken);
+
+  DynamicJsonDocument doc(512);
+  doc["type"]     = type;
+  doc["message"]  = message;
+  doc["severity"] = severity;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  Serial.printf("[Alert] Enviando alerta: %s - %s\n", type.c_str(), message.c_str());
+
+  int httpCode = http.POST(payload);
+  if (httpCode == 200 || httpCode == 201) {
+    Serial.println("[Alert] ✓ Alerta enviado com sucesso (Telegram/Email)");
+    http.end();
+    return true;
+  } else {
+    Serial.printf("[Alert] Erro ao enviar alerta: HTTP %d\n", httpCode);
+    String response = http.getString();
+    Serial.printf("[Alert] Resposta: %s\n", response.c_str());
+    http.end();
+    return false;
+  }
+}
+
+// ============================================================================
 // Menu de configuração
 // ============================================================================
 void printConfigMenu() {

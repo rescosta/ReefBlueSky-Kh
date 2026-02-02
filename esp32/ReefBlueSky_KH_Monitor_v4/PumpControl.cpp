@@ -26,10 +26,10 @@ PumpControl::PumpControl() {
     pump3.channel = 2;
     pump3.running = false;
 
-    // Bomba D (ULN2003 em LEVEL_C_PIN / GPIO5)
-    pump4.PWM     = LEVEL_C_PIN;
-    pump4.DIR1    = LEVEL_C_PIN;
-    pump4.DIR2    = LEVEL_C_PIN;
+    // [FIX] Bomba D (Compressor) - Corrigido para usar COMPRESSOR_PIN (GPIO15)
+    pump4.PWM     = COMPRESSOR_PIN;  // GPIO15, não GPIO5!
+    pump4.DIR1    = COMPRESSOR_PIN;
+    pump4.DIR2    = COMPRESSOR_PIN;
     pump4.channel = 3;
     pump4.running = false;
 }

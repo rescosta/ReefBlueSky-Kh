@@ -17,15 +17,23 @@ void reportFirmwareVersion(const String& apiBase, const String& deviceToken) {
     return;
   }
 
-  String url = apiBase + "/device/firmware";
+  // [FIX] Validar token antes de enviar
+  if (deviceToken.length() == 0) {
+    Serial.println("[FW] ERRO: Token vazio, não reportando");
+    return;
+  }
+
+  String url = apiBase + "/device/firmware";  // [FIX] URL correta com /api/v1
   HTTPClient http;
 
   Serial.print("[FW] Reportando versão para: ");
   Serial.println(url);
+  Serial.printf("[FW] Token length: %d chars\n", deviceToken.length());
 
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + deviceToken);
+  Serial.println("[FW] Headers adicionados");
 
   String body = String("{\"firmwareVersion\":\"") + FW_VERSION + "\"}";
   int code = http.POST(body);
