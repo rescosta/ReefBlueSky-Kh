@@ -70,25 +70,18 @@ async function updateDosingDeviceStatus(deviceId, online, lastIp = null) {
 
 // ===== HELPER: Enviar notificações de alerta =====
 async function notifyDosingAlert(userId, alertType, message) {
-  // Email
+  // Email - usar helper que verifica email_enabled
   try {
-    const userRes = await pool.query(
-      `SELECT email FROM users WHERE id = ? LIMIT 1`,
-      [userId]
+    await sendEmailForUser(
+      userId,
+      `[ReefBlueSky Dosadora] Alerta: ${alertType}`,
+      `<p>${message}</p>`
     );
-    if (userRes && userRes.length > 0) {
-      await mailTransporter.sendMail({
-        from: ALERT_FROM,
-        to: userRes[0].email,
-        subject: `[ReefBlueSky Dosadora] Alerta: ${alertType}`,
-        text: message,
-      });
-    }
   } catch (err) {
     console.error('Error sending dosing alert email:', err);
   }
 
-  // Telegram
+  // Telegram - usar helper que verifica telegram_enabled
   try {
     await sendTelegramForUser(
       userId,
@@ -213,27 +206,57 @@ router.post('/handshake', async (req, res) => {
             'id', s.id, 'enabled', s.enabled, 'days_mask', s.days_mask,
             'doses_per_day', s.doses_per_day, 'start_time', TIME_FORMAT(s.start_time, '%H:%i'),
             'end_time', TIME_FORMAT(s.end_time, '%H:%i'), 'volume_per_day_ml', s.volume_per_day_ml,
-            'min_gap_minutes', s.min_gap_minutes
+            'min_gap_minutes', s.min_gap_minutes, 'adjusted_times', s.adjusted_times
           )
         ) as schedules
        FROM dosing_pumps p
-       LEFT JOIN dosing_schedules s ON p.id = s.pump_id
+       LEFT JOIN dosing_schedules s ON p.id = s.pump_id AND s.enabled = 1
        WHERE p.device_id = ?
        GROUP BY p.id
        ORDER BY p.index_on_device ASC`,
       [deviceId]
     );
 
-    const pumpData = pumps.map(p => ({
-      id: p.id,
-      index_on_device: p.index_on_device,
-      enabled: !!p.enabled,
-      name: p.name,
-      calibration_rate_ml_s: parseFloat(p.calibration_rate_ml_s),
-      current_volume_ml: p.current_volume_ml,
-      max_daily_ml: p.max_daily_ml,
-      schedules: p.schedules ? JSON.parse(`[${p.schedules}]`) : []
-    }));
+    const pumpData = pumps.map(p => {
+      const schedules = p.schedules ? JSON.parse(`[${p.schedules}]`) : [];
+
+      // [FIX] Calcular volumes individuais por dose para garantir total exato
+      schedules.forEach(s => {
+        const totalVolume = s.volume_per_day_ml || 0;
+        const dosesPerDay = s.doses_per_day || 1;
+
+        if (dosesPerDay > 0 && totalVolume > 0) {
+          const volumePerDose = Math.floor(totalVolume / dosesPerDay);
+          const doses = [];
+          let accumulated = 0;
+
+          // Primeiras N-1 doses: volume padrão (divisão inteira)
+          for (let i = 0; i < dosesPerDay - 1; i++) {
+            doses.push(volumePerDose);
+            accumulated += volumePerDose;
+          }
+
+          // Última dose: pega o resto para garantir total exato
+          const lastDose = totalVolume - accumulated;
+          doses.push(lastDose);
+
+          s.dose_volumes = doses;
+        } else {
+          s.dose_volumes = [];
+        }
+      });
+
+      return {
+        id: p.id,
+        index_on_device: p.index_on_device,
+        enabled: !!p.enabled,
+        name: p.name,
+        calibration_rate_ml_s: parseFloat(p.calibration_rate_ml_s),
+        current_volume_ml: p.current_volume_ml,
+        max_daily_ml: p.max_daily_ml,
+        schedules: schedules
+      };
+    });
 
     res.json({
       success: true,
@@ -546,10 +569,11 @@ router.post('/execution', async (req, res) => {
         try {
           // Buscar pump e schedule info
           const pumpInfo = await conn.query(
-            `SELECT dp.name as pump_name, dp.user_id,
-                    ds.id as schedule_id, ds.name as schedule_name,
+            `SELECT dp.name as pump_name, dd.user_id,
+                    ds.id as schedule_id, ds.doses_per_day,
                     ds.notify_telegram, ds.notify_email
              FROM dosing_pumps dp
+             JOIN dosing_devices dd ON dp.device_id = dd.id
              LEFT JOIN dosing_schedules ds ON ds.pump_id = dp.id
              WHERE dp.id = ?
              LIMIT 1`,
@@ -563,30 +587,46 @@ router.post('/execution', async (req, res) => {
             const shouldNotifyEmail = !!info.notify_email;
 
             if (shouldNotifyTelegram || shouldNotifyEmail) {
+              // [NOVO] Calcular qual dose é (1/3, 2/3, 3/3)
+              const dosesPerDay = info.doses_per_day || 1;
+              let doseNumber = 1;
+              try {
+                const todayExecutions = await conn.query(
+                  `SELECT COUNT(*) as count FROM dosing_executions
+                   WHERE pump_id = ? AND schedule_id = ?
+                   AND DATE(FROM_UNIXTIME(executed_at/1000)) = CURDATE()`,
+                  [pump_id, info.schedule_id]
+                );
+                doseNumber = (todayExecutions[0]?.count || 0);
+              } catch (err) {
+                console.error('[NOTIFY] Erro ao contar doses:', err);
+              }
+
               // Buscar dados do usuário
               const userRows = await conn.query(
-                `SELECT email, telegramChatId, telegramBotToken, telegramEnabled
+                `SELECT email, telegram_chat_id, telegram_bot_token, telegram_enabled, email_enabled
                  FROM users WHERE id = ? LIMIT 1`,
                 [userId]
               );
 
               if (userRows && userRows.length > 0) {
                 const user = userRows[0];
+                const doseInfo = `Dose ${doseNumber}/${dosesPerDay}`;
                 const message = `✅ Dosagem concluída!\n\n` +
+                  `${doseInfo}\n` +
                   `Bomba: ${info.pump_name}\n` +
-                  `Agenda: ${info.schedule_name || 'N/A'}\n` +
                   `Volume: ${volume_ml} mL\n` +
                   `Horário: ${new Date(executedEpoch * 1000).toLocaleString('pt-BR')}`;
 
                 // Telegram
-                if (shouldNotifyTelegram && user.telegramEnabled && user.telegramChatId && user.telegramBotToken) {
+                if (shouldNotifyTelegram && user.telegram_enabled && user.telegram_chat_id && user.telegram_bot_token) {
                   try {
-                    const telegramUrl = `https://api.telegram.org/bot${user.telegramBotToken}/sendMessage`;
+                    const telegramUrl = `https://api.telegram.org/bot${user.telegram_bot_token}/sendMessage`;
                     await fetch(telegramUrl, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        chat_id: user.telegramChatId,
+                        chat_id: user.telegram_chat_id,
                         text: message
                       })
                     });
@@ -597,15 +637,15 @@ router.post('/execution', async (req, res) => {
                 }
 
                 // Email
-                if (shouldNotifyEmail) {
+                if (shouldNotifyEmail && user.email_enabled) {
                   try {
-                    const emailSubject = '✅ Dosagem Concluída - ReefBlueSky';
+                    const emailSubject = `✅ Dosagem Concluída - ${doseInfo} - ReefBlueSky`;
                     const emailBody = `
                       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                         <h2 style="color: #22c55e;">✅ Dosagem Concluída com Sucesso!</h2>
                         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                          <p style="margin: 10px 0;"><strong>${doseInfo}</strong></p>
                           <p style="margin: 10px 0;"><strong>Bomba:</strong> ${info.pump_name}</p>
-                          <p style="margin: 10px 0;"><strong>Agenda:</strong> ${info.schedule_name || 'N/A'}</p>
                           <p style="margin: 10px 0;"><strong>Volume:</strong> ${volume_ml} mL</p>
                           <p style="margin: 10px 0;"><strong>Horário:</strong> ${new Date(executedEpoch * 1000).toLocaleString('pt-BR')}</p>
                         </div>
@@ -616,10 +656,12 @@ router.post('/execution', async (req, res) => {
                     `;
 
                     await sendEmailForUser(userId, emailSubject, emailBody);
-                    console.log(`[NOTIFY] Email enviado para user ${userId}`);
+                    console.log(`[NOTIFY] Email enviado para user ${userId} - ${doseInfo}`);
                   } catch (err) {
                     console.error('[NOTIFY] Erro ao enviar Email:', err);
                   }
+                } else if (shouldNotifyEmail && !user.email_enabled) {
+                  console.log(`[NOTIFY] Email não enviado - email_enabled=0 para user ${userId}`);
                 }
               }
             }

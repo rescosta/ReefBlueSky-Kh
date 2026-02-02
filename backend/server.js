@@ -25,8 +25,9 @@ const pool = require('./db-pool');
 const nodemailer = require('nodemailer');
 const displayRoutes    = require('./display-endpoints');
 const dosingUserRoutes = require('./dosing-user-routes');
-const dosingIotRoutes  = require('./dosing-iot-routes'); 
+const dosingIotRoutes  = require('./dosing-iot-routes');
 const dosingDeviceRoutes = require('./dosing-device-routes');
+const khTestScheduleRoutes = require('./kh-test-schedule-routes');
 
 const { getLatestFirmwareForType } = require('./iot-ota');
 
@@ -809,13 +810,16 @@ function authUserMiddleware(req, res, next) {
         .json({ success: false, message: 'Token inválido para usuário' });
     }
 
+    // [FIX] Aceitar tokens de display (type: "display") e tokens de usuário
     req.user = {
       userId: decoded.userId,
       deviceId: decoded.deviceId || null,
+      displayId: decoded.displayId || null,  // [FIX] Adicionar displayId se for display token
+      type: decoded.type || 'user',          // [FIX] Adicionar type do token
       role: decoded.role || 'user',
     };
 
-    console.log('[AUTH] OK userId=', req.user.userId, 'role=', req.user.role);
+    console.log('[AUTH] OK userId=', req.user.userId, 'type=', req.user.type, 'role=', req.user.role);
     next();
   } catch (err) {
     console.warn('[AUTH] Erro ao verificar token', err.message);
@@ -3082,9 +3086,20 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
       storage,
     });
 
+    // [FIX] Extrair dados dos sensores se enviados
+    const sensorData = {};
+    if (health.level_a !== undefined) sensorData.levelA = health.level_a;
+    if (health.level_b !== undefined) sensorData.levelB = health.level_b;
+    if (health.level_c !== undefined) sensorData.levelC = health.level_c;
+    if (health.temperature !== undefined) sensorData.temperature = health.temperature;
+    if (health.ph !== undefined) sensorData.ph = health.ph;
+
+    // Salvar sensor_data como JSON no campo sensor_data da tabela devices
+    const sensorDataJSON = Object.keys(sensorData).length > 0 ? JSON.stringify(sensorData) : null;
+
     await pool.query(
-      'UPDATE devices SET last_seen = NOW(), updatedAt = NOW() WHERE deviceId = ?',
-      [deviceId]
+      'UPDATE devices SET last_seen = NOW(), updatedAt = NOW(), sensor_data = ? WHERE deviceId = ?',
+      [sensorDataJSON, deviceId]
     );
 
     await pool.query(
@@ -3880,16 +3895,28 @@ app.get('/api/v1/devices/:deviceId/sensors', authUserMiddleware, async (req, res
 
     // Verificar se o device pertence ao usuário
     const chk = await pool.query(
-      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      'SELECT id, sensor_data FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
     if (!chk.length) {
       return res.status(404).json({ success: false, message: 'Device não encontrado' });
     }
 
-    // Buscar a última medição para obter os níveis e valores dos sensores
+    // [FIX] Buscar dados de sensores do campo sensor_data (JSON) ou da última medição
+    let sensorData = null;
+
+    // Tentar parsear sensor_data se existir
+    if (chk[0].sensor_data) {
+      try {
+        sensorData = JSON.parse(chk[0].sensor_data);
+      } catch (e) {
+        console.error('Erro ao parsear sensor_data:', e);
+      }
+    }
+
+    // Buscar temperatura e pH da última medição
     const measurements = await pool.query(
-      `SELECT levelA, levelB, levelC, temperature, phsample
+      `SELECT temperature, phsample
        FROM measurements
        WHERE deviceId = ?
        ORDER BY timestamp DESC
@@ -3897,27 +3924,16 @@ app.get('/api/v1/devices/:deviceId/sensors', authUserMiddleware, async (req, res
       [deviceId]
     );
 
-    if (!measurements.length) {
-      // Sem medições ainda, retornar valores padrão
-      return res.json({
-        success: true,
-        levelA: null,
-        levelB: null,
-        levelC: null,
-        temperature: null,
-        ph: null,
-      });
-    }
+    const lastMeasurement = measurements.length ? measurements[0] : null;
 
-    const last = measurements[0];
-
+    // Retornar dados combinados
     return res.json({
       success: true,
-      levelA: last.levelA,
-      levelB: last.levelB,
-      levelC: last.levelC,
-      temperature: last.temperature,
-      ph: last.phsample,
+      levelA: sensorData?.levelA ?? null,
+      levelB: sensorData?.levelB ?? null,
+      levelC: sensorData?.levelC ?? null,
+      temperature: lastMeasurement?.temperature ?? null,
+      ph: lastMeasurement?.phsample ?? null,
     });
   } catch (err) {
     console.error('GET /sensors error', err);
@@ -4571,6 +4587,14 @@ app.get('/api/v1/user/devices/:deviceId/status', authUserMiddleware, async (req,
     const userId = req.user.userId;
     const deviceId = req.params.deviceId;
 
+    // [FIX] Buscar testMode da tabela devices
+    const deviceRows = await pool.query(
+      'SELECT testMode FROM devices WHERE deviceId = ? AND userId = ?',
+      [deviceId, userId]
+    );
+
+    const testMode = deviceRows.length > 0 ? !!deviceRows[0].testMode : false;
+
     const sql = `
       SELECT
         interval_hours,
@@ -4596,6 +4620,7 @@ if (!rows.length) {
     success: true,
     data: {
       intervalHours: null,
+      testMode: testMode,
       levels: { A: false, B: false, C: false },
       pumps: {
         1: { running: false, direction: 'forward' },
@@ -4611,6 +4636,7 @@ return res.json({
   success: true,
   data: {
     intervalHours: s.interval_hours,
+    testMode: testMode,
     levels: {
       A: !!s.level_a,
       B: !!s.level_b,
@@ -5064,6 +5090,11 @@ Pressione Ctrl+C para parar o servidor
     process.exit(1);
   }
 }
+
+// ============================================================================
+// [KH TEST SCHEDULE] Agendamento Automático de Testes
+// ============================================================================
+app.use(khTestScheduleRoutes(pool, verifyToken, authUserMiddleware));
 
 // ============================================================================
 // [ERRO] Tratamento de Erros

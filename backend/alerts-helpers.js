@@ -65,8 +65,51 @@ async function sendTelegramForUser(userId, text) {
   }
 }
 
+// === EMAIL (por usuário) ===
+async function sendEmailForUser(userId, subject, htmlBody) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      `SELECT email, email_enabled
+         FROM users
+        WHERE id = ?
+        LIMIT 1`,
+      [userId]
+    );
+
+    if (!rows || rows.length === 0) {
+      console.warn('sendEmailForUser: user não encontrado', userId);
+      return;
+    }
+
+    const u = rows[0];
+    if (!u.email_enabled || !u.email) {
+      console.log(
+        'sendEmailForUser: Email desabilitado ou não configurado para user',
+        userId
+      );
+      return;
+    }
+
+    await mailTransporter.sendMail({
+      from: ALERT_FROM,
+      to: u.email,
+      subject: subject,
+      html: htmlBody
+    });
+
+    console.log('sendEmailForUser: email enviado para user', userId, u.email);
+  } catch (err) {
+    console.error('sendEmailForUser error:', err.message);
+  } finally {
+    if (conn) try { conn.release(); } catch {}
+  }
+}
+
 module.exports = {
   mailTransporter,
   ALERT_FROM,
   sendTelegramForUser,
+  sendEmailForUser,
 };

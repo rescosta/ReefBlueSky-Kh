@@ -575,6 +575,9 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
       ]
     );
 
+    // Resolver conflitos globais após criar schedule
+    await resolveAllScheduleConflicts(conn, deviceId);
+
     res.status(201).json({
       data: {
         id: result.insertId,
@@ -644,10 +647,17 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
                  scheduleId]
             );
 
+            // Resolver conflitos globais após editar schedule
+            await resolveAllScheduleConflicts(conn, deviceId);
+
             res.json({ data: { id: scheduleId, ...validatedSchedule } });
         } else {
             // Apenas toggle enabled
             await conn.query(`UPDATE dosing_schedules SET enabled = ? WHERE id = ?`, [enabled ? 1 : 0, scheduleId]);
+
+            // Resolver conflitos globais após toggle enabled
+            await resolveAllScheduleConflicts(conn, deviceId);
+
             res.json({ data: { id: scheduleId, enabled: enabled ? 1 : 0 } });
         }
     } catch (err) {
@@ -687,6 +697,9 @@ router.delete('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async
         }
 
         await conn.query(`DELETE FROM dosing_schedules WHERE id = ?`, [scheduleId]);
+
+        // Resolver conflitos globais após deletar schedule
+        await resolveAllScheduleConflicts(conn, deviceId);
 
         res.json({ data: { id: scheduleId } });
     } catch (err) {
@@ -736,6 +749,7 @@ router.get('/devices/:deviceId/schedules', async (req, res) => {
          s.min_gap_minutes,
          s.notify_telegram,
          s.notify_email,
+         s.adjusted_times,
          s.created_at
        FROM dosing_schedules s
        JOIN dosing_pumps p   ON s.pump_id = p.id
@@ -1134,11 +1148,13 @@ function calculateDoseTimes(schedule) {
         const intermediateSlots = doses - 1;
         const gap = durationMin / intermediateSlots;
         for (let i = 1; i < doses - 1; i++) {
-            times.splice(i, 0, startMin + gap * i);
+            // [FIX] Arredondar para minuto inteiro para evitar dízimas
+            times.splice(i, 0, Math.round(startMin + gap * i));
         }
     }
-    
-    return times.map(t => formatTime(t % 1440));
+
+    // [FIX] Garantir que todos os valores sejam inteiros
+    return times.map(t => formatTime(Math.round(t) % 1440));
 }
 
 function tryAdjustIntermediateTimes(existingEvents, newTimes, minGap) {
@@ -1183,6 +1199,104 @@ function convertDaysMaskToArray(mask) {
         }
     }
     return days;
+}
+
+// Resolve conflitos entre TODOS os schedules de um device
+async function resolveAllScheduleConflicts(conn, deviceId) {
+    try {
+        console.log('[Dosing] ========================================');
+        console.log('[Dosing] Resolvendo conflitos globais para device:', deviceId);
+
+    // Buscar todos os schedules ativos do device
+    const schedules = await conn.query(`
+        SELECT s.*, p.name as pump_name, p.index_on_device
+        FROM dosing_schedules s
+        JOIN dosing_pumps p ON s.pump_id = p.id
+        WHERE p.device_id = ? AND s.enabled = 1
+        ORDER BY p.index_on_device, s.start_time
+    `, [deviceId]);
+
+    if (!schedules || schedules.length === 0) {
+        console.log('[Dosing] Nenhum schedule ativo para resolver');
+        return;
+    }
+
+    // Criar lista de todos os eventos (horário + bomba + schedule)
+    const allEvents = [];
+
+    schedules.forEach(sched => {
+        const times = calculateDoseTimes(sched);
+        const minGapMinutes = sched.min_gap_minutes || 30;
+
+        times.forEach(timeStr => {
+            const minutes = parseTime(timeStr);
+            allEvents.push({
+                minutes: minutes,
+                timeStr: timeStr,
+                scheduleId: sched.id,
+                pumpId: sched.pump_id,  // Agora vem de s.pump_id
+                pumpIndex: sched.index_on_device,
+                pumpName: sched.pump_name,
+                minGapMinutes: minGapMinutes,
+                originalTime: timeStr
+            });
+        });
+    });
+
+    // Ordenar por horário (minutos do dia)
+    allEvents.sort((a, b) => a.minutes - b.minutes);
+
+    console.log('[Dosing] Total de eventos antes de resolver:', allEvents.length);
+
+    // Resolver conflitos sequencialmente
+    let adjustedCount = 0;
+    for (let i = 1; i < allEvents.length; i++) {
+        const prev = allEvents[i - 1];
+        const curr = allEvents[i];
+
+        // Calcular diferença em minutos
+        const diffMinutes = curr.minutes - prev.minutes;
+
+        // Se a diferença for menor que o intervalo mínimo do evento anterior
+        if (diffMinutes < prev.minGapMinutes) {
+            // Ajustar o evento atual
+            const newMinutes = prev.minutes + prev.minGapMinutes;
+            const oldTimeStr = curr.timeStr;
+            curr.minutes = newMinutes;
+            curr.timeStr = formatTime(newMinutes);
+
+            console.log(`[Dosing] Conflito resolvido: ${curr.pumpName} ${oldTimeStr} -> ${curr.timeStr} (+${prev.minGapMinutes}min)`);
+            adjustedCount++;
+        }
+    }
+
+    console.log('[Dosing] Total de conflitos resolvidos:', adjustedCount);
+
+    // Agrupar eventos ajustados por schedule
+    const scheduleAdjustedTimes = {};
+    allEvents.forEach(event => {
+        if (!scheduleAdjustedTimes[event.scheduleId]) {
+            scheduleAdjustedTimes[event.scheduleId] = [];
+        }
+        scheduleAdjustedTimes[event.scheduleId].push(event.timeStr);
+    });
+
+    // Atualizar adjusted_times de cada schedule no banco
+    for (const scheduleId in scheduleAdjustedTimes) {
+        const adjustedTimes = scheduleAdjustedTimes[scheduleId];
+        await conn.query(
+            'UPDATE dosing_schedules SET adjusted_times = ? WHERE id = ?',
+            [JSON.stringify(adjustedTimes), scheduleId]
+        );
+        console.log(`[Dosing] Schedule ${scheduleId} atualizado com ${adjustedTimes.length} horários ajustados`);
+    }
+
+        console.log('[Dosing] Resolução de conflitos globais concluída');
+        console.log('[Dosing] ========================================');
+    } catch (err) {
+        console.error('[Dosing] ERRO ao resolver conflitos:', err);
+        console.error('[Dosing] Stack:', err.stack);
+    }
 }
 
 function convertDaysArrayToMask(days) {

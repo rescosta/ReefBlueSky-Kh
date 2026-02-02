@@ -405,21 +405,35 @@ router.post('/refresh', authDisplayMiddleware, async (req, res) => {
 
     const newToken = generateDisplayToken(newPayload, JWT_DISPLAY_EXPIRY);
 
+    // [FIX] Gerar novo refresh token também
+    const newRefreshPayload = {
+      type: 'refresh',
+      displayId: decoded.displayId,
+      userId: decoded.userId
+    };
+    const newRefreshToken = generateDisplayToken(newRefreshPayload, '90d');
+
     const expiresInSeconds =
       typeof JWT_DISPLAY_EXPIRY === 'string' && JWT_DISPLAY_EXPIRY.endsWith('d')
         ? parseInt(JWT_DISPLAY_EXPIRY) * 24 * 60 * 60
         : 30 * 24 * 60 * 60;
 
+    console.log('[DISPLAY] Tokens renovados para displayId=%s', decoded.displayId);
+
     return res.json({
       success: true,
       displayToken: newToken,
+      refreshToken: newRefreshToken,  // [FIX] Agora devolve novo refresh token
       expiresIn: expiresInSeconds
     });
   } catch (err) {
     console.error('[DISPLAY] ERRO /refresh:', err.message);
+    // [FIX] Adicionar header Retry-After
+    res.set('Retry-After', '300');
     return res.status(401).json({
       success: false,
-      message: 'Refresh token inválido ou expirado'
+      message: 'Refresh token inválido ou expirado',
+      retryAfter: 300
     });
   }
 });
