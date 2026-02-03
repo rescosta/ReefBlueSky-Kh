@@ -3,7 +3,7 @@
 --
 -- Host: localhost    Database: reefbluesky
 -- ------------------------------------------------------
--- Server version	10.11.14-MariaDB-0ubuntu0.24.04.1
+-- Server version	10.11.14-MariaDB-0+deb12u2
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -34,7 +34,7 @@ CREATE TABLE `device_alerts` (
   PRIMARY KEY (`id`),
   KEY `idx_deviceId_created` (`deviceId`,`created_at` DESC),
   KEY `idx_userId` (`userId`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -56,7 +56,7 @@ CREATE TABLE `device_commands` (
   `processed` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_device_status` (`deviceId`,`status`,`createdAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=463 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=468 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -98,7 +98,7 @@ CREATE TABLE `device_health` (
   `updatedAt` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_dev_user` (`deviceId`,`userId`,`updatedAt`)
-) ENGINE=InnoDB AUTO_INCREMENT=7757 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=29456 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -119,7 +119,7 @@ CREATE TABLE `device_logs` (
   PRIMARY KEY (`id`),
   KEY `idx_device_ts` (`deviceId`,`ts` DESC),
   KEY `idx_user_ts` (`userId`,`ts` DESC)
-) ENGINE=InnoDB AUTO_INCREMENT=1907 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=23993 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -233,13 +233,12 @@ CREATE TABLE `devices` (
   `sensor_data` text DEFAULT NULL,
   `test_mode` tinyint(1) DEFAULT 0,
   `testMode` tinyint(1) NOT NULL DEFAULT 0,
-  `testMode_updated_at` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_devices_deviceId` (`deviceId`),
   KEY `idx_devices_userId` (`userId`),
   KEY `idx_devices_mainDeviceId` (`mainDeviceId`),
   CONSTRAINT `fk_devices_user` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=849 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=862 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -319,7 +318,7 @@ CREATE TABLE `dosing_devices` (
   KEY `idx_dosing_device_user_online` (`user_id`,`online`,`last_seen` DESC),
   KEY `idx_dosing_offline` (`offline_alert_sent`),
   CONSTRAINT `fk_doser_device_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -345,10 +344,9 @@ CREATE TABLE `dosing_executions` (
   KEY `idx_pump_scheduled` (`pump_id`,`scheduled_at`),
   KEY `idx_pump_status` (`pump_id`,`status`,`created_at`),
   KEY `idx_dosing_exec_pump_date` (`pump_id`,`scheduled_at` DESC),
-  KEY `idx_dosing_executions_sched_date` (`schedule_id`,`executed_at`),
   CONSTRAINT `fk_exec_pump` FOREIGN KEY (`pump_id`) REFERENCES `dosing_pumps` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_exec_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `dosing_schedules` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=143 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=261 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -376,7 +374,7 @@ CREATE TABLE `dosing_pumps` (
   KEY `idx_pump_enabled` (`device_id`,`enabled`),
   KEY `idx_dosing_pump_device` (`device_id`,`enabled`),
   CONSTRAINT `fk_pump_device` FOREIGN KEY (`device_id`) REFERENCES `dosing_devices` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -404,7 +402,7 @@ CREATE TABLE `dosing_schedules` (
   PRIMARY KEY (`id`),
   KEY `idx_pump_enabled` (`pump_id`,`enabled`),
   CONSTRAINT `fk_schedule_pump` FOREIGN KEY (`pump_id`) REFERENCES `dosing_pumps` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=68 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=94 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -430,7 +428,7 @@ CREATE TABLE `kh_test_schedule` (
   KEY `idx_next_test` (`next_test_time`,`auto_enabled`),
   KEY `idx_pending_tests` (`auto_enabled`,`next_test_time`,`last_test_status`),
   CONSTRAINT `fk_test_schedule_device` FOREIGN KEY (`deviceId`) REFERENCES `devices` (`deviceId`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -455,7 +453,7 @@ CREATE TABLE `measurements` (
   `finishedAt` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_measurements_device_ts` (`deviceId`,`timestamp`)
-) ENGINE=InnoDB AUTO_INCREMENT=162 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=166 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -478,12 +476,12 @@ CREATE TABLE `users` (
   `telegram_chat_id` bigint(20) DEFAULT NULL,
   `telegram_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `telegram_bot_token` varchar(100) DEFAULT NULL,
-  `email_enabled` tinyint(1) NOT NULL DEFAULT 1,
   `name` varchar(191) DEFAULT NULL,
   `timezone` varchar(64) DEFAULT NULL,
+  `email_enabled` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_users_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -533,4 +531,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-02-02 17:41:28
+-- Dump completed on 2026-02-02 20:11:29

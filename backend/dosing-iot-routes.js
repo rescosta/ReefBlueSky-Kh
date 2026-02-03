@@ -512,7 +512,6 @@ router.post('/execution', async (req, res) => {
     const {
       esp_uid,
       pump_id,
-      schedule_id,  
       scheduled_at,  // epoch em segundos
       executed_at,   // epoch em segundos (ou null)
       volume_ml,
@@ -538,16 +537,15 @@ router.post('/execution', async (req, res) => {
     // Registrar execução (epoch direto → FROM_UNIXTIME)
     await conn.query(
       `INSERT INTO dosing_executions 
-         (pump_id, schedule_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
+         (pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
        VALUES (
-         ?, ?, 
+         ?, 
          ${schedEpoch    != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
          ${executedEpoch != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
          ?, ?, ?, ?
        )`,
       [
         pump_id,
-        schedule_id || null,
         ...(schedEpoch    != null ? [schedEpoch]    : []),
         ...(executedEpoch != null ? [executedEpoch] : []),
         volume_ml,
@@ -556,7 +554,6 @@ router.post('/execution', async (req, res) => {
         error_code || null
       ]
     );
-
 
     // Se executou com sucesso, descontar do reservatório
     if (status === 'OK') {
@@ -594,20 +591,23 @@ router.post('/execution', async (req, res) => {
               const dosesPerDay = info.doses_per_day || 1;
               let doseNumber = 1;
               try {
-                const todayExecutions = await conn.query(
-                  `SELECT COUNT(*) as count FROM dosing_executions
-                   WHERE pump_id = ? AND schedule_id = ?
-                   AND DATE(executed_at) = CURDATE()`,
-                  [pump_id, info.schedule_id]
+                const rows = await conn.query(
+                  `SELECT COUNT(*) AS count
+                     FROM dosing_executions
+                    WHERE pump_id = ?
+                      AND DATE(executed_at) = CURDATE()
+                      AND status = 'OK'
+                      AND origin = 'AUTO'`,
+                  [pump_id]
                 );
-
-                // +1 para a dose atual
-                doseNumber = (todayExecutions[0]?.count || 0) + 1;
-
-
+                // se o SELECT rodar DEPOIS do INSERT, a dose atual já entra na contagem
+                doseNumber = rows[0]?.count || 1;
               } catch (err) {
                 console.error('[NOTIFY] Erro ao contar doses:', err);
               }
+
+              const doseInfo = `Dose ${doseNumber}/${dosesPerDay}`;
+
 
               // Buscar dados do usuário
               const userRows = await conn.query(
@@ -618,7 +618,6 @@ router.post('/execution', async (req, res) => {
 
               if (userRows && userRows.length > 0) {
                 const user = userRows[0];
-                const doseInfo = `Dose ${doseNumber}/${dosesPerDay}`;
                 const message = `✅ Dosagem concluída!\n\n` +
                   `${doseInfo}\n` +
                   `Bomba: ${info.pump_name}\n` +
