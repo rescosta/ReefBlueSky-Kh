@@ -276,11 +276,13 @@ bool CloudAuthDoser::sendDoserStatus(uint32_t uptime, int8_t rssi, const JsonDoc
 }
 bool CloudAuthDoser::reportDosingExecution(
     uint32_t pumpId,
-    uint16_t volumeMl,
+    float volumeMl,
     uint32_t scheduledAt,
     uint32_t executedAt,
     const char* status,
-    const char* origin
+    const char* origin,
+    uint32_t scheduleId,   
+    uint8_t doseIndex
 ) {
   if (!isAuthenticated()) return false;
 
@@ -290,11 +292,13 @@ bool CloudAuthDoser::reportDosingExecution(
   DynamicJsonDocument payload(512);
   payload["esp_uid"]      = espUid;
   payload["pump_id"]      = pumpId;
+  payload["schedule_id"]  = scheduleId;  
   payload["volume_ml"]    = volumeMl;
   payload["scheduled_at"] = scheduledAt;
   payload["executed_at"]  = executedAt;
   payload["status"]       = status;
   payload["origin"]       = origin;
+  payload["doseindex"]   = doseIndex; 
 
   // LOG AQUI
   String jsonPayload;
@@ -389,6 +393,8 @@ void CloudAuthDoser::handleCommand(JsonObject cmd, DoserControl* doser) {
 
   else if (type == "otaupdate") {
     Serial.println("[CMD] otaupdate recebido (DOSER), iniciando OTA...");
+    int cmdId = cmd["id"] | 0;
+    otaSetCommandId(cmdId);  // habilita reporte de progresso ao backend
     otaUpdateDoser();
   }
 }

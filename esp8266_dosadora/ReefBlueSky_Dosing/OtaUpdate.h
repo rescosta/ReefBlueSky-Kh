@@ -44,6 +44,10 @@ bool otaUpdateKh();
 bool otaUpdateDoser();
 bool otaUpdateLcd();
 
+// Define o commandId do comando OTA atual para reporte de progresso ao backend
+// (0 = sem reporte). Chamar antes de otaUpdateKh/Doser/Lcd.
+void otaSetCommandId(int id);
+
 // ======== Web OTA (servidor local) ========
 
 /**

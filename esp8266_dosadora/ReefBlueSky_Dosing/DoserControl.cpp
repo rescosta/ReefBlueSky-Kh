@@ -24,10 +24,12 @@ DoserControl::DoserControl() {
   lastAnyExecEpoch = 0;
   lastPumpIdExec   = 0;
 
+  for (uint8_t i = 0; i < MAX_PUMPS; i++) {
+    lastAutoDose[i].lastEpoch    = 0;
+    lastAutoDose[i].lastDoseIndex = 0;
+  }
+
 }
-
-
-
 
 void DoserControl::initPins(const int* pins) {
   for (uint8_t i = 0; i < MAX_PUMPS; i++) {
@@ -112,7 +114,7 @@ void DoserControl::loadFromServer(const JsonDocument& config) {
         // volume_per_day_ml vindo como número (int/float/double)
         if (!volVar.isNull()) {
           double vol = volVar.as<double>();
-          sched.volumePerDayMl = (uint16_t)vol;
+          sched.volumePerDayMl = (float)vol;
         } else {
           sched.volumePerDayMl = 10;
         }
@@ -158,29 +160,29 @@ void DoserControl::loadFromServer(const JsonDocument& config) {
           uint8_t idx = 0;
           for (JsonVariantConst volVar : doseVols) {
             if (idx >= 24) break;
-            sched.doseVolumes[idx] = volVar.as<uint16_t>();
+            sched.doseVolumes[idx] = (float)volVar.as<double>();
             idx++;
           }
           sched.doseVolumesCount = idx;
           Serial.printf("[DoserControl]   Schedule %d tem %d volumes individuais: ",
                         scheduleCount, sched.doseVolumesCount);
           for (uint8_t i = 0; i < idx; i++) {
-            Serial.printf("%u", sched.doseVolumes[i]);
+            Serial.printf("%.2f", (double)sched.doseVolumes[i]);
             if (i < idx - 1) Serial.print(", ");
           }
           Serial.println(" ml");
         }
 
-        uint16_t volumePerDose = (sched.dosesPerDay > 0)
+        float volumePerDose = (sched.dosesPerDay > 0)
                                 ? (sched.volumePerDayMl / sched.dosesPerDay)
                                 : 0;
 
-        Serial.printf("[DoserControl]   Schedule %d: %u doses/day, %u mL/day (~%u mL/dose), daysMask=%u\n",
+        Serial.printf("[DoserControl]   Schedule %d: %u doses/day, %.2f mL/day (~%.2f mL/dose), daysMask=%u\n",
                       scheduleCount,
                       (unsigned int)sched.dosesPerDay,
-                      (unsigned int)sched.volumePerDayMl,
-                      (unsigned int)volumePerDose,
-                      sched.daysMask);
+                      (double)sched.volumePerDayMl,
+                      (double)volumePerDose,
+                      (unsigned int)sched.daysMask);
 
 
         scheduleCount++;
@@ -267,7 +269,7 @@ void DoserControl::rebuildJobs(time_t now) {
       if (rangeSec == 0 || sched.dosesPerDay == 0) continue;
 
       uint32_t intervalPerDose = rangeSec / sched.dosesPerDay;
-      uint16_t volumePerDose   = sched.volumePerDayMl / sched.dosesPerDay;
+      float volumePerDose   = sched.volumePerDayMl / sched.dosesPerDay;
 
       Serial.printf("[DoserControl]   rangeSec=%lu intervalPerDose=%lu volumePerDose=%u\n",
                     (unsigned long)rangeSec,
@@ -323,7 +325,7 @@ void DoserControl::rebuildJobs(time_t now) {
 
 
           // [FIX] Usar volume individual do backend se disponível, senão calcula
-          uint16_t doseVolume = volumePerDose;
+          float doseVolume = volumePerDose;
           if (sched.doseVolumesCount > 0 && d < sched.doseVolumesCount) {
             doseVolume = sched.doseVolumes[d];
           }
@@ -336,6 +338,7 @@ void DoserControl::rebuildJobs(time_t now) {
           job.executed   = false;
           job.retries    = 0;
           job.minGapSec  = sched.minGapMinutes * 60;  // [NOVO] Converter minutos para segundos
+          job.doseIndex  = d + 1;
           doseJobCount++;
         }
       }
@@ -380,7 +383,7 @@ void DoserControl::rebuildJobs(time_t now) {
                       daysAhead);
 
         // [FIX] Usar volume individual do backend se disponível, senão calcula
-        uint16_t doseVolume = volumePerDose;
+        float doseVolume = volumePerDose;
         if (sched.doseVolumesCount > 0 && d < sched.doseVolumesCount) {
           doseVolume = sched.doseVolumes[d];
         }
@@ -393,6 +396,7 @@ void DoserControl::rebuildJobs(time_t now) {
         job.executed   = false;
         job.retries    = 0;
         job.minGapSec  = sched.minGapMinutes * 60;  // [NOVO] Converter minutos para segundos
+        job.doseIndex  = d + 1;
         doseJobCount++;
       }
     }
@@ -408,7 +412,7 @@ void DoserControl::rebuildJobs(time_t now) {
 
 
 void DoserControl::startAutoRun(uint8_t pumpIdx, uint32_t durationMs,
-                                uint32_t pumpId, uint32_t scheduleId, uint16_t volumeMl) {
+                                uint32_t pumpId, uint32_t scheduleId, float volumeMl, uint8_t doseIndex) {
   if (pumpIdx >= pumpCount) return;
 
   for (uint8_t i = 0; i < MAX_ACTIVE_RUNS; i++) {
@@ -421,6 +425,8 @@ void DoserControl::startAutoRun(uint8_t pumpIdx, uint32_t durationMs,
       ar.scheduleId = scheduleId;
       ar.volumeMl   = volumeMl;
       ar.origin     = "AUTO";
+      ar.doseIndex  = doseIndex;  
+
 
       digitalWrite(pumpPins[pumpIdx], HIGH);
       return;
@@ -445,7 +451,9 @@ void DoserControl::processActiveRuns(uint32_t nowMs, time_t nowSec) {
           ar.scheduleId,
           (uint32_t)nowSec,
           "OK",
-          ar.origin
+          ar.origin,
+          ar.doseIndex   // [NOVO]
+
         );
       }
       ar.inUse = false;
@@ -477,8 +485,9 @@ void DoserControl::loop(time_t now) {
           manualRun.volumeMl,
           manualRun.scheduleId,
           (uint32_t)nowSec,
-          "OK",               // <-- aqui é OK
-          manualRun.origin    // "MANUAL"
+          "OK",               
+          manualRun.origin,    // "MANUAL"
+          0
         );
       }
     }
@@ -523,7 +532,7 @@ void DoserControl::loop(time_t now) {
           job.executed = true;
           if (onExecutionCallback) {
             onExecutionCallback(job.pumpId, job.volumeMl, job.scheduleId,
-                                job.whenEpoch, "DISABLED", "AUTO");
+                                job.whenEpoch, "DISABLED", "AUTO", job.doseIndex);
           }
           continue;
         }
@@ -533,7 +542,7 @@ void DoserControl::loop(time_t now) {
           job.executed = true;
           if (onExecutionCallback) {
             onExecutionCallback(job.pumpId, job.volumeMl, job.scheduleId,
-                                job.whenEpoch, "LOW_VOLUME", "AUTO");
+                                job.whenEpoch, "LOW_VOLUME", "AUTO", job.doseIndex);
           }
           continue;
         }
@@ -565,10 +574,64 @@ void DoserControl::loop(time_t now) {
 
         uint32_t durationMs =
           (uint32_t)((job.volumeMl / pump.calibMlPerSec) * 1000);
-        Serial.printf("[DoserControl] Pump %lu: dosing %u mL for %lu ms\n",
-                      job.pumpId, job.volumeMl, durationMs);
+        Serial.printf("[DoserControl] Pump %lu: dosing %.2f mL for %lu ms\n",
+                      (unsigned long)job.pumpId,
+                      (double)job.volumeMl,
+                      (unsigned long)durationMs);
 
-        startAutoRun(pumpIdx, durationMs, job.pumpId, job.scheduleId, job.volumeMl);
+        // ----- GUARD RAIL DE VOLUME/DURAÇÃO -----
+        const float MAX_RUN_FRACTION_OF_DAILY = 0.5f;   // 50% do volume diário
+        float maxRunVolume = pump.maxDailyMl * MAX_RUN_FRACTION_OF_DAILY;
+
+        if (job.volumeMl > maxRunVolume) {
+          Serial.printf("[DoserControl] GUARD_FAIL volume alto: pumpId=%lu job=%.2f mL maxRun=%.2f mL\n",
+                        (unsigned long)job.pumpId,
+                        (double)job.volumeMl,
+                        (double)maxRunVolume);
+
+          job.executed = true;
+          if (onExecutionCallback) {
+            onExecutionCallback(job.pumpId, job.volumeMl, job.scheduleId,
+                                (uint32_t)now, "GUARD_VOLUME", "AUTO", job.doseIndex);
+          }
+          continue;
+        }
+
+        // Duração máxima esperada para esse volume
+        float maxDurationSec = maxRunVolume / pump.calibMlPerSec;
+        uint32_t maxDurationMs = (uint32_t)(maxDurationSec * 1000 * 1.2f); // +20% margem
+
+        if (durationMs > maxDurationMs) {
+          Serial.printf("[DoserControl] GUARD_FAIL duration alto: pumpId=%lu dur=%lu ms max=%lu ms\n",
+                        (unsigned long)job.pumpId,
+                        (unsigned long)durationMs,
+                        (unsigned long)maxDurationMs);
+
+          job.executed = true;
+          if (onExecutionCallback) {
+            onExecutionCallback(job.pumpId, job.volumeMl, job.scheduleId,
+                                (uint32_t)now, "GUARD_DURATION", "AUTO", job.doseIndex);
+          }
+          continue;
+        }
+
+        uint32_t nowEpoch = (uint32_t)now;
+        if (!canStartAutoDose(pumpIdx, job.doseIndex, nowEpoch)) {
+          Serial.printf("[DoserControl] DUP_SKIP pumpIdx=%u pumpId=%lu schedId=%lu dose=%u\n",
+              pumpIdx, (unsigned long)job.pumpId,
+              (unsigned long)job.scheduleId, job.doseIndex);
+          
+          // não executa, mas marca como executado para não ficar em loop infinito
+          job.executed = true;
+          // opcional: reportar status especial para o backend
+          if (onExecutionCallback) {
+            onExecutionCallback(job.pumpId, job.volumeMl, job.scheduleId,
+                                nowEpoch, "SKIPPED_DUP", "AUTO", job.doseIndex);
+          }
+          continue;
+        }              
+
+        startAutoRun(pumpIdx, durationMs, job.pumpId, job.scheduleId, job.volumeMl, job.doseIndex);
 
         pump.currentVolumeMl -= job.volumeMl;
         job.executed = true;
@@ -582,7 +645,7 @@ void DoserControl::loop(time_t now) {
   }
 }
 
-void DoserControl::startManualDose(uint8_t pumpIdx, uint16_t volumeMl,
+void DoserControl::startManualDose(uint8_t pumpIdx, float volumeMl,
                                    uint32_t scheduleId, uint32_t pumpIdOverride) {
   if (pumpIdx >= pumpCount) return;
   PumpConfig& pump = pumps[pumpIdx];
@@ -631,7 +694,8 @@ void DoserControl::stopManualDose(uint32_t pumpId) {
       manualRun.scheduleId,
       (uint32_t)nowSec,
       "ABORTED",
-      manualRun.origin     
+      manualRun.origin,
+      0   
     );
   }
 }
@@ -662,6 +726,33 @@ uint32_t DoserControl::parseTimeToSeconds(const String& timeStr) {
 
   return (hours * 3600) + (minutes * 60);
 }
+
+// Janela para bloquear repetição da mesma dose (em segundos)
+static const uint32_t DUP_WINDOW_SEC = 5 * 60;   // 5 minutos
+
+
+bool DoserControl::canStartAutoDose(uint8_t pumpIdx, uint8_t doseIndex, uint32_t nowEpoch) {
+  if (pumpIdx >= MAX_PUMPS) return false;
+
+  LastDoseInfo &info = lastAutoDose[pumpIdx];
+
+  // Bloqueia MESMA bomba + MESMO doseIndex repetindo dentro de 5 min
+  if (info.lastEpoch != 0 &&
+      info.lastDoseIndex == doseIndex &&
+      (nowEpoch - info.lastEpoch) < DUP_WINDOW_SEC) {  
+    Serial.printf("[DoserControl] DUP_SKIP pumpIdx=%u dose=%u last=%lu now=%lu (window=%lus)\n",
+                  pumpIdx, doseIndex,
+                  (unsigned long)info.lastEpoch,
+                  (unsigned long)nowEpoch,
+                  (unsigned long)DUP_WINDOW_SEC);
+    return false;
+  }
+
+  info.lastEpoch     = nowEpoch;
+  info.lastDoseIndex = doseIndex;
+  return true;
+}
+
 
 // [NOVO] Resolver conflitos de horário entre jobs
 // Quando múltiplas bombas têm o mesmo horário agendado, escalonar automaticamente

@@ -28,7 +28,7 @@ struct Schedule {
   bool     enabled;
   uint8_t  daysMask;
   uint8_t  dosesPerDay;
-  uint16_t volumePerDayMl;
+  float volumePerDayMl;
   uint16_t minGapMinutes;
   uint32_t startSecSinceMidnight;
   uint32_t endSecSinceMidnight;
@@ -37,7 +37,7 @@ struct Schedule {
   uint32_t adjustedTimes[24];  // Máximo 24 doses por dia
   uint8_t  adjustedTimesCount;
   // [FIX] Volumes individuais por dose (backend calcula para garantir total exato)
-  uint16_t doseVolumes[24];  // Volume específico de cada dose
+  float doseVolumes[24];  // Volume específico de cada dose
   uint8_t  doseVolumesCount;
 };
 
@@ -46,10 +46,12 @@ struct DoseJob {
   uint32_t pumpId;
   uint32_t scheduleId;
   uint32_t whenEpoch;
-  uint16_t volumeMl;
+  float volumeMl;
   bool     executed;
   uint8_t  retries;
   uint16_t minGapSec;  // [NOVO] Intervalo mínimo entre bombas (segundos)
+  uint8_t  doseIndex;   // [NOVO] 1..dosesPerDay (posição da dose na schedule)
+
 };
 
 struct ManualRun {
@@ -59,7 +61,7 @@ struct ManualRun {
   uint32_t startMs;
   uint32_t durationMs;
   uint32_t scheduleId;
-  uint16_t volumeMl;
+  float volumeMl;
   const char* origin;
 };
 
@@ -69,8 +71,15 @@ struct ActiveRun {
   uint32_t endMs;
   uint32_t pumpId;
   uint32_t scheduleId;
-  uint16_t volumeMl;
+  float volumeMl;
   const char* origin;
+  uint8_t  doseIndex;   
+
+};
+
+struct LastDoseInfo {
+  uint32_t lastEpoch;
+  uint8_t  lastDoseIndex;
 };
 
 
@@ -90,6 +99,9 @@ private:
 
   int       pumpPins[MAX_PUMPS];
 
+  LastDoseInfo lastAutoDose[MAX_PUMPS];
+
+
   uint32_t lastAnyExecEpoch = 0;    // horário da última dose automática (qualquer bomba)
   uint32_t lastPumpIdExec   = 0;    // pumpId da última dose automática
 
@@ -97,11 +109,13 @@ private:
   uint32_t  lastDailyExecuted = 0;
 
   typedef std::function<void(uint32_t pumpId,
-                            uint16_t volumeMl,
+                            float volumeMl,
                             uint32_t scheduleId,
                             uint32_t whenEpoch,
                             const char* status,
-                            const char* origin)> ExecutionCallback;
+                            const char* origin,
+                            uint8_t doseIndex)> ExecutionCallback; 
+
 
   ExecutionCallback onExecutionCallback = nullptr;
 
@@ -114,7 +128,7 @@ public:
   void rebuildJobs(time_t now);
   void loop(time_t now);
 
-  void startManualDose(uint8_t pumpIdx, uint16_t volumeMl,
+  void startManualDose(uint8_t pumpIdx, float volumeMl,
                      uint32_t scheduleId, uint32_t pumpIdOverride = 0);
   void stopManualDose(uint32_t pumpId);
 
@@ -131,9 +145,11 @@ public:
 private:
   uint32_t parseTimeToSeconds(const String& timeStr);
   void     startAutoRun(uint8_t pumpIdx, uint32_t durationMs,
-                        uint32_t pumpId, uint32_t scheduleId, uint16_t volumeMl);
+                        uint32_t pumpId, uint32_t scheduleId, float volumeMl, uint8_t doseIndex);
   void     processActiveRuns(uint32_t nowMs, time_t nowSec);
   void     resolveTimeConflicts();  // [NOVO] Escalonar jobs com horários conflitantes
+
+  bool     canStartAutoDose(uint8_t pumpIdx, uint8_t doseIndex, uint32_t nowEpoch); // ✅ NOVA
 
   void     saveConfigToFile(const JsonDocument& config);
 };

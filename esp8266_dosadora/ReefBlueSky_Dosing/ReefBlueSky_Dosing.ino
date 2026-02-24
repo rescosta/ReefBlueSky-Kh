@@ -5,7 +5,7 @@
 #include "OtaUpdate.h"
 
 const char* FW_DEVICE_TYPE = "DOSER";
-const char* FW_VERSION     = "RBS_DOSER_260131.bin";
+const char* FW_VERSION     = "RBS_DOSER_260204.bin";
 
 #ifdef ESP8266
   #include <ESP8266WiFi.h>
@@ -111,10 +111,10 @@ void setup() {
   // 6. DoserControl init
   doser = new DoserControl();
   doser->initPins(DOSER_PUMP_PINS);  // [FIX] Usar constante correta (6 bombas)
-  doser->onExecution([](uint32_t pumpId, uint16_t volumeMl,
+  doser->onExecution([](uint32_t pumpId, float volumeMl,
                         uint32_t scheduleId, uint32_t whenEpoch,
-                        const char* status, const char* origin) {
-    handleExecution(pumpId, volumeMl, scheduleId, whenEpoch, status, origin);
+                        const char* status, const char* origin, uint8_t doseIndex) {
+    handleExecution(pumpId, volumeMl, scheduleId, whenEpoch, status, origin, doseIndex);
   });
 
   // 7. Handshake inicial: SEMPRE tentar config do servidor primeiro
@@ -372,11 +372,18 @@ void setupCloud() {
 }
 
 
-void handleExecution(uint32_t pumpId, uint16_t volumeMl,
+void handleExecution(uint32_t pumpId, float volumeMl,
                      uint32_t scheduleId, uint32_t whenEpoch,
-                     const char* status, const char* origin) {
-  Serial.printf("[EXEC] PumpId=%lu Volume=%u Sched=%lu When=%lu Status=%s Origin=%s\n",
-                pumpId, volumeMl, scheduleId, whenEpoch, status, origin);
+                     const char* status, const char* origin, uint8_t doseIndex) {
+  Serial.printf("[EXEC] PumpId=%lu Volume=%.2f Sched=%lu When=%lu Status=%s Origin=%s\n",
+                (unsigned long)pumpId,
+                (double)volumeMl,
+                (unsigned long)scheduleId,
+                (unsigned long)whenEpoch,
+                status,
+                origin,
+                (unsigned int)doseIndex);
+
 
   if (cloudAuth && cloudAuth->isAuthenticated()) {
     uint32_t scheduledAt = 0;
@@ -387,13 +394,24 @@ void handleExecution(uint32_t pumpId, uint16_t volumeMl,
       scheduledAt = 0;               // MANUAL → sem agendamento
     }
 
+    // [FIX TIMEZONE] whenEpoch vem em horário local (nowUsr), converter para UTC
+    // DoserControl recebe nowUsr = nowUtc + offset, então para voltar: whenUtc = whenLocal - offset
+    uint32_t whenEpochUTC = whenEpoch - g_userUtcOffsetSec;
+
+    Serial.printf("[EXEC] Timezone conversion: Local=%lu UTC=%lu (offset=%ld)\n",
+                  (unsigned long)whenEpoch,
+                  (unsigned long)whenEpochUTC,
+                  (long)g_userUtcOffsetSec);
+
     cloudAuth->reportDosingExecution(
       pumpId,
       volumeMl,
       scheduledAt,
-      whenEpoch,
+      whenEpochUTC,  // [FIX] Agora envia em UTC
       status,
-      origin
+      origin,
+      scheduleId,
+      doseIndex
     );
   }
 }

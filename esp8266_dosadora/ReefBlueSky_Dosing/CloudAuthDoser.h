@@ -91,7 +91,8 @@ public:
   bool ensureTokenFresh();
   bool fetchDoserConfig(JsonDocument& outConfig);
   bool sendDoserStatus(uint32_t uptime, int8_t rssi, const JsonDocument& pumpsStatus);
-  bool reportDosingExecution(uint32_t pumpId, uint16_t volumeMl, uint32_t scheduledAt, uint32_t executedAt, const char* status, const char* origin);
+  bool reportDosingExecution(uint32_t pumpId, float volumeMl, uint32_t scheduledAt, uint32_t executedAt, const char* status, const char* origin, uint32_t scheduleId, uint8_t doseIndex);
+
 
   String getAuthHeader() const;
 
