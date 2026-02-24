@@ -19,10 +19,10 @@ void SensorManager::begin() {
 
     pinMode(_ph_pin, INPUT);
 
-    // Sensores ópticos de nível (saída digital)
-    pinMode(LEVEL_A_PIN, INPUT);
-    pinMode(LEVEL_B_PIN, INPUT);
-    pinMode(LEVEL_C_PIN, INPUT);
+    // Sensores de nível (saída digital open-drain — requer pull-up interno)
+    pinMode(LEVEL_A_PIN, INPUT_PULLUP);
+    pinMode(LEVEL_B_PIN, INPUT_PULLUP);
+    pinMode(LEVEL_C_PIN, INPUT_PULLUP);
 
     _sensors->begin();
 
@@ -51,94 +51,103 @@ float SensorManager::getTemperature() {
 int SensorManager::getLevelA() {
     if (!_levelAEnabled) return 0;
 
-    // [SIMULAÇÃO] Retornar valor simulado se modo teste ativo
-    if (_levelSimulationEnabled) {
-        return _simulatedLevelA;
+    // Debounce baseado em tempo: exige sinal estável por DEBOUNCE_MS
+    // Imune a glitches elétricos causados por outros sensores no mesmo barramento
+    static int           stableA  = -1;   // -1 = não inicializado ainda
+    static int           pendingA = -1;
+    static unsigned long tPendA   = 0;
+    const unsigned long  DEBOUNCE_MS = 80;
+
+    int raw     = digitalRead(LEVEL_A_PIN);
+    int logical = (raw == LOW) ? 1 : 0;   // HIGH=seco(0), LOW=molhado(1)
+
+    if (stableA < 0) {
+        stableA = logical;                 // inicializa imediatamente no boot
+        return stableA;
     }
 
-    static int stableStatusA = 0;
-    static int lastLogicalA  = -1;
-    static int sameCountA    = 0;
-    const int REQUIRED_SAME  = 3;
-
-    int raw     = digitalRead(LEVEL_A_PIN);      // HIGH=seco, LOW=molhado
-    int logical = (raw == LOW) ? 1 : 0;          // 1 = com água
-
-    if (logical == lastLogicalA) {
-        if (sameCountA < REQUIRED_SAME) sameCountA++;
-    } else {
-        sameCountA   = 1;
-        lastLogicalA = logical;
+    if (logical == stableA) {
+        pendingA = -1;                     // voltou ao estado estável: cancela transição
+        return stableA;
     }
 
-    if (sameCountA == REQUIRED_SAME && logical != stableStatusA) {
-        stableStatusA = logical;
-        Serial.printf("[LEVEL A] RAW=%d -> %d\n", raw, stableStatusA);
+    // Valor diferente do estável: só aceita após DEBOUNCE_MS contínuos
+    if (pendingA != logical) {
+        pendingA = logical;
+        tPendA   = millis();
+    } else if (millis() - tPendA >= DEBOUNCE_MS) {
+        stableA  = logical;
+        pendingA = -1;
+        Serial.printf("[LEVEL A] -> %d\n", stableA);
     }
 
-    return stableStatusA;
+    return stableA;
 }
 
 int SensorManager::getLevelB() {
     if (!_levelBEnabled) return 0;
 
-    // [SIMULAÇÃO] Retornar valor simulado se modo teste ativo
-    if (_levelSimulationEnabled) {
-        return _simulatedLevelB;
-    }
-
-    static int stableStatusB = 0;
-    static int lastLogicalB  = -1;
-    static int sameCountB    = 0;
-    const int REQUIRED_SAME  = 3;
+    static int           stableB  = -1;
+    static int           pendingB = -1;
+    static unsigned long tPendB   = 0;
+    const unsigned long  DEBOUNCE_MS = 80;
 
     int raw     = digitalRead(LEVEL_B_PIN);
     int logical = (raw == LOW) ? 1 : 0;
 
-    if (logical == lastLogicalB) {
-        if (sameCountB < REQUIRED_SAME) sameCountB++;
-    } else {
-        sameCountB   = 1;
-        lastLogicalB = logical;
+    if (stableB < 0) {
+        stableB = logical;
+        return stableB;
     }
 
-    if (sameCountB == REQUIRED_SAME && logical != stableStatusB) {
-        stableStatusB = logical;
-        Serial.printf("[LEVEL B] RAW=%d -> %d\n", raw, stableStatusB);
+    if (logical == stableB) {
+        pendingB = -1;
+        return stableB;
     }
 
-    return stableStatusB;
+    if (pendingB != logical) {
+        pendingB = logical;
+        tPendB   = millis();
+    } else if (millis() - tPendB >= DEBOUNCE_MS) {
+        stableB  = logical;
+        pendingB = -1;
+        Serial.printf("[LEVEL B] -> %d\n", stableB);
+    }
+
+    return stableB;
 }
 
 int SensorManager::getLevelC() {
     if (!_levelCEnabled) return 0;
 
-    // [SIMULAÇÃO] Retornar valor simulado se modo teste ativo
-    if (_levelSimulationEnabled) {
-        return _simulatedLevelC;
-    }
-
-    static int stableStatusC = 0;
-    static int lastLogicalC  = -1;
-    static int sameCountC    = 0;
-    const int REQUIRED_SAME  = 3;
+    static int           stableC  = -1;
+    static int           pendingC = -1;
+    static unsigned long tPendC   = 0;
+    const unsigned long  DEBOUNCE_MS = 80;
 
     int raw     = digitalRead(LEVEL_C_PIN);
     int logical = (raw == LOW) ? 1 : 0;
 
-    if (logical == lastLogicalC) {
-        if (sameCountC < REQUIRED_SAME) sameCountC++;
-    } else {
-        sameCountC   = 1;
-        lastLogicalC = logical;
+    if (stableC < 0) {
+        stableC = logical;
+        return stableC;
     }
 
-    if (sameCountC == REQUIRED_SAME && logical != stableStatusC) {
-        stableStatusC = logical;
-        Serial.printf("[LEVEL C] RAW=%d -> %d\n", raw, stableStatusC);
+    if (logical == stableC) {
+        pendingC = -1;
+        return stableC;
     }
 
-    return stableStatusC;
+    if (pendingC != logical) {
+        pendingC = logical;
+        tPendC   = millis();
+    } else if (millis() - tPendC >= DEBOUNCE_MS) {
+        stableC  = logical;
+        pendingC = -1;
+        Serial.printf("[LEVEL C] -> %d\n", stableC);
+    }
+
+    return stableC;
 }
 
 
@@ -256,24 +265,3 @@ bool SensorManager::isLevelAEnabled() const { return _levelAEnabled; }
 bool SensorManager::isLevelBEnabled() const { return _levelBEnabled; }
 bool SensorManager::isLevelCEnabled() const { return _levelCEnabled; }
 
-// [SIMULAÇÃO] Métodos para modo teste
-void SensorManager::setSimulatedLevelA(int value) {
-    _simulatedLevelA = value;
-}
-
-void SensorManager::setSimulatedLevelB(int value) {
-    _simulatedLevelB = value;
-}
-
-void SensorManager::setSimulatedLevelC(int value) {
-    _simulatedLevelC = value;
-}
-
-void SensorManager::enableLevelSimulation(bool enable) {
-    _levelSimulationEnabled = enable;
-    Serial.printf("[SensorManager] Simulação de níveis: %s\n", enable ? "ATIVADA" : "DESATIVADA");
-}
-
-bool SensorManager::isLevelSimulationEnabled() const {
-    return _levelSimulationEnabled;
-}

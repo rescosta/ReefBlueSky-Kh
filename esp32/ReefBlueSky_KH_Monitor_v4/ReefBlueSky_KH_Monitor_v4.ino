@@ -41,7 +41,7 @@ void wifiFactoryReset();
 
 
 const char* FW_DEVICE_TYPE = "KH";
-const char* FW_VERSION     = "RBS_KH_260126.bin";
+const char* FW_VERSION     = "RBS_KH_260201.bin";
 
 extern CloudAuth cloudAuth;
 
@@ -61,7 +61,31 @@ WebServer webServer(80);
 
 bool khCalibRunning = false;
 unsigned long khCalibLastStepMs = 0;
-const unsigned long KH_CALIB_STEP_INTERVAL_MS = 100; // quanto menor, mais “tempo real”
+const unsigned long KH_CALIB_STEP_INTERVAL_MS = 100; // quanto menor, mais "tempo real"
+
+bool khAnalyzerRunning = false;
+unsigned long khAnalyzerLastStepMs = 0;
+const unsigned long KH_ANALYZER_STEP_INTERVAL_MS = 100;
+
+// Intervalo de envio de progresso KH para o backend (a cada 1 s durante ciclo ativo)
+static unsigned long khProgressLastSentMs = 0;
+const unsigned long KH_PROGRESS_SEND_INTERVAL_MS = 1000;
+
+// Dreno de câmaras (kh_drain): descarrega A+B+C de volta ao aquário
+bool khDrainRunning = false;
+unsigned long khDrainStartMs = 0;
+const unsigned long KH_DRAIN_DURATION_MS = 30000UL; // 30 s de descarga simultânea
+
+// System flush: limpeza inteligente com proteções de sensor
+bool systemFlushRunning = false;
+unsigned long systemFlushStartMs = 0;
+unsigned long systemFlushDurationMs = 300000UL; // 5 min padrão (atualizado se calibrado)
+
+// [NOVO] Teste de enchimento individual de câmaras
+bool fillTestRunning = false;
+unsigned long fillTestStartMs = 0;
+unsigned long fillTestDurationMs = 10000UL;  // 10s padrão
+char fillTestChamber = 'X';  // 'A', 'B' ou 'C'
 
 
 void debugTestStatus() {
@@ -504,22 +528,10 @@ const unsigned long MAX_NO_TOKEN_MS  = 5UL  * 60UL * 1000UL; // 5 min sem Cloud/
 unsigned long lastMeasurementTime = 0;
 unsigned long measurementInterval = 3600000;  // 1 hora em ms
 unsigned long lastResetButtonCheck = 0;
-const unsigned long HEALTH_INTERVAL_MS = 5UL * 1000UL; // 5 segundos (para atualização rápida dos sensores)
+const unsigned long HEALTH_INTERVAL_MS = 2UL * 1000UL; // 2 segundos (atualização rápida dos sensores de nível)
 unsigned long lastHealthSent = 0;
 
 bool resetButtonPressed = false;
-
-bool testModeEnabled = false;  // [FIX] Default false - só ativa se carregar do backend/SPIFFS
-
-// 🔥 SIMULAÇÃO DE SENSORES DE NÍVEL (MODO TESTE)
-struct PumpSimulation {
-  bool active = false;
-  bool forward = true;  // true = normal, false = reverso
-  unsigned long startTime = 0;
-};
-
-PumpSimulation pumpSim[4];  // Para bombas 1, 2, 3, 4
-const unsigned long LEVEL_SIMULATION_DELAY_MS = 5000;  // 5 segundos
 
 // 🔥 COMPRESSOR NON-BLOCKING
 bool compressorActive = false;
@@ -750,26 +762,11 @@ void checkScheduledTest() {
       isScheduledTestRunning = true;
       memset(&lastScheduledTestResult, 0, sizeof(Measurement));
 
-      // Executar medição de KH (bloqueante)
+      // Iniciar medição não-bloqueante — resultado processado na seção 10 do loop
+      Serial.println("[TestSchedule] Iniciando medição não-bloqueante...");
+      debugLog.log("INFO", "Teste agendado iniciando (interval=%dh)", intervalHours);
       performMeasurement();
-
-      // Reportar resultado para o backend
-      if (lastScheduledTestResult.kh > 0) {
-        // Teste bem-sucedido com dados
-        Serial.printf("[TestSchedule] ✓ Teste concluído com sucesso: KH=%.2f\n",
-                     lastScheduledTestResult.kh);
-
-        cloudAuth.reportTestResult(true, "", &lastScheduledTestResult);
-        debugLog.log("INFO", "Teste agendado concluído: KH=%.2f", lastScheduledTestResult.kh);
-      } else {
-        // Teste falhou
-        Serial.println("[TestSchedule] ✗ Teste falhou (sem dados de KH)");
-        cloudAuth.reportTestResult(false, "Measurement failed - no KH data");
-        debugLog.log("ERROR", "Teste agendado falhou");
-      }
-
-      // Resetar flag
-      isScheduledTestRunning = false;
+      systemState = MEASURING;
 
     } else {
       // Ainda não é hora - apenas informativo no debug
@@ -795,7 +792,7 @@ void checkScheduledTest() {
 
 void setup() {
   Serial.begin(115200); delay(1000);
-  initFirmwarePrefs(); 
+  initFirmwarePrefs();
   lastHealthSent = millis() - HEALTH_INTERVAL_MS;
 
   Serial.println("\n\n========================================");
@@ -814,6 +811,11 @@ void setup() {
 
   // 1️⃣ RESET botão (OK)
   //pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
+
+  // ⚠️ [CRITICAL] GPIO 2 NÃO DEVE SER TOCADO!
+  // GPIO 2 é gerenciado internamente pelo módulo WiFi PHY do ESP32
+  // NUNCA usar pinMode/digitalWrite/analogWrite no GPIO 2
+  // PUMP_B_OUT (bit flag 0x02) NÃO é GPIO físico
 
   // 2️⃣ WIFI PRIMEIRO (CRÍTICO!)
   Serial.println("[Main] Iniciando WiFiSetup...");
@@ -903,69 +905,6 @@ void setup() {
 // =================================================================================
 
 // Registrar ativação de bomba (chamado quando bomba é ligada)
-void registerPumpActivation(int pumpIndex, bool forward) {
-  if (pumpIndex < 0 || pumpIndex >= 4) return;
-
-  pumpSim[pumpIndex].active = true;
-  pumpSim[pumpIndex].forward = forward;
-  pumpSim[pumpIndex].startTime = millis();
-
-  Serial.printf("[SIMULATION] Bomba %d ativada (sentido: %s)\n",
-                pumpIndex + 1, forward ? "NORMAL" : "REVERSO");
-}
-
-// Registrar desativação de bomba
-void registerPumpDeactivation(int pumpIndex) {
-  if (pumpIndex < 0 || pumpIndex >= 4) return;
-  pumpSim[pumpIndex].active = false;
-  Serial.printf("[SIMULATION] Bomba %d desativada\n", pumpIndex + 1);
-}
-
-// Atualizar simulação dos sensores baseado no estado das bombas
-void updateLevelSimulation() {
-  if (!testModeEnabled) {
-    // Desabilitar simulação se testMode não estiver ativo
-    if (sensorManager.isLevelSimulationEnabled()) {
-      sensorManager.enableLevelSimulation(false);
-    }
-    return;
-  }
-
-  // Habilitar simulação quando testMode ativo
-  if (!sensorManager.isLevelSimulationEnabled()) {
-    sensorManager.enableLevelSimulation(true);
-  }
-
-  unsigned long now = millis();
-
-  // Bomba 1 → Câmara A
-  if (pumpSim[0].active) {
-    unsigned long elapsed = now - pumpSim[0].startTime;
-    if (elapsed >= LEVEL_SIMULATION_DELAY_MS) {
-      // Após 5s: normal=1 (enche), reverso=0 (esvazia)
-      int level = pumpSim[0].forward ? 1 : 0;
-      sensorManager.setSimulatedLevelA(level);
-    }
-  }
-
-  // Bomba 2 → Câmara B
-  if (pumpSim[1].active) {
-    unsigned long elapsed = now - pumpSim[1].startTime;
-    if (elapsed >= LEVEL_SIMULATION_DELAY_MS) {
-      int level = pumpSim[1].forward ? 1 : 0;
-      sensorManager.setSimulatedLevelB(level);
-    }
-  }
-
-  // Bomba 3 → Câmara C
-  if (pumpSim[2].active) {
-    unsigned long elapsed = now - pumpSim[2].startTime;
-    if (elapsed >= LEVEL_SIMULATION_DELAY_MS) {
-      int level = pumpSim[2].forward ? 1 : 0;
-      sensorManager.setSimulatedLevelC(level);
-    }
-  }
-}
 
 // =================================================================================
 // Loop Principal
@@ -1067,6 +1006,9 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
       khCalibrator.start(khRefUser, assumeEmpty);
       khCalibRunning    = true;
       khCalibLastStepMs = millis();
+      // Envia progresso imediatamente ao iniciar
+      khProgressLastSentMs = millis();
+      sendCalibProgress();
     }
     
     // Toggle sensores nível
@@ -1102,21 +1044,11 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
     checkScheduledTest();
   }
 
-  // 🔥 2.6 DEVICE CONFIG - Polling de configurações (testMode)
+  // 🔥 2.6 DEVICE CONFIG - Polling de configurações (intervalHours)
   if (now - lastDeviceConfigCheck >= DEVICE_CONFIG_CHECK_MS) {
     lastDeviceConfigCheck = now;
-    bool serverTestMode = false;
-    if (cloudAuth.fetchDeviceConfig(serverTestMode)) {
-      if (serverTestMode != testModeEnabled) {
-        testModeEnabled = serverTestMode;
-        Serial.printf("[CONFIG] Modo teste %s pelo servidor\n", testModeEnabled ? "ATIVADO" : "DESATIVADO");
-        if (testModeEnabled) {
-          sensorManager.enableLevelSimulation(true);
-        } else {
-          sensorManager.enableLevelSimulation(false);
-        }
-      }
-    }
+    bool unused = false;
+    cloudAuth.fetchDeviceConfig(unused);
   }
 
   // 🔥 3. WEB SERVER
@@ -1149,15 +1081,14 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
         forceImmediateMeasurement = false;
         debugLog.log("INFO", "Manual measurement triggered");
         systemState = MEASURING;
-      } else if (testModeEnabled && shouldMeasure()) {
-        debugLog.log("INFO", "Auto measurement triggered (testMode ON, interval reached)");
-        systemState = MEASURING;
       }
       break;
 
     case MEASURING:
-      performMeasurement();
-      systemState = PREDICTING;
+      // FSM não-bloqueante gerenciada pela seção 10 do loop
+      if (!khAnalyzerRunning) {
+        performMeasurement();  // inicia o ciclo; define khAnalyzerRunning = true
+      }
       break;
 
     case PREDICTING:
@@ -1172,21 +1103,21 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
         calibrateAiSensors();
       }
       
-      if (sensorManager.getLevelB() > 70) {
-        systemState = AI_KH_RENEW_A;  // ← TAMBÉM UNDERSCORE
+      if (sensorManager.getLevelB() == 1) {  // [FIX] getLevelB() retorna 0 ou 1
+        systemState = AI_KH_RENEW_A;
         Serial.println("✅ pH calibrado + IA ATIVA! Renovando A...");
       }
       break;
 
     case AI_KH_RENEW_A:
-      if (sensorManager.getLevelA() > 80) {
+      if (sensorManager.getLevelA() == 1) {  // [FIX] getLevelA() retorna 0 ou 1
         systemState = AI_KH_TEST_A_TO_B;
         Serial.println("✅ A renovado → Teste KH");
       }
       break;
 
     case AI_KH_TEST_A_TO_B:
-      if (sensorManager.getLevelB() > 70) {
+      if (sensorManager.getLevelB() == 1) {  // [FIX] getLevelB() retorna 0 ou 1
         systemState = AI_KH_CLEAN_B_TO_C;
         Serial.println("✅ KH medido → Limpando");
         performMeasurement();
@@ -1194,14 +1125,14 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
       break;
 
     case AI_KH_CLEAN_B_TO_C:
-      if (sensorManager.getLevelB() < 20) {
+      if (sensorManager.getLevelB() == 0) {  // [FIX] getLevelB() retorna 0 ou 1
         systemState = AI_PREP_NEW_TEST;
         Serial.println("✅ B limpo → Prep novo");
       }
       break;
 
     case AI_PREP_NEW_TEST:
-      if (sensorManager.getLevelA() < 10 && sensorManager.getLevelB() < 10) {
+      if (sensorManager.getLevelA() == 0 && sensorManager.getLevelB() == 0) {  // [FIX]
         systemState = IDLE;
         Serial.println("🎉 Pronto para novo teste!");
       }
@@ -1217,9 +1148,6 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
   // Periodic log sync (independent of health)
   debugLog.syncToServer();
 
-  // [SIMULAÇÃO] Atualizar simulação de sensores de nível (modo teste)
-  updateLevelSimulation();
-
   static unsigned long lastDebug = 0;
   if (now - lastDebug > 6000) {
     lastDebug = now;
@@ -1228,12 +1156,14 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
               (int)systemState);
   }
 
+  // Leitura rápida de sensores a cada 100ms para alimentar o debounce temporal (80ms)
   static unsigned long lastLevelDebug = 0;
-  if (now - lastLevelDebug > 4000) {
+  if (now - lastLevelDebug >= 100) {
     lastLevelDebug = now;
-    Serial.printf("[LEVEL] A=%d B=%d C=%d\n",
-                  sensorManager.getLevelA(), sensorManager.getLevelB(),
-                  sensorManager.getLevelC());
+    int la = sensorManager.getLevelA();
+    int lb = sensorManager.getLevelB();
+    int lc = sensorManager.getLevelC();
+    Serial.printf("[LEVEL] A=%d B=%d C=%d\n", la, lb, lc);
   }
 
   // 🔥 7. DIAG WiFi GERAL + MEMORY (a cada 30s)
@@ -1265,7 +1195,52 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
     if (now - khCalibLastStepMs >= KH_CALIB_STEP_INTERVAL_MS) {
       khCalibLastStepMs = now;
 
+      // [FIX] Verificar ANTES de processStep() para evitar race condition
+      // (processStep muda estado de CAL_KH_TEST_START -> CAL_KH_TEST_WAIT na mesma chamada)
+      bool needsTest = khCalibrator.needsKhTestCycle();
+      Serial.printf("[DEBUG] ANTES processStep: needsKhTestCycle=%d khAnalyzerRunning=%d\n", needsTest, khAnalyzerRunning);
+
       bool stillRunning = khCalibrator.processStep();
+
+      // Passo 5 da calibracao: inicia KH_Analyzer se necessário
+      if (needsTest && !khAnalyzerRunning) {
+        Serial.println("[KH_Calib] Passo 5: iniciando ciclo KH_Analyzer (medicao de referencia)...");
+
+        // [FIX] Configurar KH de referência no KH_Analyzer antes de iniciar
+        KH_Calibrator::Result calibResult = khCalibrator.getResult();
+        Serial.printf("[DEBUG] kh_ref_user da calibracao: %.2f\n", calibResult.kh_ref_user);
+
+        if (calibResult.kh_ref_user > 0) {
+          Serial.printf("[KH_Calib] Configurando KH de referencia: %.2f dKH\n", calibResult.kh_ref_user);
+          khAnalyzer.setReferenceKH(calibResult.kh_ref_user);
+        } else {
+          Serial.println("[KH_Calib] AVISO: kh_ref_user <= 0, pulando setReferenceKH");
+        }
+
+        Serial.println("[DEBUG] Tentando iniciar KH_Analyzer.startMeasurementCycle(true) [MODO CALIBRACAO]...");
+        if (khAnalyzer.startMeasurementCycle(true)) {  // true = modo calibração (pula preparação)
+          khAnalyzerRunning    = true;
+          khAnalyzerLastStepMs = millis();
+          Serial.println("[KH_Analyzer] INICIADO com sucesso durante calibracao (modo direto para compressor)");
+        } else {
+          Serial.println("[KH_Calib] ERRO: nao foi possivel iniciar KH_Analyzer no Passo 5");
+          String errMsg = khAnalyzer.getErrorMessage();
+          Serial.printf("[KH_Calib] Motivo: %s\n", errMsg.c_str());
+          // [FIX] Sinaliza erro ao calibrador para não travar
+          khCalibrator.onKhTestComplete(0.0f, 0.0f);  // força erro
+        }
+      } else if (!needsTest) {
+        Serial.println("[DEBUG] needsKhTestCycle() retornou FALSE - pulando ciclo de teste");
+      } else if (khAnalyzerRunning) {
+        Serial.println("[DEBUG] khAnalyzerRunning já está TRUE");
+      }
+
+      // Enviar progresso ao backend a cada 1 s
+      if (now - khProgressLastSentMs >= KH_PROGRESS_SEND_INTERVAL_MS) {
+        khProgressLastSentMs = now;
+        sendCalibProgress();
+      }
+
       if (!stillRunning) {
         khCalibRunning = false;
 
@@ -1273,19 +1248,152 @@ if (now - lastLevelDebug > 1000) { // 1 s, ajuste se quiser
         if (khCalibrator.hasError()) {
           Serial.printf("[KH_Calib] ERRO: %s\n", res.error.c_str());
           debugLog.log("ERROR", "KH Calibration FAILED: %s", res.error.c_str());
-
-          // [FIX] Enviar alerta de falha de calibração (Telegram/Email)
-          sendAlert("Falha na Calibração", res.error, "high");
+          sendAlert("Falha na Calibracao", res.error, "high");
+          sendKhProgressToCloud(false, "calibration", "ERRO: " + res.error,
+                                -1, 0,
+                                sensorManager.getLevelA(), sensorManager.getLevelB(),
+                                sensorManager.getLevelC(),
+                                sensorManager.getPH(), sensorManager.getTemperature());
         } else {
           Serial.printf("[KH_Calib] OK: kh_ref=%.2f ph_ref=%.2f temp=%.2f b1=%.4f b2=%.4f b3=%.4f\n",
-                        res.kh_ref_user,
-                        res.ph_ref_measured,
-                        res.temp_ref,
-                        res.mlps_b1,
-                        res.mlps_b2,
-                        res.mlps_b3);
+                        res.kh_ref_user, res.ph_ref_measured, res.temp_ref,
+                        res.mlps_b1, res.mlps_b2, res.mlps_b3);
+          sendKhProgressDone("calibration", "Calibracao concluida!");
         }
       }
+    }
+  }
+
+  // 🔧 10. KH ANALYZER FSM (não-bloqueante)
+  if (khAnalyzerRunning) {
+    if (now - khAnalyzerLastStepMs >= KH_ANALYZER_STEP_INTERVAL_MS) {
+      khAnalyzerLastStepMs = now;
+
+      bool stillRunning = khAnalyzer.processNextPhase();
+
+      // Enviar progresso ao backend a cada 1 s
+      if (now - khProgressLastSentMs >= KH_PROGRESS_SEND_INTERVAL_MS) {
+        khProgressLastSentMs = now;
+        sendMeasureProgress();
+      }
+
+      if (!stillRunning) {
+        khAnalyzerRunning = false;
+        Serial.println("[KH_Analyzer] TERMINOU");
+
+        if (khAnalyzer.hasError()) {
+          String errMsg = khAnalyzer.getErrorMessage();
+          Serial.printf("[KH_Measure] ERRO: %s\n", errMsg.c_str());
+          debugLog.log("ERROR", "KH Measurement FAILED: %s", errMsg.c_str());
+          sendAlert("Falha na Medicao de KH", errMsg, "high");
+          sendKhProgressToCloud(false, "measurement", "ERRO: " + errMsg,
+                                -1, 0,
+                                sensorManager.getLevelA(), sensorManager.getLevelB(),
+                                sensorManager.getLevelC(),
+                                sensorManager.getPH(), sensorManager.getTemperature());
+
+          if (isScheduledTestRunning) {
+            cloudAuth.reportTestResult(false, errMsg);
+            isScheduledTestRunning = false;
+          }
+          systemState = IDLE;
+
+        } else if (khCalibRunning) {
+          // Passo 5 da calibracao: passa pH_ref e temperatura para o calibrador
+          float ph_ref  = khAnalyzer.getPhRef();
+          float temp_ref = khAnalyzer.getTemperature();
+          Serial.printf("[KH_Calib] Passo 5 concluido: ph_ref=%.2f temp=%.2f\n",
+                        ph_ref, temp_ref);
+          khCalibrator.onKhTestComplete(ph_ref, temp_ref);
+          // khCalibRunning continua true; seção 9 continuará o FSM (CAL_SAVE → CAL_COMPLETE)
+
+        } else {
+          handleMeasurementResult();
+          sendKhProgressDone("measurement", "Medicao concluida!");
+
+          if (isScheduledTestRunning) {
+            if (lastScheduledTestResult.kh > 0) {
+              Serial.printf("[TestSchedule] ✓ Teste concluído: KH=%.2f\n",
+                            lastScheduledTestResult.kh);
+              debugLog.log("INFO", "Teste agendado concluído: KH=%.2f",
+                           lastScheduledTestResult.kh);
+              cloudAuth.reportTestResult(true, "", &lastScheduledTestResult);
+            } else {
+              Serial.println("[TestSchedule] ✗ Teste falhou (sem dados de KH)");
+              cloudAuth.reportTestResult(false, "Measurement failed - no KH data");
+              debugLog.log("ERROR", "Teste agendado falhou");
+            }
+            isScheduledTestRunning = false;
+          }
+          systemState = PREDICTING;
+        }
+      }
+    }
+  }
+
+  // 🔧 11. KH DRAIN: descarrega câmaras A/B/C → aquário
+  if (khDrainRunning) {
+    if (now - khDrainStartMs >= KH_DRAIN_DURATION_MS) {
+      pumpControl.pumpC_stop();
+      pumpControl.pumpB_stop();
+      pumpControl.pumpA_stop();
+      khDrainRunning = false;
+      Serial.println("[KH_Drain] Dreno concluido.");
+    }
+  }
+
+  // 🔧 12. SYSTEM FLUSH: limpeza inteligente com proteções de sensor
+  if (systemFlushRunning) {
+    // Proteção A: se A cheio, pausa bomba B (B está enchendo A mais rápido que A drena)
+    bool a = (sensorManager.getLevelA() == 1);
+    bool b = (sensorManager.getLevelB() == 1);
+
+    if (a && pumpControl.isPumpRunning(2)) {
+      pumpControl.pumpB_stop();
+      Serial.println("[FLUSH] Sensor A ativo - pausando bomba B");
+    } else if (!a && !pumpControl.isPumpRunning(2)) {
+      pumpControl.pumpB_discharge();
+      Serial.println("[FLUSH] Sensor A inativo - retomando bomba B");
+    }
+
+    // Proteção B: se B cheio, pausa bomba C (C está enchendo B mais rápido que B drena)
+    if (b && pumpControl.isPumpRunning(3)) {
+      pumpControl.pumpC_stop();
+      Serial.println("[FLUSH] Sensor B ativo - pausando bomba C");
+    } else if (!b && !pumpControl.isPumpRunning(3)) {
+      pumpControl.pumpC_discharge();
+      Serial.println("[FLUSH] Sensor B inativo - retomando bomba C");
+    }
+
+    // Timeout: encerra após tempo calculado
+    if (now - systemFlushStartMs >= systemFlushDurationMs) {
+      pumpControl.stopAll();
+      systemFlushRunning = false;
+      Serial.printf("[FLUSH] Flush concluido (%.1f s).\n",
+                    (now - systemFlushStartMs) / 1000.0f);
+    }
+  }
+
+  // 🔧 13. FILL TEST: teste de enchimento individual de câmaras (não-bloqueante)
+  if (fillTestRunning) {
+    if (now - fillTestStartMs >= fillTestDurationMs) {
+      // Para a bomba apropriada
+      switch (fillTestChamber) {
+        case 'A':
+          pumpControl.pumpA_stop();
+          Serial.println("[FILL_TEST] Câmara A: enchimento concluído");
+          break;
+        case 'B':
+          pumpControl.pumpB_stop();
+          Serial.println("[FILL_TEST] Câmara B: enchimento concluído");
+          break;
+        case 'C':
+          pumpControl.pumpC_stop();
+          Serial.println("[FILL_TEST] Câmara C: enchimento concluído");
+          break;
+      }
+      fillTestRunning = false;
+      fillTestChamber = 'X';
     }
   }
 }
@@ -1465,32 +1573,8 @@ void handleSetKH() {
   }
 }
 
-void handleTestMode() {
-  if (!webServer.hasArg("enabled")) {
-    webServer.send(400, "application/json",
-                   "{\"error\":\"missing_enabled_param\"}");
-    return;
-  }
-  String v = webServer.arg("enabled");
-  testModeEnabled = (v == "1" || v == "true");
-  saveConfigToSPIFFS();  // [NOVO] Salvar no SPIFFS para persistir após reboot
-  webServer.send(200, "application/json",
-                 String("{\"success\":true,\"testModeEnabled\":") +
-                 (testModeEnabled ? "true" : "false") + "}");
-}
-
 void handleTestNow() {
-  // 1) Test mode precisa estar ligado
-  if (!testModeEnabled) {
-    webServer.send(
-      400,
-      "application/json",
-      "{\"success\":false,\"error\":\"test_mode_disabled\"}"
-    );
-    return;
-  }
-
-  // 2) Precisa ter KH de referência configurado
+  // Precisa ter KH de referência configurado
   if (!khAnalyzer.isReferenceKHConfigured()) {
     webServer.send(
       400,
@@ -1546,17 +1630,171 @@ void handleLcdState() {
   webServer.send(200, "application/json", json);
 }
 
+// =================================================================================
+// [NOVO] Handlers para teste de enchimento de câmaras
+// =================================================================================
+
+void handleFillA() {
+  Serial.println("[WEB] Comando recebido: encher câmara A (aquário→A)");
+
+  // [PRIORIDADE] Rejeita se calibração ou teste KH estiver rodando
+  if (khCalibRunning || khAnalyzerRunning) {
+    webServer.send(409, "application/json",
+      "{\"success\":false,\"error\":\"calibration_or_test_running\","
+      "\"message\":\"Calibração ou teste de KH em andamento. Aguarde conclusão.\"}");
+    Serial.println("[FILL_TEST] REJEITADO: calibração/teste em andamento");
+    return;
+  }
+
+  if (fillTestRunning) {
+    webServer.send(400, "application/json",
+      "{\"success\":false,\"error\":\"test_already_running\"}");
+    return;
+  }
+
+  int duration = 10000;  // padrão 10s
+  if (webServer.hasArg("plain")) {
+    DynamicJsonDocument doc(128);
+    deserializeJson(doc, webServer.arg("plain"));
+    duration = doc["duration"] | 10000;
+  }
+
+  fillTestRunning = true;
+  fillTestStartMs = millis();
+  fillTestDurationMs = duration;
+  fillTestChamber = 'A';
+
+  pumpControl.pumpA_fill();  // aquário → A
+
+  webServer.send(200, "application/json",
+    "{\"success\":true,\"message\":\"Enchendo câmara A por " + String(duration/1000) + "s\","
+    "\"warning\":\"Será necessário recalibrar após este comando.\"}");
+
+  Serial.printf("[FILL_TEST] Iniciando enchimento câmara A por %d ms\n", duration);
+}
+
+void handleFillB() {
+  Serial.println("[WEB] Comando recebido: encher câmara B (A→B)");
+
+  // [PRIORIDADE] Rejeita se calibração ou teste KH estiver rodando
+  if (khCalibRunning || khAnalyzerRunning) {
+    webServer.send(409, "application/json",
+      "{\"success\":false,\"error\":\"calibration_or_test_running\","
+      "\"message\":\"Calibração ou teste de KH em andamento. Aguarde conclusão.\"}");
+    Serial.println("[FILL_TEST] REJEITADO: calibração/teste em andamento");
+    return;
+  }
+
+  if (fillTestRunning) {
+    webServer.send(400, "application/json",
+      "{\"success\":false,\"error\":\"test_already_running\"}");
+    return;
+  }
+
+  int duration = 10000;  // padrão 10s
+  if (webServer.hasArg("plain")) {
+    DynamicJsonDocument doc(128);
+    deserializeJson(doc, webServer.arg("plain"));
+    duration = doc["duration"] | 10000;
+  }
+
+  fillTestRunning = true;
+  fillTestStartMs = millis();
+  fillTestDurationMs = duration;
+  fillTestChamber = 'B';
+
+  pumpControl.pumpB_fill();  // A → B
+
+  webServer.send(200, "application/json",
+    "{\"success\":true,\"message\":\"Enchendo câmara B por " + String(duration/1000) + "s\","
+    "\"warning\":\"Será necessário recalibrar após este comando.\"}");
+
+  Serial.printf("[FILL_TEST] Iniciando enchimento câmara B por %d ms\n", duration);
+}
+
+void handleFillC() {
+  Serial.println("[WEB] Comando recebido: encher câmara C (B→C)");
+
+  // [PRIORIDADE] Rejeita se calibração ou teste KH estiver rodando
+  if (khCalibRunning || khAnalyzerRunning) {
+    webServer.send(409, "application/json",
+      "{\"success\":false,\"error\":\"calibration_or_test_running\","
+      "\"message\":\"Calibração ou teste de KH em andamento. Aguarde conclusão.\"}");
+    Serial.println("[FILL_TEST] REJEITADO: calibração/teste em andamento");
+    return;
+  }
+
+  if (fillTestRunning) {
+    webServer.send(400, "application/json",
+      "{\"success\":false,\"error\":\"test_already_running\"}");
+    return;
+  }
+
+  int duration = 10000;  // padrão 10s
+  if (webServer.hasArg("plain")) {
+    DynamicJsonDocument doc(128);
+    deserializeJson(doc, webServer.arg("plain"));
+    duration = doc["duration"] | 10000;
+  }
+
+  fillTestRunning = true;
+  fillTestStartMs = millis();
+  fillTestDurationMs = duration;
+  fillTestChamber = 'C';
+
+  pumpControl.pumpC_fill();  // B → C
+
+  webServer.send(200, "application/json",
+    "{\"success\":true,\"message\":\"Enchendo câmara C por " + String(duration/1000) + "s\","
+    "\"warning\":\"Será necessário recalibrar após este comando.\"}");
+
+  Serial.printf("[FILL_TEST] Iniciando enchimento câmara C por %d ms\n", duration);
+}
+
+void handleFlushAll() {
+  Serial.println("[WEB] Comando recebido: executar ciclo de limpeza completo");
+
+  // [PRIORIDADE] Rejeita se calibração ou teste KH estiver rodando
+  if (khCalibRunning || khAnalyzerRunning) {
+    webServer.send(409, "application/json",
+      "{\"success\":false,\"error\":\"calibration_or_test_running\","
+      "\"message\":\"Calibração ou teste de KH em andamento. Aguarde conclusão.\"}");
+    Serial.println("[FLUSH] REJEITADO: calibração/teste em andamento");
+    return;
+  }
+
+  // Ativa o sistema de flush existente
+  systemFlushRunning = true;
+  systemFlushStartMs = millis();
+
+  // Inicia bombas de drenagem em paralelo
+  pumpControl.pumpA_discharge();  // A → aquário
+  pumpControl.pumpB_discharge();  // B → A
+  pumpControl.pumpC_discharge();  // C → B
+
+  webServer.send(200, "application/json",
+    "{\"success\":true,\"message\":\"Ciclo de limpeza iniciado (5 min)\","
+    "\"warning\":\"Será necessário recalibrar após este comando.\"}");
+
+  Serial.println("[FLUSH] Ciclo de limpeza iniciado via web");
+}
+
 
 void setupWebServer() {
   webServer.on("/factory_reset", HTTP_POST, handleFactoryReset);
   webServer.on("/reset_kh",     HTTP_POST, handleResetKH);
   webServer.on("/set_kh",       HTTP_POST, handleSetKH);
-  webServer.on("/test_mode",    HTTP_POST, handleTestMode);
   webServer.on("/test_now",     HTTP_POST, handleTestNow);
   webServer.on("/status",       HTTP_GET,  handleStatus);
   webServer.on("/lcd_state",    HTTP_GET,  handleLcdState);
 
-  Serial.println("[WEB] Registrando endpoints KH");
+  // [NOVO] Endpoints para teste de enchimento de câmaras
+  webServer.on("/fill_a",       HTTP_POST, handleFillA);
+  webServer.on("/fill_b",       HTTP_POST, handleFillB);
+  webServer.on("/fill_c",       HTTP_POST, handleFillC);
+  webServer.on("/flush_all",    HTTP_POST, handleFlushAll);
+
+  Serial.println("[WEB] Registrando endpoints KH e testes");
   webServer.begin();
   Serial.println("[WEB] Servidor web iniciado na porta 80");
 }
@@ -1763,7 +2001,8 @@ void processCloudCommand() {
     Serial.println("[CMD] ota_update recebido, iniciando OTA...");
     debugLog.log("WARN", "OTA update START");
     debugLog.saveToSPIFFS();  // Save before OTA attempt
-    ok = otaUpdateKh();             // DOSER/LCD: troca para otaUpdateDoser/Lcd
+    otaSetCommandId(cmd.command_id.toInt());  // habilita reporte de progresso
+    ok = otaUpdateKh();
     if (!ok) {
       errorMsg = "OTA failed";
       debugLog.log("ERROR", "OTA update FAILED");
@@ -1780,9 +2019,10 @@ void processCloudCommand() {
       ok = false;
       errorMsg = "KH de referência não configurado. Faça a calibração em Configurações > Calibração de KH.";
     } else {
-      // 2) Roda o ciclo normal de medição
-      performMeasurement();          // usa KH_Analyzer completo
-      ok = true;                     // se quiser, depois podemos checar validade via histórico
+      // 2) Inicia o ciclo não-bloqueante de medição
+      performMeasurement();
+      systemState = MEASURING;
+      ok = true;
     }
   }
 
@@ -2001,33 +2241,146 @@ void processCloudCommand() {
 
 
   } else if (cmd.action == "testmode") {
-    if (cmd.params.isNull()) {
-      ok = false;
-      errorMsg = "missing payload";
-    } else {
-      bool enabled = cmd.params["enabled"] | false;
-      testModeEnabled = enabled;
-      Serial.printf("[CMD] testmode: %s\n", enabled ? "ON" : "OFF");
-      debugLog.log("INFO", "Test mode changed: %s", enabled ? "ON" : "OFF");
-      saveConfigToSPIFFS();  // [NOVO] Salvar no SPIFFS para persistir após reboot
-    }
+    // testMode removido - ignorar comando
+    ok = true;
 
   } else if (cmd.action == "abort") {
     // Para qualquer ciclo em andamento e volta para IDLE
     khAnalyzer.stopMeasurement();
-    forceImmediateMeasurement = false;   // opcional, mas recomendado
+    forceImmediateMeasurement = false;
+    khCalibRunning    = false;
+    khAnalyzerRunning = false;
+    khDrainRunning    = false;
+    systemFlushRunning = false;
+    pumpControl.pumpA_stop();
+    pumpControl.pumpB_stop();
+    pumpControl.pumpC_stop();
+    pumpControl.pumpD_stop();
     systemState = IDLE;
-  }
+    ok = true;
 
-  else if (cmd.action == "khcalibrate") {
-      Serial.println("CMD khcalibrate recebido, iniciando calibração completa de KH...");
+  } else if (cmd.action == "kh_drain") {
+    // Descarrega câmaras A+B+C → aquário (30 s simultâneo)
+    khAnalyzer.stopMeasurement();
+    khCalibRunning    = false;
+    khAnalyzerRunning = false;
+    pumpControl.pumpD_stop();
+    pumpControl.pumpC_discharge();  // C → B
+    pumpControl.pumpB_discharge();  // B → A
+    pumpControl.pumpA_discharge();  // A → aquário
+    khDrainRunning = true;
+    khDrainStartMs = millis();
+    systemState = IDLE;
+    ok = true;
 
-      float khRefUser = 8.0f;      // por enquanto fixo; depois pode ler de config
-      bool assumeEmpty = false;    // ou true se você garantir câmaras vazias
+  } else if (cmd.action == "fillchamber") {
+    // Enchimento individual de câmaras (modo manutenção)
+    String chamber = cmd.params["chamber"];
+    Serial.printf("[CMD] fillchamber: requisitando enchimento de câmara %s\n", chamber.c_str());
+
+    // [PRIORIDADE] Rejeita imediatamente se calibração ou teste KH estiver rodando
+    if (khCalibRunning || khAnalyzerRunning) {
+      errorMsg = "Calibração ou teste de KH em andamento. Comando descartado.";
+      ok = false;
+      Serial.println("[CMD] fillchamber REJEITADO: calibração/teste em andamento");
+    } else if (fillTestRunning) {
+      errorMsg = "Teste de enchimento já em andamento";
+      ok = false;
+    } else {
+      // Para outros processos secundários antes de iniciar teste
+      khDrainRunning = false;
+      systemFlushRunning = false;
+      pumpControl.stopAll();
+
+      // Iniciar teste de enchimento
+      fillTestRunning = true;
+      fillTestStartMs = millis();
+      fillTestDurationMs = 10000;  // 10s padrão
+      fillTestChamber = chamber.charAt(0);  // 'A', 'B' ou 'C'
+
+      if (chamber == "A") {
+        pumpControl.pumpA_fill();  // aquário → A
+      } else if (chamber == "B") {
+        pumpControl.pumpB_fill();  // A → B
+      } else if (chamber == "C") {
+        pumpControl.pumpC_fill();  // B → C
+      } else {
+        errorMsg = "Câmara inválida (deve ser A, B ou C)";
+        fillTestRunning = false;
+        ok = false;
+      }
+
+      if (ok) {
+        Serial.printf("[CMD] Enchimento câmara %s iniciado (10s). AVISO: Recalibração necessária.\n", chamber.c_str());
+      }
+    }
+
+  } else if (cmd.action == "system_flush") {
+    // Flush inteligente: usa tempo calibrado + 30% ou 5 min fixo
+    Serial.println("[CMD] system_flush: requisitando flush inteligente");
+
+    // [PRIORIDADE] Rejeita imediatamente se calibração ou teste KH estiver rodando
+    if (khCalibRunning || khAnalyzerRunning) {
+      errorMsg = "Calibração ou teste de KH em andamento. Comando descartado.";
+      ok = false;
+      Serial.println("[CMD] system_flush REJEITADO: calibração/teste em andamento");
+    } else {
+      // Para processos secundários
+      khDrainRunning = false;
+      pumpControl.stopAll();
+
+      // Carrega calibração para calcular tempo inteligente
+      if (SPIFFS.begin(true) && SPIFFS.exists("/kh_calib.json")) {
+        File f = SPIFFS.open("/kh_calib.json", "r");
+        if (f) {
+          DynamicJsonDocument doc(768);
+          DeserializationError error = deserializeJson(doc, f);
+          f.close();
+
+          if (!error) {
+            unsigned long t_a = doc["time_fill_a_ms"] | 0;
+            unsigned long t_b = doc["time_fill_b_ms"] | 0;
+            unsigned long t_c = doc["time_fill_c_ms"] | 0;
+
+            if (t_a > 0 && t_b > 0 && t_c > 0) {
+              systemFlushDurationMs = (t_a + t_b + t_c) * 1.3;
+              Serial.printf("[CMD] Flush inteligente: %.1f s (baseado em calibracao)\n",
+                            systemFlushDurationMs / 1000.0f);
+            } else {
+              systemFlushDurationMs = 300000UL; // 5 min fixo
+              Serial.println("[CMD] Flush fixo: 5 min (sem calibracao previa)");
+            }
+          }
+        }
+      } else {
+        systemFlushDurationMs = 300000UL; // 5 min fixo
+        Serial.println("[CMD] Flush fixo: 5 min (sem calibracao previa)");
+      }
+
+      // Inicia flush
+      pumpControl.pumpC_discharge();  // C → B
+      pumpControl.pumpB_discharge();  // B → A
+      pumpControl.pumpA_discharge();  // A → aquário
+      systemFlushRunning = true;
+      systemFlushStartMs = millis();
+      systemState = IDLE;
+      ok = true;
+      Serial.println("[CMD] Flush iniciado. AVISO: Recalibração necessária.");
+    }
+
+  } else if (cmd.action == "khcalibrate") {
+      float khRefUser  = cmd.params["kh_ref_user"]  | 8.0f;
+      bool assumeEmpty = cmd.params["assume_empty"] | false;
+
+      Serial.printf("[CMD] khcalibrate: kh_ref=%.2f assumeEmpty=%d\n", khRefUser, assumeEmpty);
 
       khCalibrator.start(khRefUser, assumeEmpty);
       khCalibRunning    = true;
       khCalibLastStepMs = millis();
+      // Envia progresso imediatamente ao iniciar
+      khProgressLastSentMs = millis();
+      sendCalibProgress();
+      ok = true;
   }
 
 
@@ -2045,8 +2398,152 @@ void processCloudCommand() {
 bool shouldMeasure() {
   return (millis() - lastMeasurementTime) >= measurementInterval;
 }
+// Envia status de progresso do ciclo KH para o backend (armazenado em memória no servidor)
+// Chamado a cada KH_PROGRESS_SEND_INTERVAL_MS enquanto khCalibRunning ou khAnalyzerRunning
+void sendKhProgressToCloud(bool active, const String& type,
+                           const String& msg, int pct,
+                           int compS,
+                           int lvlA, int lvlB, int lvlC,
+                           float ph, float temp) {
+  // [DEBUG] Log de tentativa de envio
+  static unsigned long send_count = 0;
+  send_count++;
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.printf("[KH_Progress] #%lu FALHOU: WiFi desconectado\n", send_count);
+    return;
+  }
+
+  if (deviceToken.length() == 0) {
+    Serial.printf("[KH_Progress] #%lu FALHOU: deviceToken vazio\n", send_count);
+    return;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+  String url = String(CLOUD_BASE_URL) + "/device/kh-status";
+
+  Serial.printf("[KH_Progress] #%lu Enviando: active=%d type=%s pct=%d msg='%s'\n",
+                send_count, active, type.c_str(), pct, msg.c_str());
+
+  if (!http.begin(client, url)) return;
+  http.setTimeout(3000);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + deviceToken);
+
+  StaticJsonDocument<320> doc;
+  doc["active"]                = active;
+  doc["type"]                  = type;
+  doc["msg"]                   = msg;
+  doc["pct"]                   = pct;
+  doc["compressor_remaining_s"]= compS;
+  doc["level_a"]               = lvlA;
+  doc["level_b"]               = lvlB;
+  doc["level_c"]               = lvlC;
+  doc["ph"]                    = serialized(String(ph, 2));
+  doc["temperature"]           = serialized(String(temp, 1));
+
+  String payload;
+  serializeJson(doc, payload);
+
+  int httpCode = http.POST(payload);
+  http.end();
+
+  if (httpCode > 0) {
+    Serial.printf("[KH_Progress] #%lu OK: HTTP %d\n", send_count, httpCode);
+  } else {
+    Serial.printf("[KH_Progress] #%lu FALHOU: HTTP erro %d (%s)\n",
+                  send_count, httpCode, http.errorToString(httpCode).c_str());
+  }
+}
+
+// Chama sendKhProgressToCloud com dados atuais do calibrador
+void sendCalibProgress() {
+  sendKhProgressToCloud(
+    true,
+    "calibration",
+    khCalibrator.getProgressMessage(),
+    khCalibrator.getProgressPercent(),
+    (int)(khCalibrator.getCompressorRemainingMs() / 1000UL),
+    sensorManager.getLevelA(), sensorManager.getLevelB(), sensorManager.getLevelC(),
+    sensorManager.getPH(), sensorManager.getTemperature()
+  );
+}
+
+// Chama sendKhProgressToCloud com dados atuais do analyzer
+void sendMeasureProgress() {
+  sendKhProgressToCloud(
+    true,
+    "measurement",
+    khAnalyzer.getProgressMessage(),
+    khAnalyzer.getProgressPercent(),
+    (int)(khAnalyzer.getCompressorRemainingMs() / 1000UL),
+    sensorManager.getLevelA(), sensorManager.getLevelB(), sensorManager.getLevelC(),
+    sensorManager.getPH(), sensorManager.getTemperature()
+  );
+}
+
+// Notifica o backend que o ciclo terminou (active=false)
+void sendKhProgressDone(const String& type, const String& finalMsg) {
+  sendKhProgressToCloud(false, type, finalMsg, 100, 0,
+    sensorManager.getLevelA(), sensorManager.getLevelB(), sensorManager.getLevelC(),
+    sensorManager.getPH(), sensorManager.getTemperature());
+}
+
+// Processa e salva o resultado após o ciclo KH completar (chamado pela seção 10 do loop)
+void handleMeasurementResult() {
+  KH_Analyzer::MeasurementResult result = khAnalyzer.getMeasurementResult();
+  Serial.printf("[DEBUG] result.is_valid=%d kh=%.2f ph_ref=%.2f ph_sample=%.2f temp=%.1f\n",
+                result.is_valid, result.kh_value,
+                result.ph_reference, result.ph_sample, result.temperature);
+
+  Serial.printf("[Main] Medição concluída: KH=%.2f dKH\n", result.kh_value);
+  debugLog.log("INFO", "Measurement COMPLETE: KH=%.2f, pH_ref=%.2f, pH_sample=%.2f, temp=%.1f",
+               result.kh_value, result.ph_reference, result.ph_sample, result.temperature);
+
+  MeasurementHistory::Measurement mh;
+  mh.kh          = result.kh_value;
+  mh.ph_ref      = result.ph_reference;
+  mh.ph_sample   = result.ph_sample;
+  mh.temperature = result.temperature;
+
+  unsigned long long ts = getCurrentEpochMs();
+  if (ts == 0) {
+    Serial.println("[Main] NTP falhou, usando millis()");
+    ts = millis() / 1000ULL;
+  }
+  mh.timestamp = ts;
+  mh.is_valid  = true;
+  history.addMeasurement(mh);
+
+  Measurement mc;
+  mc.timestamp    = mh.timestamp;
+  mc.startedAt    = currentCycleStartMs;
+  mc.kh           = mh.kh;
+  mc.ph_reference = mh.ph_ref;
+  mc.ph_sample    = mh.ph_sample;
+  mc.temperature  = mh.temperature;
+  mc.is_valid     = mh.is_valid;
+  mc.confidence   = 0.9f;
+
+  if (isScheduledTestRunning) {
+    lastScheduledTestResult = mc;
+    Serial.println("[TestSchedule] Resultado da medição agendada salvo");
+  }
+
+  if (deviceToken.length() > 0) {
+    cloudAuth.queueMeasurement(mc);
+    debugLog.log("DEBUG", "Measurement queued for sync, queue size=%d",
+                 cloudAuth.getQueueSize());
+  } else {
+    debugLog.log("WARN", "Measurement not synced - no token");
+  }
+}
+
+// Inicia o ciclo de medição de KH (não-bloqueante)
+// A FSM é avançada pela seção 10 do loop(); o resultado é processado em handleMeasurementResult()
 void performMeasurement() {
-  Serial.println("Main Iniciando ciclo de medição...");
+  Serial.println("[Main] Iniciando ciclo de medição...");
   debugLog.log("INFO", "Measurement cycle START");
 
   currentCycleStartMs = getCurrentEpochMs();
@@ -2055,63 +2552,8 @@ void performMeasurement() {
   }
 
   if (khAnalyzer.startMeasurementCycle()) {
-    while (khAnalyzer.processNextPhase()) {
-      delay(100);
-    }
-
-    KH_Analyzer::MeasurementResult result = khAnalyzer.getMeasurementResult();
-    Serial.printf("[DEBUG] result.is_valid=%d kh=%.2f ph_ref=%.2f ph_sample=%.2f temp=%.1f\n",
-                  result.is_valid, result.kh_value,
-                  result.ph_reference, result.ph_sample, result.temperature);
-
-    // ===== IGNORAR is_valid SÓ PARA TESTE =====
-    Serial.printf("[Main] Medição concluída (forçada): KH=%.2f dKH\n", result.kh_value);
-    debugLog.log("INFO", "Measurement COMPLETE: KH=%.2f, pH_ref=%.2f, pH_sample=%.2f, temp=%.1f",
-                 result.kh_value, result.ph_reference, result.ph_sample, result.temperature);
-
-    MeasurementHistory::Measurement mh;
-    mh.kh         = result.kh_value;
-    mh.ph_ref     = result.ph_reference;
-    mh.ph_sample  = result.ph_sample;
-    mh.temperature= result.temperature;
-
-    unsigned long long ts = getCurrentEpochMs();
-    if (ts == 0) {
-      Serial.println("[Main] NTP falhou, usando millis()");
-      ts = millis() / 1000ULL;
-    }
-    mh.timestamp = ts;
-    mh.is_valid  = true;
-    history.addMeasurement(mh);
-
-    Measurement mc;
-    mc.timestamp    = mh.timestamp;
-    mc.startedAt    = currentCycleStartMs;
-    mc.kh           = mh.kh;
-    mc.ph_reference = mh.ph_ref;
-    mc.ph_sample    = mh.ph_sample;
-    mc.temperature  = mh.temperature;
-    mc.is_valid     = mh.is_valid;
-    mc.confidence   = 0.9f;
-
-    // [TEST SCHEDULE] Salvar resultado se for teste agendado
-    if (isScheduledTestRunning) {
-      lastScheduledTestResult = mc;
-      Serial.println("[TestSchedule] Resultado da medição agendada salvo");
-    }
-
-    if (deviceToken.length() > 0) {
-      cloudAuth.queueMeasurement(mc);
-      debugLog.log("DEBUG", "Measurement queued for sync, queue size=%d",
-                   cloudAuth.getQueueSize());
-      // [FIX] Removida chamada imediata de sync - deixar apenas sync periódico (a cada 30s)
-      // para evitar rate limiting. O sync periódico no loop principal já cuida disso.
-      // cloudAuth.syncOfflineMeasurements();
-    } else {
-      debugLog.log("WARN", "Measurement not synced - no token");
-    }
-    // ===== FIM BLOCO FORÇADO =====
-
+    khAnalyzerRunning    = true;
+    khAnalyzerLastStepMs = millis();
   } else {
     Serial.println("[Main] ERRO: Falha ao iniciar ciclo de medição");
     debugLog.log("ERROR", "Measurement cycle FAILED to start!");
@@ -2187,7 +2629,7 @@ void loadPump4CalibrationFromSPIFFS() {
 }
 
 // =================================================================================
-// Persistência de testMode e intervalHours (SPIFFS)
+// Persistência de intervalHours (SPIFFS)
 // =================================================================================
 
 void saveConfigToSPIFFS() {
@@ -2202,15 +2644,14 @@ void saveConfigToSPIFFS() {
     return;
   }
 
-  DynamicJsonDocument doc(256);
-  doc["testMode"] = testModeEnabled;
-  doc["intervalHours"] = measurementInterval / (60UL * 60UL * 1000UL);  // ms -> horas
+  DynamicJsonDocument doc(128);
+  doc["intervalHours"] = measurementInterval / (60UL * 60UL * 1000UL);
 
   if (serializeJson(doc, f) == 0) {
     Serial.println("[Config] Erro ao serializar config JSON");
   } else {
-    Serial.printf("[Config] Config salva: testMode=%d, intervalHours=%lu\n",
-                  testModeEnabled, measurementInterval / (60UL * 60UL * 1000UL));
+    Serial.printf("[Config] Config salva: intervalHours=%lu\n",
+                  measurementInterval / (60UL * 60UL * 1000UL));
   }
   f.close();
 }
@@ -2232,7 +2673,7 @@ void loadConfigFromSPIFFS() {
     return;
   }
 
-  DynamicJsonDocument doc(256);
+  DynamicJsonDocument doc(128);
   DeserializationError err = deserializeJson(doc, f);
   f.close();
 
@@ -2241,17 +2682,14 @@ void loadConfigFromSPIFFS() {
     return;
   }
 
-  testModeEnabled = doc["testMode"] | false;
   unsigned long hours = doc["intervalHours"] | 1;
-  measurementInterval = hours * 60UL * 60UL * 1000UL;  // horas -> ms
+  measurementInterval = hours * 60UL * 60UL * 1000UL;
 
-  Serial.printf("[Config] Config carregada do SPIFFS: testMode=%d, intervalHours=%lu\n",
-                testModeEnabled, hours);
-  debugLog.log("INFO", "Config loaded from SPIFFS: testMode=%d, interval=%lu h",
-               testModeEnabled, hours);
+  Serial.printf("[Config] Config carregada do SPIFFS: intervalHours=%lu\n", hours);
+  debugLog.log("INFO", "Config loaded from SPIFFS: interval=%lu h", hours);
 }
 
-// Busca config do backend (testMode e intervalHours)
+// Busca config do backend (intervalHours)
 bool fetchConfigFromBackend() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[Config] WiFi não conectado, não pode buscar config do backend");
@@ -2310,20 +2748,11 @@ bool fetchConfigFromBackend() {
     return false;
   }
 
-  // Ler testMode
-  if (data.containsKey("testMode")) {
-    testModeEnabled = data["testMode"].as<bool>();
-    Serial.printf("[Config] testMode do backend: %d\n", testModeEnabled);
-  }
-
-  // Ler intervalHours (via endpoint /status - mas vamos tentar aqui também)
-  // Se não vier neste endpoint, buscar de /status separadamente
-
   // Salvar no SPIFFS para próximo boot
   saveConfigToSPIFFS();
 
   Serial.println("[Config] ✓ Config do backend carregada e salva no SPIFFS");
-  debugLog.log("INFO", "Config loaded from backend: testMode=%d", testModeEnabled);
+  debugLog.log("INFO", "Config loaded from backend");
   return true;
 }
 

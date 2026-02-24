@@ -4,81 +4,100 @@
 #include <ArduinoJson.h>
 
 KH_Calibrator::KH_Calibrator(PumpControl* pc, SensorManager* sm)
-: _pc(pc), _sm(sm) {}
+    : _pc(pc), _sm(sm) {}
 
+// =============================================================
+// start()
+// =============================================================
 void KH_Calibrator::start(float kh_ref_user, bool assumeEmpty) {
     _kh_ref_user = kh_ref_user;
     _b1_mlps = _b2_mlps = _b3_mlps = 0.0f;
+    _t_fill_a_ms = _t_fill_b_ms = _t_fill_c_ms = 0;
+    _ph_ref_measured = _temp_ref = 0.0f;
     _result  = Result();
-    _state   = CAL_B1_FILL_A;
-    _t_start = millis();
+    _t_start = _t_stable = 0;
+
+    // Carrega calibração prévia (se existir) para usar tempos como fallback
+    loadPreviousCalibration();
+
+    _pc->stopAll();
 
     Serial.println("\n========================================");
-    Serial.println("[CAL] INICIANDO CALIBRAÇÃO COMPLETA");
+    Serial.println("[CAL] INICIANDO CALIBRACAO COMPLETA");
     Serial.println("========================================");
-    Serial.printf("[CAL] KH de referência configurado: %.2f dKH\n", kh_ref_user);
-    Serial.printf("[CAL] Assume câmaras vazias: %s\n", assumeEmpty ? "SIM" : "NÃO");
+    Serial.printf("[CAL] KH de referencia: %.2f dKH\n", kh_ref_user);
+    Serial.printf("[CAL] Camaras vazias assumidas: %s\n", assumeEmpty ? "SIM" : "NAO");
 
-    // Opcional: garantir câmaras vazias se !assumeEmpty
-    if (!assumeEmpty) {
-        Serial.println("[CAL] Realizando flush das câmaras A, B e C...");
-        _pc->stopAll();
-        _pc->pumpC_discharge();  // C -> B
-        _pc->pumpB_discharge();  // B -> A
-        _pc->pumpA_discharge();  // A -> aquário
-        delay(3000); // flush simples
-        _pc->stopAll();
-        Serial.println("[CAL] Flush concluído, câmaras esvaziadas.");
+    if (assumeEmpty) {
+        Serial.println("[CAL] Pulando flush - iniciando Passo 2: calibrar bomba A (aquario->A)");
+        _state = CAL_B1_TIMED_START;
+    } else {
+        Serial.println("[CAL] Passo 1: flush das camaras A/B/C...");
+        _state = CAL_FLUSH_START;
     }
-
-    Serial.println("[CAL] Iniciando Fase B1: Calibração bomba A->B (50mL)...");
 }
 
+// =============================================================
+// processStep()  — despachador principal
+// =============================================================
 bool KH_Calibrator::processStep() {
     switch (_state) {
-        case CAL_B1_FILL_A:
+        case CAL_FLUSH_START:
+        case CAL_FLUSH_WAIT:
+            return stepFlush();
+
+        case CAL_B1_TIMED_START:
         case CAL_B1_WAIT_A_FULL:
-        case CAL_B1_FILL_B:
-        case CAL_B1_WAIT_B_FULL:
-        case CAL_B1_DONE:
             return stepCalibB1();
 
-        case CAL_B2_PREP_EMPTY_B:
-        case CAL_B2_FILL_B:
+        case CAL_B2_TIMED_START:
         case CAL_B2_WAIT_B_FULL:
-        case CAL_B2_DONE:
             return stepCalibB2();
 
-        case CAL_B3_PREP_EMPTY_C:
-        case CAL_B3_FLUSHING:
-        case CAL_B3_ENSURE_B_FULL:  // [FIX] Novo estado
-        case CAL_B3_WAIT_B_FULL:    // [FIX] Atualizado
-        case CAL_B3_FILL_C:         // [FIX] Renomeado
-        case CAL_B3_WAIT_C_FULL:    // [FIX] Renomeado
-        case CAL_B3_DONE:
+        case CAL_B3_TIMED_START:
+        case CAL_B3_WAIT_C_FULL:
             return stepCalibB3();
 
-        case CAL_SAVE: {
-            Serial.println("[CAL] Salvando calibração em SPIFFS...");
+        case CAL_DRAIN_B_START:
+        case CAL_DRAIN_B_WAIT:
+        case CAL_ENSURE_A_FULL:
+        case CAL_ENSURE_A_WAIT:
+            return stepDrainB();
 
-            // Preencher struct de resultado antes de salvar
-            _result.kh_ref_user    = _kh_ref_user;
+        case CAL_FILL_B_FROM_C_START:
+        case CAL_FILL_B_FROM_C_WAIT:
+            return stepFillBFromC();
+
+        case CAL_KH_TEST_START:
+        case CAL_KH_TEST_WAIT:
+            return stepKhTestTrigger();
+
+        case CAL_SAVE: {
+            _result.kh_ref_user     = _kh_ref_user;
             _result.ph_ref_measured = _ph_ref_measured;
             _result.temp_ref        = _temp_ref;
             _result.mlps_b1         = _b1_mlps;
             _result.mlps_b2         = _b2_mlps;
             _result.mlps_b3         = _b3_mlps;
+            _result.time_fill_a_ms  = _t_fill_a_ms;
+            _result.time_fill_b_ms  = _t_fill_b_ms;
+            _result.time_fill_c_ms  = _t_fill_c_ms;
 
             if (!saveCalibrationToSPIFFS()) {
-                _result.error = "Falha ao salvar calibração em SPIFFS";
-                _state        = CAL_ERROR;
+                setError("Falha ao salvar calibracao em SPIFFS");
             } else {
                 _result.success = true;
-                _state          = CAL_COMPLETE;
+                _state = CAL_COMPLETE;
+                Serial.println("[CAL] === CALIBRACAO CONCLUIDA COM SUCESSO ===");
+                Serial.printf("[CAL] mlps_b1=%.4f  mlps_b2=%.4f  mlps_b3=%.4f\n",
+                              _b1_mlps, _b2_mlps, _b3_mlps);
+                Serial.printf("[CAL] tempos: A=%lu ms  B=%lu ms  C=%lu ms\n",
+                              _t_fill_a_ms, _t_fill_b_ms, _t_fill_c_ms);
+                Serial.printf("[CAL] KH_ref=%.2f  pH_ref=%.2f  temp=%.2f C\n",
+                              _kh_ref_user, _ph_ref_measured, _temp_ref);
             }
-            return false;
+            return false;  // FSM encerrada
         }
-
 
         case CAL_COMPLETE:
         case CAL_ERROR:
@@ -88,462 +107,650 @@ bool KH_Calibrator::processStep() {
     }
 }
 
-bool KH_Calibrator::hasError() const {
-    return (_state == CAL_ERROR);
-}
+bool KH_Calibrator::hasError()  const { return (_state == CAL_ERROR); }
+KH_Calibrator::Result KH_Calibrator::getResult() const { return _result; }
 
-KH_Calibrator::Result KH_Calibrator::getResult() const {
-    return _result;
-}
+// =============================================================
+// Passo 1: Flush A/B/C
+//   Fluxo: C->B->A->aquario com protecao de overflow por sensor.
+//   Termina quando nenhum sensor estiver em "cheio" por FLUSH_STABLE_MS,
+//   ou por timeout FLUSH_TIMEOUT_MS.
+// =============================================================
+bool KH_Calibrator::stepFlush() {
+    unsigned long now = millis();
+    static bool logged_wait = false;  // Flag para log de debug
 
-// ---------- B1: calibrar bomba 1 (Aquário -> A/B) ----------
-bool KH_Calibrator::stepCalibB1() {
-    switch (_state) {
-        case CAL_B1_FILL_A: {
-            Serial.println("[CAL][B1] Enchendo A a partir do aquário...");
-            _pc->pumpA_fill();
-            _t_start = millis();
-            _state   = CAL_B1_WAIT_A_FULL;
-            return true;
+    if (_state == CAL_FLUSH_START) {
+        logged_wait = false;  // Reset para novo ciclo
+        _pc->pumpC_discharge();  // C -> B (esvazia C para B)
+        _pc->pumpB_discharge();  // B -> A (esvazia B para A)
+        _pc->pumpA_discharge();  // A -> aquario (esvazia A para aquario)
+        _t_start  = now;
+
+        // Flush inteligente: tempo calibrado + 30% ou 5 min fixo
+        if (_t_fill_a_ms > 0 && _t_fill_b_ms > 0 && _t_fill_c_ms > 0) {
+            unsigned long calculated_flush = (_t_fill_a_ms + _t_fill_b_ms + _t_fill_c_ms) * 1.3;
+            // [FIX] Limita timeout inteligente ao máximo de 5 min
+            if (calculated_flush > FLUSH_TIMEOUT_MS) {
+                _t_stable = FLUSH_TIMEOUT_MS;
+                Serial.printf("[CAL][FLUSH] Timeout inteligente muito alto (%.1f s), usando fixo: %.1f s\n",
+                              calculated_flush / 1000.0f, FLUSH_TIMEOUT_MS / 1000.0f);
+            } else {
+                _t_stable = calculated_flush;
+                Serial.printf("[CAL][FLUSH] Timeout inteligente: %.1f s (baseado em calibracao previa)\n",
+                              calculated_flush / 1000.0f);
+            }
+        } else {
+            _t_stable = FLUSH_TIMEOUT_MS;  // 5 min fixo
+            Serial.printf("[CAL][FLUSH] Timeout fixo: %.1f s\n", FLUSH_TIMEOUT_MS / 1000.0f);
         }
 
-        case CAL_B1_WAIT_A_FULL: {
-            bool a_full = (_sm->getLevelA() == 1);
-            if (a_full) {
-                Serial.println("[CAL][B1] A cheio, enchendo B...");
-                _pc->pumpA_stop();
-                _pc->pumpB_fill();
-                _t_start = millis();
-                _state   = CAL_B1_WAIT_B_FULL;
-                return true;
-            }
-            if (millis() - _t_start > MAX_FILL_MS) {
-                _pc->pumpA_stop();
-                _state        = CAL_ERROR;
-                _result.error = "Timeout enchendo A na calibração da bomba 1";
-                return false;
-            }
-            return true;
-        }
-
-        case CAL_B1_WAIT_B_FULL: {
-            bool b_full = (_sm->getLevelB() == 1);
-            if (b_full) {
-                unsigned long dt_ms = millis() - _t_start;
-                float dt_s = dt_ms / 1000.0f;
-                // [FIX] Volume correto de B: 50 mL
-                float volume_ml = 50.0f;
-                _b1_mlps = volume_ml / dt_s;
-                Serial.printf("[CAL][B1] B cheio (50mL), tempo=%.2fs, vazao=%.4f mL/s (Bomba A->B)\n",
-                              dt_s, _b1_mlps);
-                _pc->pumpB_stop();
-
-                // [FIX] Validação de vazão B1
-                if (!validateFlowRate(_b1_mlps, "Bomba 2 (A->B)")) {
-                    _state = CAL_ERROR;
-                    return false;
-                }
-
-                _state = CAL_B1_DONE;
-                return true;
-            }
-            if (millis() - _t_start > MAX_FILL_MS) {
-                _pc->pumpB_stop();
-                _state        = CAL_ERROR;
-                _result.error = "Timeout enchendo B na calibração da bomba 1";
-                return false;
-            }
-            return true;
-        }
-
-        case CAL_B1_DONE:
-            Serial.println("[CAL][B1] Calibração da bomba 1 concluída.");
-            _state = CAL_B2_PREP_EMPTY_B;
-            return true;
-        
-        default:
-            return false;
+        _state = CAL_FLUSH_WAIT;
+        Serial.println("[CAL][FLUSH] Bombas ativas: C->B, B->A, A->aquario (flush camaras)");
+        return true;
     }
+
+    // CAL_FLUSH_WAIT
+    // [DEBUG] Confirma que está em CAL_FLUSH_WAIT
+    if (!logged_wait) {
+        Serial.printf("[CAL][FLUSH] Entrou em CAL_FLUSH_WAIT. Timeout configurado: %.1f s\n", _t_stable / 1000.0f);
+        logged_wait = true;
+    }
+
+    bool a = (_sm->getLevelA() == 1);
+    bool b = (_sm->getLevelB() == 1);
+    bool c = (_sm->getLevelC() == 1);
+
+    // Protecao A: se A estiver cheio, B esta enchendo A mais rapido que A drena.
+    // Para bomba B temporariamente.
+    if (a && _pc->isPumpRunning(2)) {
+        _pc->pumpB_stop();
+        Serial.println("[CAL][FLUSH] Sensor A ativo (A cheio) - pausando bomba B");
+    } else if (!a && !_pc->isPumpRunning(2)) {
+        _pc->pumpB_discharge();
+        Serial.println("[CAL][FLUSH] Sensor A inativo - retomando bomba B (B->A)");
+    }
+
+    // Protecao B: se B estiver cheio, C esta enchendo B mais rapido que B drena.
+    // Para bomba C temporariamente.
+    if (b && _pc->isPumpRunning(3)) {
+        _pc->pumpC_stop();
+        Serial.println("[CAL][FLUSH] Sensor B ativo (B cheio) - pausando bomba C");
+    } else if (!b && !_pc->isPumpRunning(3)) {
+        _pc->pumpC_discharge();
+        Serial.println("[CAL][FLUSH] Sensor B inativo - retomando bomba C (C->B)");
+    }
+
+    // [DEBUG] Log de progresso do flush a cada 10 segundos
+    static unsigned long last_debug_ms = 0;
+    if (now - last_debug_ms >= 10000) {
+        last_debug_ms = now;
+        unsigned long elapsed_ms = now - _t_start;
+        Serial.printf("[CAL][FLUSH] Progresso: %.1f s / %.1f s (%.1f%%)\n",
+                      elapsed_ms / 1000.0f, _t_stable / 1000.0f,
+                      (elapsed_ms * 100.0f) / _t_stable);
+    }
+
+    // Timeout: tempo calibrado + 30% ou 5 min fixo
+    if (now - _t_start >= _t_stable) {
+        _pc->stopAll();
+        Serial.printf("[CAL][FLUSH] Flush concluido (%.1f s). Iniciando calibracao bomba A.\n",
+                      (now - _t_start) / 1000.0f);
+        _state = CAL_B1_TIMED_START;
+        return true;
+    }
+
+    return true;
 }
 
-// ---------- B2: calibrar bomba 2 (B -> C) ----------
+// =============================================================
+// Passo 3: Calibrar bomba 2 (A->B, 50 mL)
+//   - A já está cheio (veio do stepCalibB1)
+//   - Zera timer; liga bomba 2 (A->B) + bomba 1 reposição paralela
+//   - Quando B cheia: mlps_b2 = 50 / t
+// =============================================================
 bool KH_Calibrator::stepCalibB2() {
-    switch (_state) {
-        case CAL_B2_PREP_EMPTY_B: {
-            Serial.println("[CAL][B2] Esvaziando B...");
-            _pc->pumpB_discharge();
-            _t_start = millis();
-            _state   = CAL_B2_FILL_B;
-            return true;
-        }
+    unsigned long now = millis();
 
-        case CAL_B2_FILL_B: {
-            if (millis() - _t_start > 5000UL) { // flush inicial
-                _pc->pumpB_stop();
-                Serial.println("[CAL][B2] Enchendo B de solução padrão...");
-                _pc->pumpB_fill();
-                _t_start = millis();
-                _state   = CAL_B2_WAIT_B_FULL;
-            }
+    switch (_state) {
+        case CAL_B2_TIMED_START: {
+            Serial.println("[CAL][B2] Passo 3 - Calibrar bomba B (A->B, 50 mL)");
+            _t_start = millis();
+            _pc->pumpB_fill();    // A -> B (mede esta bomba)
+            _pc->pumpA_fill();    // aquario -> A (reposicao paralela)
+            Serial.println("[CAL][B2] Timer zerado. Bombas B (A->B) e A (aquario->A) ligadas.");
+            _state = CAL_B2_WAIT_B_FULL;
             return true;
         }
 
         case CAL_B2_WAIT_B_FULL: {
-            bool b_full = (_sm->getLevelB() == 1);
-            if (b_full) {
-                unsigned long dt_ms = millis() - _t_start;
-                float dt_s   = dt_ms / 1000.0f;
-                // [FIX] Volume correto de B: 50 mL (solução padrão para referência)
-                float volume_ml = 50.0f;
-                _b2_mlps = volume_ml / dt_s;
-                Serial.printf("[CAL][B2] B cheio (50mL) com solução padrão, tempo=%.2fs, vazao=%.4f mL/s\n",
-                              dt_s, _b2_mlps);
-                _pc->pumpB_stop();
-
-                // [FIX] Validação de vazão B2
-                if (!validateFlowRate(_b2_mlps, "Enchimento B (solução padrão)")) {
-                    _state = CAL_ERROR;
-                    return false;
-                }
-
-                _state = CAL_B2_DONE;
-                return true;
-            }
-            if (millis() - _t_start > MAX_FILL_MS) {
-                _pc->pumpB_stop();
-                _state        = CAL_ERROR;
-                _result.error = "Timeout enchendo B na calibração da bomba 2";
-                return false;
-            }
-            return true;
-        }
-
-        case CAL_B2_DONE: {
-            Serial.println("[CAL][B2] Calibração da bomba 2 concluída.");
-            Serial.println("[CAL][B2] Ativando compressor para equilibrar pH...");
-
-            // [FIX] Ativar compressor (bomba D) para equilibrar CO2 antes de ler pH
-            _pc->pumpD_start();
-            delay(5000);  // Aguarda 5 segundos para equilibrar
-            Serial.println("[CAL][B2] Equilibração concluída, lendo pH e temperatura de referência...");
-
-            // Captura PH/Temp da solução padrão (B cheio)
-            _ph_ref_measured = _sm->getPH();
-            _temp_ref        = _sm->getTemperature();
-
-            Serial.printf("[CAL][B2] pH ref=%.2f, temp ref=%.2f°C\n", _ph_ref_measured, _temp_ref);
-
-            // [FIX] Desligar compressor
-            _pc->pumpD_stop();
-            Serial.println("[CAL][B2] Compressor desligado.");
-
-            // [FIX] Validações de pH e temperatura
-            if (!validatePHReference(_ph_ref_measured)) {
-                _state = CAL_ERROR;
-                return false;
-            }
-
-            if (!validateTemperature(_temp_ref)) {
-                _state = CAL_ERROR;
-                return false;
-            }
-
-            _state = CAL_B3_PREP_EMPTY_C;
-            return true;
-        }
-
-        default:
-            return false;
-    }
-}
-
-// ---------- B3: calibrar bomba 3 (B -> C, 150mL) ----------
-bool KH_Calibrator::stepCalibB3() {
-    switch (_state) {
-        case CAL_B3_PREP_EMPTY_C: {
-            Serial.println("[CAL][B3] === INICIANDO CALIBRAÇÃO BOMBA C (B->C, 150mL) ===");
-            Serial.println("[CAL][B3] Esvaziando câmara C (flush C->B->A->aquário)...");
-            _t_start = millis();
-            _pc->pumpC_discharge();  // C -> B
-            _pc->pumpB_discharge();  // B -> A (paralelo para drenar o que vier de C)
-            _pc->pumpA_discharge();  // A -> aquário
-            _state   = CAL_B3_FLUSHING;
-            return true;
-        }
-
-        case CAL_B3_FLUSHING: {
-            if (millis() - _t_start < 5000UL) {
-                return true;
-            }
-            Serial.println("[CAL][B3] Flush de C concluído.");
-            _pc->stopAll();
-            Serial.println("[CAL][B3] Garantindo que B está cheio com solução padrão...");
-            _pc->pumpB_fill();  // Enche B a partir de A (solução padrão deve estar em A)
-            _t_start = millis();
-            _state   = CAL_B3_ENSURE_B_FULL;
-            return true;
-        }
-
-        case CAL_B3_ENSURE_B_FULL: {
-            // Enche B para garantir que há volume suficiente
-            bool b_full = (_sm->getLevelB() == 1);
-            if (b_full) {
-                Serial.println("[CAL][B3] B está cheio (50mL). Preparando para calibrar B->C...");
-                _pc->pumpB_stop();
-                // Pequena pausa antes de iniciar transferência
-                delay(1000);
-                _state = CAL_B3_WAIT_B_FULL;
-                return true;
-            }
-            if (millis() - _t_start > MAX_FILL_MS) {
-                _pc->pumpB_stop();
-                _state        = CAL_ERROR;
-                _result.error = "Timeout ao garantir B cheio na calibração B3";
-                return false;
-            }
-            return true;
-        }
-
-        case CAL_B3_WAIT_B_FULL: {
-            // Estado intermediário para garantir que B está pronto
-            Serial.println("[CAL][B3] === INICIANDO TRANSFERÊNCIA B->C COM REABASTECIMENTO ===");
-            Serial.println("[CAL][B3] ATENÇÃO: B tem 50mL mas C precisa de 150mL");
-            Serial.println("[CAL][B3] Sistema irá:");
-            Serial.println("[CAL][B3]   - Transferir B->C (bomba C)");
-            Serial.println("[CAL][B3]   - Reabastecer B com A->B (bomba 2)");
-            Serial.println("[CAL][B3]   - Reabastecer A com aquário->A (bomba 1)");
-            Serial.println("[CAL][B3]   - Respeitar limites de sensores A e B");
-
-            // Liga todas as bombas em paralelo
-            _pc->pumpC_fill();  // B -> C
-            _pc->pumpB_fill();  // A -> B (reabastece B)
-            _pc->pumpA_fill();  // Aquário -> A (reabastece A)
-
-            _t_start = millis();
-            _state   = CAL_B3_FILL_C;
-
-            Serial.println("[CAL][B3] Bombas C, 2 e 1 ligadas, monitorando sensores...");
-            return true;
-        }
-
-        case CAL_B3_FILL_C: {
-            // [FIX] Monitora enchimento de C com reabastecimento contínuo de B e A
-
-            // Verifica se C está cheio (objetivo final)
-            bool c_full = (_sm->getLevelC() == 1);
-            if (c_full) {
-                unsigned long dt_ms = millis() - _t_start;
-                float dt_s = dt_ms / 1000.0f;
-                // [FIX] Volume correto de C: 150 mL
-                float volume_ml = 150.0f;
-                _b3_mlps = volume_ml / dt_s;
-
-                // Para todas as bombas
-                _pc->pumpC_stop();
-                _pc->pumpB_stop();
-                _pc->pumpA_stop();
-
-                Serial.println("[CAL][B3] ========================================");
-                Serial.printf("[CAL][B3] ✓ C CHEIO (150mL)!\n");
-                Serial.printf("[CAL][B3] Tempo de enchimento: %.2f segundos\n", dt_s);
-                Serial.printf("[CAL][B3] Vazão bomba C (B->C): %.4f mL/s\n", _b3_mlps);
-                Serial.println("[CAL][B3] ========================================");
-
-                // [FIX] Validação de vazão B3
-                if (!validateFlowRate(_b3_mlps, "Bomba 3 (B->C)")) {
-                    _state = CAL_ERROR;
-                    return false;
-                }
-
-                _state = CAL_B3_WAIT_C_FULL;
-                return true;
-            }
-
-            // [FIX] PROTEÇÃO: Se A atingir nível máximo, para bomba 1 temporariamente
+            // Gerencia reposicao de A: pausa se A cheio, retoma se A nao cheio
             bool a_full = (_sm->getLevelA() == 1);
             if (a_full && _pc->isPumpRunning(1)) {
-                Serial.println("[CAL][B3][PROTEÇÃO] A atingiu nível máximo! Parando bomba 1 temporariamente.");
                 _pc->pumpA_stop();
-            }
-            // Retoma bomba 1 se A não estiver mais cheio
-            else if (!a_full && !_pc->isPumpRunning(1)) {
-                Serial.println("[CAL][B3][PROTEÇÃO] A tem espaço, retomando bomba 1 (aquário->A).");
+            } else if (!a_full && !_pc->isPumpRunning(1)) {
                 _pc->pumpA_fill();
             }
 
-            // [FIX] PROTEÇÃO: Se B atingir nível máximo, para bomba 2 temporariamente
-            bool b_full = (_sm->getLevelB() == 1);
-            if (b_full && _pc->isPumpRunning(2)) {
-                Serial.println("[CAL][B3][PROTEÇÃO] B atingiu nível máximo! Parando bomba 2 temporariamente.");
+            if (_sm->getLevelB() == 1) {
+                unsigned long dt_ms = millis() - _t_start;
+                float dt_s = dt_ms / 1000.0f;
+                _b2_mlps = VOLUME_B_ML / dt_s;
+                _t_fill_b_ms = dt_ms;  // REGISTRA TEMPO
                 _pc->pumpB_stop();
-            }
-            // Retoma bomba 2 se B não estiver mais cheio (consumido pela bomba C)
-            else if (!b_full && !_pc->isPumpRunning(2)) {
-                Serial.println("[CAL][B3][PROTEÇÃO] B tem espaço, retomando bomba 2 (A->B).");
-                _pc->pumpB_fill();
+                _pc->pumpA_stop();
+                Serial.printf("[CAL][B2] B cheio (50 mL). Tempo=%.2f s (%.0f ms), vazao=%.4f mL/s\n",
+                              dt_s, (float)dt_ms, _b2_mlps);
+
+                if (!validateFlowRate(_b2_mlps, "Bomba 2 (A->B)")) return false;
+
+                Serial.println("[CAL][B2] Bomba B calibrada. Iniciando calibracao bomba C...");
+                _state = CAL_B3_TIMED_START;
+                return true;
             }
 
-            // Timeout estendido (C precisa de 150mL, pode levar mais tempo)
-            if (millis() - _t_start > 90000UL) {  // 90s timeout
+            if (now - _t_start > MAX_FILL_B_MS) {
                 _pc->stopAll();
-                _state        = CAL_ERROR;
-                _result.error = "Timeout enchendo C na calibração da bomba 3 (B->C)";
-                Serial.println("[CAL][B3][ERRO] Timeout ao encher C! Sensor C não detectou nível cheio após 90s.");
+                setError("Timeout enchendo B (bomba 2)");
                 return false;
             }
+            return true;
+        }
 
+        default: return false;
+    }
+}
+
+// =============================================================
+// Passo 4.5: ESVAZIAR B e garantir A cheio (preparar para ciclo KH)
+//   Após calibrar C, esvazia B e garante A cheio.
+//   - Esvazia B->A (bomba 2 reversa)
+//   - Se A encher, drena A->aquário (bomba 1 reversa)
+//   - Usa tempo calibrado de B + 30%, ou timeout
+//   - Garante que A está cheio antes de prosseguir
+//   Estado final: A CHEIO + B VAZIO + C CHEIO
+// =============================================================
+bool KH_Calibrator::stepDrainB() {
+    unsigned long now = millis();
+
+    switch (_state) {
+        case CAL_DRAIN_B_START: {
+            Serial.println("[CAL][DRAIN_B] Passo 4.5 - Esvaziando B após calibrar bomba C");
+            _t_start = millis();
+            _pc->pumpB_discharge();  // B -> A
+
+            // Calcula timeout: tempo calibrado de B + 30%, ou 10 min se não calibrado
+            unsigned long drain_timeout;
+            if (_t_fill_b_ms > 0) {
+                drain_timeout = _t_fill_b_ms * 1.3;
+                Serial.printf("[CAL][DRAIN_B] Usando tempo inteligente: %.1f s (baseado em %.1f s + 30%%)\n",
+                              drain_timeout / 1000.0f, _t_fill_b_ms / 1000.0f);
+            } else {
+                drain_timeout = MAX_FILL_B_MS;
+                Serial.println("[CAL][DRAIN_B] Usando timeout fixo: 10 min");
+            }
+            _t_stable = drain_timeout;  // reutiliza _t_stable para guardar timeout
+
+            Serial.println("[CAL][DRAIN_B] Bomba B (B->A) ligada para esvaziar B");
+            _state = CAL_DRAIN_B_WAIT;
+            return true;
+        }
+
+        case CAL_DRAIN_B_WAIT: {
+            // Proteção: se A encher, drena A para aquário
+            bool a_full = (_sm->getLevelA() == 1);
+            if (a_full && !_pc->isPumpRunning(1)) {
+                Serial.println("[CAL][DRAIN_B] A cheio durante drenagem B - iniciando drenagem A->aquário");
+                _pc->pumpA_discharge();  // A -> aquário
+            } else if (!a_full && _pc->isPumpRunning(1)) {
+                Serial.println("[CAL][DRAIN_B] A abaixo do máximo - parando drenagem A->aquário");
+                _pc->pumpA_stop();
+            }
+
+            // Verifica timeout
+            if (now - _t_start >= _t_stable) {
+                _pc->pumpB_stop();
+                _pc->pumpA_stop();
+                Serial.printf("[CAL][DRAIN_B] B esvaziado após %lu ms. Verificando se A está cheio...\n",
+                              now - _t_start);
+                _state = CAL_ENSURE_A_FULL;
+                return true;
+            }
+            return true;
+        }
+
+        case CAL_ENSURE_A_FULL: {
+            if (_sm->getLevelA() == 1) {
+                Serial.println("[CAL][DRAIN_B] A já está cheio. Enchendo B de C (referência)...");
+                _state = CAL_FILL_B_FROM_C_START;
+                return true;
+            }
+
+            Serial.println("[CAL][DRAIN_B] A não está cheio. Enchendo A do aquário...");
+            _pc->pumpA_fill();  // aquário -> A
+            _t_start = millis();
+            _state = CAL_ENSURE_A_WAIT;
+            return true;
+        }
+
+        case CAL_ENSURE_A_WAIT: {
+            if (_sm->getLevelA() == 1) {
+                _pc->pumpA_stop();
+                Serial.printf("[CAL][DRAIN_B] A cheio após %lu ms. Enchendo B de C...\n",
+                              now - _t_start);
+                _state = CAL_FILL_B_FROM_C_START;
+                return true;
+            }
+
+            if (now - _t_start > MAX_FILL_A_MS) {
+                _pc->stopAll();
+                setError("Timeout enchendo A antes de encher B");
+                return false;
+            }
+            return true;
+        }
+
+        default: return false;
+    }
+}
+
+// =============================================================
+// Passo 4: Calibrar bomba 3 (B->C, 150 mL)
+//   - B agora está VAZIA (esvaziada em stepPrepB3)
+//   - A está cheia
+//   - Zera timer; liga bombas C+B+A em paralelo (reposição contínua)
+//   - C (150 mL) > A+B (100 mL): reposição contínua obrigatória
+//   - Quando C cheia: mlps_b3 = 150 / t
+// =============================================================
+bool KH_Calibrator::stepCalibB3() {
+    unsigned long now = millis();
+
+    switch (_state) {
+        case CAL_B3_TIMED_START: {
+            Serial.println("[CAL][B3] Passo 4 - Calibrar bomba C (B->C, 150 mL)");
+            _t_start = millis();
+            _pc->pumpC_fill();  // B -> C  (mede esta bomba)
+            _pc->pumpB_fill();  // A -> B  (reposicao de B)
+            _pc->pumpA_fill();  // aquario -> A  (reposicao de A)
+            Serial.println("[CAL][B3] Timer zerado. Bombas C(B->C), B(A->B), A(aquario->A) ligadas.");
+            _state = CAL_B3_WAIT_C_FULL;
             return true;
         }
 
         case CAL_B3_WAIT_C_FULL: {
-            // Estado final de confirmação
-            Serial.println("[CAL][B3] Calibração da bomba 3 (B->C) concluída com sucesso!");
-            _state = CAL_B3_DONE;
+            // Protecao A: se cheio, pausa bomba 1; retoma quando nao cheio
+            bool a_full = (_sm->getLevelA() == 1);
+            if (a_full && _pc->isPumpRunning(1)) {
+                _pc->pumpA_stop();
+            } else if (!a_full && !_pc->isPumpRunning(1)) {
+                _pc->pumpA_fill();
+            }
+
+            // Protecao B: se cheio, pausa bomba 2; retoma quando nao cheio
+            bool b_full = (_sm->getLevelB() == 1);
+            if (b_full && _pc->isPumpRunning(2)) {
+                _pc->pumpB_stop();
+            } else if (!b_full && !_pc->isPumpRunning(2)) {
+                _pc->pumpB_fill();
+            }
+
+            if (_sm->getLevelC() == 1) {
+                unsigned long dt_ms = millis() - _t_start;
+                float dt_s = dt_ms / 1000.0f;
+                _b3_mlps = VOLUME_C_ML / dt_s;
+                _t_fill_c_ms = dt_ms;  // REGISTRA TEMPO
+                _pc->stopAll();
+                Serial.printf("[CAL][B3] C cheio (150 mL). Tempo=%.2f s (%.0f ms), vazao=%.4f mL/s\n",
+                              dt_s, (float)dt_ms, _b3_mlps);
+
+                if (!validateFlowRate(_b3_mlps, "Bomba 3 (B->C)")) return false;
+
+                Serial.println("[CAL][B3] Bomba C calibrada. Esvaziando B para preparar ciclo KH...");
+                _state = CAL_DRAIN_B_START;
+                return true;
+            }
+
+            if (now - _t_start > MAX_FILL_C_MS) {
+                _pc->stopAll();
+                setError("Timeout enchendo C (bomba 3)");
+                return false;
+            }
             return true;
         }
 
-        case CAL_B3_DONE:
-            Serial.println("[CAL][B3] === FIM DA CALIBRAÇÃO B3 ===\n");
-            _state = CAL_SAVE;
-            return true;
-
-        default:
-            return false;
+        default: return false;
     }
 }
 
+// =============================================================
+// Passo 2: Calibrar bomba 1 PRIMEIRO (aquario->A, 60.6 mL)
+//   - Após flush, enche A diretamente
+//   - Zera timer; liga bomba 1 (aquario->A)
+//   - Quando A cheia: mlps_b1 = (50 + 10.6) / t
+// =============================================================
+bool KH_Calibrator::stepCalibB1() {
+    unsigned long now = millis();
+
+    switch (_state) {
+        case CAL_B1_TIMED_START: {
+            Serial.println("[CAL][B1] Passo 2 - Calibrar bomba A (aquario->A, 60.6 mL)");
+            _t_start = millis();
+            _pc->pumpA_fill();  // aquario -> A
+            Serial.println("[CAL][B1] Timer zerado. Bomba A (aquario->A) ligada.");
+            _state = CAL_B1_WAIT_A_FULL;
+            return true;
+        }
+
+        case CAL_B1_WAIT_A_FULL: {
+            if (_sm->getLevelA() == 1) {
+                unsigned long dt_ms = millis() - _t_start;
+                float dt_s = dt_ms / 1000.0f;
+                _b1_mlps = (VOLUME_A_ML + HOSE_ML) / dt_s;
+                _t_fill_a_ms = dt_ms;  // REGISTRA TEMPO
+                _pc->pumpA_stop();
+                Serial.printf("[CAL][B1] A cheio (60.6 mL). Tempo=%.2f s (%.0f ms), vazao=%.4f mL/s\n",
+                              dt_s, (float)dt_ms, _b1_mlps);
+
+                if (!validateFlowRate(_b1_mlps, "Bomba 1 (aquario->A)")) return false;
+
+                Serial.println("[CAL][B1] Bomba A calibrada. Iniciando calibracao bomba B...");
+                _state = CAL_B2_TIMED_START;
+                return true;
+            }
+            if (now - _t_start > MAX_FILL_A_MS) {
+                _pc->stopAll();
+                setError("Timeout enchendo A (bomba 1)");
+                return false;
+            }
+            return true;
+        }
+
+        default: return false;
+    }
+}
+
+// =============================================================
+// Passo 5: Encher B de C (solução de referência)
+//   Após esvaziar B e garantir A cheio, enche B de C.
+//   - Liga bomba 3 reversa (C->B)
+//   - Tempo: calibrado de B + 30% (por perdas/evaporação)
+//   - NÃO dá erro se sensor B não ativar (perdas esperadas)
+//   Estado final: A CHEIO + B CHEIO (ref) + C PARCIAL
+// =============================================================
+bool KH_Calibrator::stepFillBFromC() {
+    unsigned long now = millis();
+
+    switch (_state) {
+        case CAL_FILL_B_FROM_C_START: {
+            Serial.println("[CAL][FILL_B] Passo 5 - Enchendo B de C (solucao de referencia)...");
+            _pc->pumpC_discharge();  // C -> B (bomba 3 reversa)
+            _t_start = now;
+            _state = CAL_FILL_B_FROM_C_WAIT;
+            return true;
+        }
+
+        case CAL_FILL_B_FROM_C_WAIT: {
+            // Para quando sensor B ativar
+            if (_sm->getLevelB() == 1) {
+                _pc->pumpC_stop();
+                Serial.printf("[CAL][FILL_B] B cheio após %lu ms. Iniciando ciclo de teste KH...\n",
+                              now - _t_start);
+                _state = CAL_KH_TEST_START;
+                return true;
+            }
+
+            // Timeout baseado em tempo calibrado + 30%
+            unsigned long fill_timeout;
+            if (_t_fill_b_ms > 0) {
+                fill_timeout = _t_fill_b_ms * 1.3;
+            } else {
+                fill_timeout = MAX_FILL_B_MS;
+            }
+
+            if (now - _t_start > fill_timeout) {
+                _pc->pumpC_stop();
+                // NÃO dá erro - perdas/evaporação são esperadas
+                Serial.printf("[CAL][FILL_B] Timeout após %lu ms (sensor B nao ativou). Prosseguindo...\n",
+                              now - _t_start);
+                _state = CAL_KH_TEST_START;
+                return true;
+            }
+            return true;
+        }
+
+        default: return false;
+    }
+}
+
+// =============================================================
+// Passo 5: Ciclo de teste de KH via KH_Analyzer
+//   CAL_KH_TEST_START: sinaliza .ino via needsKhTestCycle().
+//     O .ino detecta e inicia KH_Analyzer. Calibrador vai para WAIT.
+//   CAL_KH_TEST_WAIT: aguarda o .ino chamar onKhTestComplete().
+//     onKhTestComplete() armazena ph_ref e temp e avanca para CAL_SAVE.
+// =============================================================
+bool KH_Calibrator::stepKhTestTrigger() {
+    switch (_state) {
+        case CAL_KH_TEST_START:
+            // O .ino consulta needsKhTestCycle() e inicia o KH_Analyzer.
+            // Aqui apenas avancamos para WAIT - a transicao ocorre na proxima
+            // iteracao do loop apos o .ino ter iniciado o analyzer.
+            _state = CAL_KH_TEST_WAIT;
+            Serial.println("[CAL][KH_TEST] Aguardando ciclo de KH_Analyzer...");
+            return true;
+
+        case CAL_KH_TEST_WAIT:
+            // Aguarda onKhTestComplete() ser chamado pelo .ino.
+            return true;
+
+        default: return false;
+    }
+}
+
+// Chamado pelo .ino quando KH_Analyzer.isComplete() == true durante calibracao.
+void KH_Calibrator::onKhTestComplete(float ph_ref_measured, float temp_ref) {
+    _ph_ref_measured = ph_ref_measured;
+    _temp_ref        = temp_ref;
+
+    Serial.printf("[CAL][KH_TEST] Ciclo KH concluido: pH_ref=%.2f temp=%.2f C\n",
+                  _ph_ref_measured, _temp_ref);
+
+    if (!validatePHReference(_ph_ref_measured)) return;
+    if (!validateTemperature(_temp_ref))        return;
+
+    Serial.println("[CAL][KH_TEST] pH e temperatura validos. Salvando calibracao...");
+    _state = CAL_SAVE;
+}
+
+// =============================================================
+// Persistencia
+// =============================================================
 bool KH_Calibrator::saveCalibrationToSPIFFS() {
     if (!SPIFFS.begin(true)) {
-        Serial.println("[CAL] ERRO: SPIFFS.begin falhou ao salvar calibração");
+        Serial.println("[CAL] ERRO: SPIFFS.begin falhou");
         return false;
     }
 
-    DynamicJsonDocument doc(512);
-    doc["kh_ref_user"] = _kh_ref_user;
-    doc["mlps_b1"]     = _b1_mlps;
-    doc["mlps_b2"]     = _b2_mlps;
-    doc["mlps_b3"]     = _b3_mlps;
-
-    // [FIX] Salvar pH e temperatura de referência
+    DynamicJsonDocument doc(768);  // Aumentado para caber tempos
+    doc["kh_ref_user"]     = _kh_ref_user;
     doc["ph_ref_measured"] = _ph_ref_measured;
     doc["temp_ref"]        = _temp_ref;
-
-    Serial.printf("[CAL] Salvando calibração: KH_ref=%.2f, pH_ref=%.2f, temp_ref=%.2f°C\n",
-                  _kh_ref_user, _ph_ref_measured, _temp_ref);
-    Serial.printf("[CAL] Vazões: B1=%.4f, B2=%.4f, B3=%.4f mL/s\n",
-                  _b1_mlps, _b2_mlps, _b3_mlps);
+    doc["mlps_b1"]         = _b1_mlps;
+    doc["mlps_b2"]         = _b2_mlps;
+    doc["mlps_b3"]         = _b3_mlps;
+    doc["time_fill_a_ms"]  = _t_fill_a_ms;
+    doc["time_fill_b_ms"]  = _t_fill_b_ms;
+    doc["time_fill_c_ms"]  = _t_fill_c_ms;
 
     File f = SPIFFS.open(CAL_FILE, "w");
     if (!f) {
-        Serial.printf("[CAL] ERRO: não abriu %s para escrita\n", CAL_FILE);
+        Serial.printf("[CAL] ERRO: nao abriu %s\n", CAL_FILE);
         return false;
     }
     serializeJson(doc, f);
     f.close();
 
-    Serial.println("[CAL] Calibração salva em SPIFFS com sucesso.");
+    Serial.printf("[CAL] Salvo em SPIFFS: kh=%.2f pH=%.2f temp=%.2f\n",
+                  _kh_ref_user, _ph_ref_measured, _temp_ref);
+    Serial.printf("[CAL]   mlps: b1=%.4f b2=%.4f b3=%.4f\n",
+                  _b1_mlps, _b2_mlps, _b3_mlps);
+    Serial.printf("[CAL]   tempos: A=%lu ms  B=%lu ms  C=%lu ms\n",
+                  _t_fill_a_ms, _t_fill_b_ms, _t_fill_c_ms);
     return true;
 }
 
-// ========================================
-// [FIX] SANITY CHECKS - Validações
-// ========================================
-
-bool KH_Calibrator::validateFlowRate(float mlps, const char* pump_name) {
-    Serial.printf("[CAL][VALIDAÇÃO] Checando vazão %s: %.4f mL/s\n", pump_name, mlps);
-
-    if (mlps < MIN_FLOW_RATE) {
-        String msg = String("[CAL][ERRO] Vazão ") + pump_name + " muito baixa: " +
-                     String(mlps, 4) + " mL/s (mín: " + String(MIN_FLOW_RATE) + ")";
-        Serial.println(msg);
-        Serial.println("[CAL][DIAGNÓSTICO] Possíveis causas:");
-        Serial.println("  - Bomba travada ou com problema mecânico");
-        Serial.println("  - Mangueira obstruída ou dobrada");
-        Serial.println("  - Líquido muito viscoso");
-        Serial.println("  - Sensor de nível defeituoso (falso positivo)");
-
-        _result.error = msg;
-        sendCalibrationAlert(msg);
+// =============================================================
+// Validacoes (sanity checks)
+// =============================================================
+bool KH_Calibrator::validateFlowRate(float mlps, const char* name) {
+    if (mlps < MIN_FLOW_RATE || mlps > MAX_FLOW_RATE) {
+        String msg = String("[CAL] Vazao ") + name + " fora do esperado: " +
+                     String(mlps, 4) + " mL/s (esperado " +
+                     String(MIN_FLOW_RATE) + " - " + String(MAX_FLOW_RATE) + ")";
+        setError(msg);
         return false;
     }
-
-    if (mlps > MAX_FLOW_RATE) {
-        String msg = String("[CAL][ERRO] Vazão ") + pump_name + " muito alta: " +
-                     String(mlps, 4) + " mL/s (máx: " + String(MAX_FLOW_RATE) + ")";
-        Serial.println(msg);
-        Serial.println("[CAL][DIAGNÓSTICO] Possíveis causas:");
-        Serial.println("  - Sensor de nível defeituoso (não detectou cheio)");
-        Serial.println("  - Vazamento na câmara");
-        Serial.println("  - Volume da câmara menor que esperado");
-
-        _result.error = msg;
-        sendCalibrationAlert(msg);
-        return false;
-    }
-
-    Serial.printf("[CAL][VALIDAÇÃO] ✓ Vazão %s OK (%.4f mL/s está entre %.2f e %.2f)\n",
-                  pump_name, mlps, MIN_FLOW_RATE, MAX_FLOW_RATE);
+    Serial.printf("[CAL][OK] Vazao %s: %.4f mL/s\n", name, mlps);
     return true;
 }
 
 bool KH_Calibrator::validatePHReference(float ph) {
-    Serial.printf("[CAL][VALIDAÇÃO] Checando pH de referência: %.2f\n", ph);
-
     if (ph < MIN_PH_REF || ph > MAX_PH_REF) {
-        String msg = String("[CAL][ERRO] pH de referência fora do esperado: ") +
-                     String(ph, 2) + " (esperado: " + String(MIN_PH_REF) +
-                     "-" + String(MAX_PH_REF) + ")";
-        Serial.println(msg);
-        Serial.println("[CAL][DIAGNÓSTICO] Possíveis causas:");
-        Serial.println("  - Sonda de pH descalibrada");
-        Serial.println("  - Solução padrão vencida ou contaminada");
-        Serial.println("  - Sonda com bolhas de ar");
-        Serial.println("  - Sonda seca ou danificada");
-
-        _result.error = msg;
-        sendCalibrationAlert(msg);
+        String msg = String("[CAL] pH de referencia fora do esperado: ") +
+                     String(ph, 2) + " (esperado " +
+                     String(MIN_PH_REF) + " - " + String(MAX_PH_REF) + ")";
+        setError(msg);
         return false;
     }
-
-    Serial.printf("[CAL][VALIDAÇÃO] ✓ pH de referência OK (%.2f está entre %.2f e %.2f)\n",
-                  ph, MIN_PH_REF, MAX_PH_REF);
+    Serial.printf("[CAL][OK] pH referencia: %.2f\n", ph);
     return true;
 }
 
 bool KH_Calibrator::validateTemperature(float temp) {
-    Serial.printf("[CAL][VALIDAÇÃO] Checando temperatura: %.2f°C\n", temp);
-
     if (temp < MIN_TEMP || temp > MAX_TEMP) {
-        String msg = String("[CAL][ERRO] Temperatura fora do esperado: ") +
-                     String(temp, 2) + "°C (esperado: " + String(MIN_TEMP) +
-                     "-" + String(MAX_TEMP) + "°C)";
-        Serial.println(msg);
-        Serial.println("[CAL][DIAGNÓSTICO] Possíveis causas:");
-        Serial.println("  - Sensor de temperatura defeituoso");
-        Serial.println("  - Sensor mal posicionado");
-        Serial.println("  - Temperatura ambiente fora do normal");
-
-        _result.error = msg;
-        sendCalibrationAlert(msg);
+        String msg = String("[CAL] Temperatura fora do esperado: ") +
+                     String(temp, 2) + " C (esperado " +
+                     String(MIN_TEMP) + " - " + String(MAX_TEMP) + " C)";
+        setError(msg);
         return false;
     }
-
-    Serial.printf("[CAL][VALIDAÇÃO] ✓ Temperatura OK (%.2f°C está entre %.2f e %.2f)\n",
-                  temp, MIN_TEMP, MAX_TEMP);
+    Serial.printf("[CAL][OK] Temperatura: %.2f C\n", temp);
     return true;
 }
 
-void KH_Calibrator::sendCalibrationAlert(const String& message) {
-    Serial.println("[CAL][ALERTA] Preparando alerta de calibração...");
-    Serial.printf("[CAL][ALERTA] Mensagem: %s\n", message.c_str());
-
-    // [FIX] Envia alerta via sistema existente do servidor
-    // O ESP32 enviará uma medição especial com status="calibration_error"
-    // O servidor detectará e enviará alerta via Telegram/Email
-
-    // Esta função será chamada pelo arquivo .ino principal
-    // que tem acesso ao cloudAuth para enviar ao servidor
-    Serial.println("[CAL][ALERTA] ⚠️ Calibração falhou! Verifique os logs acima.");
-    Serial.println("[CAL][ALERTA] O sistema tentará notificar o usuário via servidor.");
+void KH_Calibrator::setError(const String& msg) {
+    _pc->stopAll();
+    _result.error = msg;
+    _state = CAL_ERROR;
+    Serial.println(msg);
+    Serial.println("[CAL] !!! CALIBRACAO ABORTADA !!!");
 }
 
+// =============================================================
+// Progresso — getters para barra de progresso no frontend
+// =============================================================
+
+String KH_Calibrator::getProgressMessage() {
+    switch (_state) {
+        case CAL_IDLE:           return "";
+        case CAL_FLUSH_START:    return "Limpeza: iniciando descarga das câmaras...";
+        case CAL_FLUSH_WAIT:     return "Limpeza: aguardando câmaras estabilizarem...";
+        case CAL_B1_TIMED_START: return "Bomba A (aquário→A): enchendo reservatório A (cronometrado)...";
+        case CAL_B1_WAIT_A_FULL: return "Bomba A (aquário→A): aguardando sensor A ativar...";
+        case CAL_B2_TIMED_START: return "Bomba B (A→B): transferência A→B iniciada (cronometrada)...";
+        case CAL_B2_WAIT_B_FULL: return "Bomba B (A→B): aguardando sensor B ativar...";
+        case CAL_B3_TIMED_START: return "Bomba C (B→C): transferência B→C iniciada (cronometrada)...";
+        case CAL_B3_WAIT_C_FULL: return "Bomba C (B→C): aguardando sensor C ativar...";
+        case CAL_DRAIN_B_START:
+        case CAL_DRAIN_B_WAIT:   return "Pós-calibração: esvaziando câmara B...";
+        case CAL_ENSURE_A_FULL:
+        case CAL_ENSURE_A_WAIT:  return "Pós-calibração: garantindo A cheio...";
+        case CAL_FILL_B_FROM_C_START:
+        case CAL_FILL_B_FROM_C_WAIT:  return "Preparação ciclo KH: enchendo B de C (referência)...";
+        case CAL_KH_TEST_START:
+        case CAL_KH_TEST_WAIT:   return "Executando ciclo de teste de KH (Fases 1-5)...";
+        case CAL_SAVE:       return "Salvando calibracao no SPIFFS...";
+        case CAL_COMPLETE:   return "Calibracao concluida!";
+        case CAL_ERROR:      return "ERRO: " + _result.error;
+        default:             return "";
+    }
+}
+
+int KH_Calibrator::getProgressPercent() {
+    switch (_state) {
+        case CAL_IDLE:           return -1;
+        case CAL_FLUSH_START:    return 2;
+        case CAL_FLUSH_WAIT:     return 8;
+        case CAL_B1_TIMED_START: return 15;
+        case CAL_B1_WAIT_A_FULL: return 20;
+        case CAL_B2_TIMED_START: return 30;
+        case CAL_B2_WAIT_B_FULL: return 35;
+        case CAL_B3_TIMED_START: return 45;
+        case CAL_B3_WAIT_C_FULL: return 55;
+        case CAL_DRAIN_B_START:
+        case CAL_DRAIN_B_WAIT:   return 60;
+        case CAL_ENSURE_A_FULL:
+        case CAL_ENSURE_A_WAIT:  return 65;
+        case CAL_FILL_B_FROM_C_START:
+        case CAL_FILL_B_FROM_C_WAIT:  return 70;
+        case CAL_KH_TEST_START:  return 75;
+        case CAL_KH_TEST_WAIT:   return 85;
+        case CAL_SAVE:       return 98;
+        case CAL_COMPLETE:   return 100;
+        case CAL_ERROR:      return -1;
+        default:             return 0;
+    }
+}
+
+unsigned long KH_Calibrator::getCompressorRemainingMs() {
+    // O compressor no Passo 5 e gerenciado pelo KH_Analyzer.
+    // O frontend deve consultar KH_Analyzer::getCompressorRemainingMs()
+    // durante CAL_KH_TEST_WAIT.
+    return 0;
+}
+
+// =============================================================
+// Carrega calibração prévia do SPIFFS
+//   Usado para flush inteligente e fallback de sensores
+// =============================================================
+bool KH_Calibrator::loadPreviousCalibration() {
+    if (!SPIFFS.begin(true)) {
+        Serial.println("[CAL] SPIFFS.begin falhou - sem calibracao previa");
+        return false;
+    }
+
+    if (!SPIFFS.exists(CAL_FILE)) {
+        Serial.println("[CAL] Nenhuma calibracao previa encontrada");
+        return false;
+    }
+
+    File f = SPIFFS.open(CAL_FILE, "r");
+    if (!f) {
+        Serial.println("[CAL] ERRO: nao conseguiu abrir calibracao previa");
+        return false;
+    }
+
+    DynamicJsonDocument doc(768);
+    DeserializationError error = deserializeJson(doc, f);
+    f.close();
+
+    if (error) {
+        Serial.printf("[CAL] ERRO ao ler JSON: %s\n", error.c_str());
+        return false;
+    }
+
+    // Carrega tempos para flush inteligente e fallback
+    _t_fill_a_ms = doc["time_fill_a_ms"] | 0;
+    _t_fill_b_ms = doc["time_fill_b_ms"] | 0;
+    _t_fill_c_ms = doc["time_fill_c_ms"] | 0;
+
+    if (_t_fill_a_ms > 0 && _t_fill_b_ms > 0 && _t_fill_c_ms > 0) {
+        Serial.printf("[CAL] Calibracao previa carregada: A=%lu ms, B=%lu ms, C=%lu ms\n",
+                      _t_fill_a_ms, _t_fill_b_ms, _t_fill_c_ms);
+        return true;
+    } else {
+        Serial.println("[CAL] Calibracao previa incompleta - usando tempos fixos");
+        _t_fill_a_ms = _t_fill_b_ms = _t_fill_c_ms = 0;
+        return false;
+    }
+}

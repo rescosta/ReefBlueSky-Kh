@@ -1,7 +1,7 @@
 //CloudAuth.cpp
 
 #include "CloudAuth.h"
-#include <ESP32-targz.h>
+// #include <ESP32-targz.h>  // [FIX] REMOVIDO - não usado e causa conflito GPIO 2 com WiFi PHY
 #include "MultiDeviceAuth.h"
 #include "TimeProvider.h"
 #include <stdint.h>
@@ -23,11 +23,11 @@ CloudAuth cloudAuth(CLOUD_BASE_URL, "");
 // [SEGURANÇA] Construtor e Inicialização
 // ============================================================================
 
-CloudAuth::CloudAuth(const char* url, const char* devId) 
+CloudAuth::CloudAuth(const char* url, const char* devId)
     : serverUrl(url), deviceId(devId) {
     Serial.printf("[CloudAuth] Inicializando com servidor: %s\n", url);
     Serial.printf("[CloudAuth] Device ID: %s\n", devId);
-    
+
     // [BOOT] Carregar checkpoint de sincronização
     incrementalSync.loadSyncCheckpoint();
 }
@@ -38,7 +38,7 @@ CloudAuth::CloudAuth(const char* url, const char* devId)
 
 bool CloudAuth::init() {
     Serial.println("[CloudAuth::init] Iniciando autenticação...");
-    
+
     if (deviceToken.length() > 0) {
         Serial.println("[CloudAuth::init] Usando deviceToken em RAM, pulando NVS.");
         onCloudAuthOk();

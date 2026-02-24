@@ -57,6 +57,35 @@ static OtaProgressCallback g_progressCallback = nullptr;
 static OtaEventCallback g_eventCallback = nullptr;
 static String g_lastError;
 static bool g_otaInProgress = false;
+static int g_ota_command_id = 0;       // commandId do comando OTA atual
+static int g_ota_last_reported = -1;   // último % reportado (throttle 25%)
+
+// Reporta progresso real ao backend via /api/v1/device/commands/ota-progress
+static void reportOtaProgressToCloud(int commandId, int percent, const String& status) {
+  if (commandId <= 0 || WiFi.status() != WL_CONNECTED) return;
+  if (deviceToken.length() == 0) return;
+
+  WiFiClient client;
+  HTTPClient http;
+  String url = "http://iot.reefbluesky.com.br/api/v1/device/commands/ota-progress";
+
+  String body = "{\"commandId\":";
+  body += String(commandId);
+  body += ",\"progress\":";
+  body += String(percent);
+  body += ",\"otaStatus\":\"";
+  body += status;
+  body += "\"}";
+
+  http.begin(client, url);
+  http.setTimeout(5000);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + deviceToken);
+  int code = http.POST(body);
+  Serial.printf("[OTA-PROG] cmd=%d pct=%d status=%s -> HTTP %d\n",
+                commandId, percent, status.c_str(), code);
+  http.end();
+}
 
 // ======== CALLBACKS ========
 
@@ -101,6 +130,13 @@ static bool otaInternal(const String& url) {
 
   g_otaInProgress = true;
   g_lastError = "";
+  g_ota_last_reported = -1;
+
+  // Reporta início (0%) se commandId válido
+  if (g_ota_command_id > 0) {
+    reportOtaProgressToCloud(g_ota_command_id, 0, "in_progress");
+    g_ota_last_reported = 0;
+  }
 
   WiFiClient client;
   HTTPClient http;
@@ -176,6 +212,8 @@ static bool otaInternal(const String& url) {
           writeRes, len, Update.getError());
         http.end();
         Update.abort();
+        if (g_ota_command_id > 0)
+          reportOtaProgressToCloud(g_ota_command_id, g_ota_last_reported, "failed");
         callEventCallback("failed", g_lastError);
         g_otaInProgress = false;
         return false;
@@ -190,6 +228,14 @@ static bool otaInternal(const String& url) {
         if (prog % 10 == 0 || written == (size_t)contentLen) {
           Serial.printf("[OTA] %d%% (%u/%d)\n", prog, written, contentLen);
           callProgressCallback(written, contentLen);
+        }
+        // Throttle: reporta ao backend apenas em múltiplos de 25%
+        if (g_ota_command_id > 0) {
+          int milestone = (prog / 25) * 25;
+          if (milestone > g_ota_last_reported) {
+            reportOtaProgressToCloud(g_ota_command_id, milestone, "in_progress");
+            g_ota_last_reported = milestone;
+          }
         }
       } else {
         if (written % 10240 == 0) {
@@ -226,6 +272,8 @@ static bool otaInternal(const String& url) {
   if (!Update.end(true)) {  // true = setSize() com bytes escritos
     g_lastError = "Update.end failed: " + String(Update.errorString());
     Serial.printf("[OTA] Erro: %s\n", Update.errorString());
+    if (g_ota_command_id > 0)
+      reportOtaProgressToCloud(g_ota_command_id, g_ota_last_reported, "failed");
     callEventCallback("failed", g_lastError);
     g_otaInProgress = false;
     return false;
@@ -234,13 +282,18 @@ static bool otaInternal(const String& url) {
   if (!Update.isFinished()) {
     g_lastError = "Update incomplete";
     Serial.println("[OTA] Update não finalizou corretamente");
+    if (g_ota_command_id > 0)
+      reportOtaProgressToCloud(g_ota_command_id, g_ota_last_reported, "failed");
     callEventCallback("failed", g_lastError);
     g_otaInProgress = false;
     return false;
   }
 
+  // Reporta 100% / done antes de reiniciar
+  if (g_ota_command_id > 0)
+    reportOtaProgressToCloud(g_ota_command_id, 100, "done");
 
-  // 🔹 Log de sucesso no backend antes de reiniciar
+  // Log de sucesso no backend antes de reiniciar
   logOtaSuccessToCloud();
 
   Serial.println("[OTA] 100% OK - Reboot em 2s!");
@@ -255,6 +308,11 @@ static bool otaInternal(const String& url) {
 
 bool otaFromUrl(const String& url) {
   return otaInternal(url);
+}
+
+void otaSetCommandId(int id) {
+  g_ota_command_id = id;
+  g_ota_last_reported = -1;
 }
 
 bool otaUpdateKh() {

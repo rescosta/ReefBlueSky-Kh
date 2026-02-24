@@ -13,9 +13,10 @@ PumpControl::PumpControl() {
     pump1.running = false;
 
     // Bomba B (R1 ↔ R2)
+    // [FIX] DIR1/DIR2 invertidos para corrigir sentido físico do motor
     pump2.PWM     = 27;
-    pump2.DIR1    = 25;
-    pump2.DIR2    = 26;
+    pump2.DIR1    = 26;
+    pump2.DIR2    = 25;
     pump2.channel = 1;
     pump2.running = false;
 
@@ -171,12 +172,13 @@ void PumpControl::setPumpDirection(int pump_id, bool forward) {
     }
 
     // TB6612: IN1/IN2 = DIR1/DIR2
+    // [FIX] Invertido porque motores estavam com polaridade trocada
     if (forward) {
-        digitalWrite(pump->DIR1, HIGH);
-        digitalWrite(pump->DIR2, LOW);
+        digitalWrite(pump->DIR1, LOW);   // Invertido
+        digitalWrite(pump->DIR2, HIGH);  // Invertido
     } else {
-        digitalWrite(pump->DIR1, LOW);
-        digitalWrite(pump->DIR2, HIGH);
+        digitalWrite(pump->DIR1, HIGH);  // Invertido
+        digitalWrite(pump->DIR2, LOW);   // Invertido
     }
 }
 

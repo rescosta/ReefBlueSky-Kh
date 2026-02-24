@@ -18,6 +18,11 @@ bool saveCredentialsToNVS(String email, String password);
 bool WiFiSetup::begin() {
   Serial.println("[WiFiSetup] Iniciando sistema de configuração...");
 
+  // ⚠️ IMPORTANTE: Usar ESP32 Arduino Core versão 3.3.5 ou inferior
+  // Versão 3.3.6 tem bug no WiFi PHY que causa erro "gpio[0] number: 2 is reserved"
+  // Bug aparece em múltiplas chamadas WiFi.disconnect()/begin() em sequência
+  // O erro é só um warning mas impede conexão STA em código complexo
+
   if (!SPIFFS.begin(true)) {
     Serial.println("[WiFiSetup] ERRO: Falha ao inicializar SPIFFS");
     return false;
@@ -46,10 +51,10 @@ bool WiFiSetup::begin() {
 
 bool WiFiSetup::createAccessPoint() {
     Serial.printf("[WiFiSetup] Criando Access Point: %s\n", AP_SSID);
-    
+
     // Desligar WiFi station
     WiFi.mode(WIFI_AP);
-    
+
     // Criar AP
     if (!WiFi.softAP(AP_SSID, AP_PASSWORD)) {
         Serial.println("[WiFiSetup] ERRO: Falha ao criar AP");
@@ -157,7 +162,7 @@ bool WiFiSetup::connectToWiFi() {
   }
 
 
-  // 1) Sempre tenta primeiro a ÚLTIMA rede conhecida (ssid/password atuais)
+  // 1) Sempre tenta primeira a ÚLTIMA rede conhecida (ssid/password atuais)
   if (!ssid.isEmpty()) {
     Serial.printf("[WiFiSetup] Tentando última rede conhecida primeiro: %s\n", ssid.c_str());
     WiFi.mode(WIFI_STA);

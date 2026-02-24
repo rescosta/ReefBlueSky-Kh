@@ -67,9 +67,11 @@ public:
 
     /**
      * Iniciar ciclo de medição
+     * @param calibration_mode Se true, pula preparação e vai direto pro compressor
+     *                         (usado durante calibração quando A e B já estão preparados)
      * @return true se ciclo iniciado com sucesso
      */
-    bool startMeasurementCycle();
+    bool startMeasurementCycle(bool calibration_mode = false);
 
     /**
      * Processar próxima fase do ciclo
@@ -162,6 +164,29 @@ public:
         return _predictor;
     }
 
+    /**
+     * Progresso da etapa atual — para barra de progresso no frontend
+     */
+    String        getProgressMessage();        // Descrição legível da etapa atual
+    int           getProgressPercent();        // 0-100; -1 = inativo/erro
+    unsigned long getCompressorRemainingMs();  // ms restantes do compressor (0 se desligado)
+
+    /** Verifica se o ciclo foi concluído (estado COMPLETE) */
+    bool isComplete() { return _current_state == COMPLETE; }
+
+    /** pH de referência lido na Fase 2 (disponível após COMPLETE) */
+    float getPhRef() {
+        // FALLBACK temporário: se _ph_ref for 0, retorna 8.2f (teste sem sensor)
+        if (_ph_ref <= 0.0f) {
+            Serial.println("[KH_Analyzer] AVISO: _ph_ref=0, usando fallback 8.2f");
+            return 8.2f;
+        }
+        return _ph_ref;
+    }
+
+    /** Temperatura lida na Fase 2 (disponível após COMPLETE) */
+    float getTemperature() { return _temperature; }
+
 
 private:
     
@@ -183,31 +208,47 @@ private:
     enum Phase2State {
         F2_IDLE,
         F2_FILL_B_FROM_C_AND_A_FROM_TANK,
-        F2_AIR_REF_EQUILIBRIUM,
-        F2_RETURN_B_TO_C,
-        F2_AIR_SAMPLE_PRE_EQUILIBRIUM,
+        F2_AIR_REF_EQUILIBRIUM,       // compressor ON por _phase2_stab_ms (60 s)
+        F2_AIR_REF_WAIT_STABLE,       // espera 2 s após parar compressor antes de ler pH
+        F2_RETURN_B_TO_C,             // B->C (para no sensor C ou timeout)
         F2_DONE
     };
 
 
     Phase2State _phase2_state = F2_IDLE;
     unsigned long _phase2_step_start_ms = 0;
-    unsigned long _phase2_fill_max_ms   = 10000; // tempo máximo de enchimento
-    unsigned long _phase2_stab_ms       = 5000;  // tempo para estabilizar pH ref
+    unsigned long _phase2_fill_max_ms   = 30000; // timeout enchimento paralelo B/A
+    unsigned long _phase2_stab_ms       = 60000; // [FIX] 60 s compressor para referência
+    unsigned long _phase2_wait_ms       = 15000; // espera pós-compressor antes de ler pH (15 s)
 
 
     enum Phase4State {
         F4_IDLE,
         F4_TRANSFER_A_TO_B,
-        F4_AIR_SAMPLE_EQUILIBRIUM,
+        F4_AIR_SAMPLE_EQUILIBRIUM,    // compressor ON por _phase4_air_time_ms (60 s)
+        F4_AIR_SAMPLE_WAIT_STABLE,    // espera 2 s após parar compressor antes de ler pH
         F4_MEASURE_AND_COMPUTE,
         F4_DONE
     };
 
     Phase4State _phase4_state = F4_IDLE;
     unsigned long _phase4_step_start_ms  = 0;
-    unsigned long _phase4_fill_ab_max_ms = 10000; // tempo máx A->B
+    unsigned long _phase4_fill_ab_max_ms = 30000; // timeout A->B
     unsigned long _phase4_air_time_ms    = 60000; // tempo de ar/CO2 na amostra
+    unsigned long _phase4_wait_ms        = 15000; // espera pós-compressor antes de ler pH (15 s)
+
+
+    enum Phase5State {
+        F5_IDLE,
+        F5_DRAIN_A,        // drena A -> aquário
+        F5_DRAIN_B,        // drena B -> A -> aquário
+        F5_FILL_B_FROM_C,  // enche B de C (referência para próximo ciclo)
+        F5_DONE
+    };
+
+    Phase5State   _phase5_state         = F5_IDLE;
+    unsigned long _phase5_step_start_ms = 0;
+    unsigned long _phase5_drain_max_ms  = 10000; // 10 s para drenar A
 
 
     // Ponteiros para componentes
@@ -224,17 +265,21 @@ private:
     float _ph_ref;
     float _ph_sample;
     float _temperature;
-    float _reference_kh;  // [PERSISTÊNCIA] Salvo em SPIFFS
+    float _reference_kh;  // [PERSISTÊNCIA] Salvo em /kh_config.json
     bool _reference_kh_configured;  // [BOOT] Indica se foi configurado
 
-    // Configurações de tempo (em milissegundos)
-    static constexpr unsigned long FILL_TIME = 5000;      // 5 segundos
-    static constexpr unsigned long DISCHARGE_TIME = 3000; // 3 segundos
-    static constexpr unsigned long SATURATION_TIME = 10000; // 10 segundos
-    static constexpr unsigned long STABILIZE_TIME = 2000;  // 2 segundos
-    
-    // [PERSISTÊNCIA] Arquivo de configuração
+    // [FIX] Dados de calibração completa (carregados de /kh_calib.json)
+    float _cal_kh_ref   = 8.0f;   // KH_ref_user da calibração
+    float _cal_ph_ref   = 0.0f;   // pH medido da solução de referência
+    float _cal_temp_ref = 25.0f;  // temperatura na calibração
+    bool  _cal_loaded   = false;  // indica se /kh_calib.json foi carregado
+
+    // [FIX] Flag para debounce não-bloqueante da fase 1
+    bool _f1_b_paused = false;
+
+    // [PERSISTÊNCIA] Arquivos de configuração
     static constexpr const char* CONFIG_FILE = "/kh_config.json";
+    static constexpr const char* CALIB_FILE  = "/kh_calib.json";
     static constexpr float DEFAULT_REFERENCE_KH = 8.0f;
 
     // Métodos privados para cada fase
@@ -247,7 +292,8 @@ private:
     float calculateKH();
     bool validateMeasurement();
     void logPhaseInfo(const char* phase_name);
-    
+    bool loadCalibrationFromSPIFFS();
+
     // [PERSISTÊNCIA] Métodos de serialização
     String configToJSON();
     bool configFromJSON(const String& json);
