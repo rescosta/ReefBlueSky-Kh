@@ -13,6 +13,30 @@ let editingScheduleData = {};
 let calibrationTimer = null;
 let calibrationSecondsTotal = 60;
 let calibrationSecondsLeft = 0;
+let manualDoseTimer = null;
+let _overlayMode = 'calibration'; // 'calibration' | 'manual'
+
+// Abre o overlay com título e botão corretos para o modo indicado
+function _openOverlay(mode) {
+  const overlay  = document.getElementById('calibrationOverlay');
+  const titleEl  = document.getElementById('calibrationOverlayTitle');
+  const abortBtn = document.getElementById('abortCalibrationBtn');
+  if (!overlay) return;
+  _overlayMode = mode;
+  if (mode === 'manual') {
+    if (titleEl)  titleEl.textContent  = '💧 Dose Manual em andamento';
+    if (abortBtn) abortBtn.textContent = '✖ Abortar Dose';
+  } else {
+    if (titleEl)  titleEl.textContent  = '⚙️ Calibração em andamento';
+    if (abortBtn) abortBtn.textContent = '✖ Abortar Calibração';
+  }
+  overlay.style.display = 'flex';
+}
+
+function _closeOverlay() {
+  const overlay = document.getElementById('calibrationOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
 
 
 function showTabFromQuery() {
@@ -199,6 +223,276 @@ function updateDeviceInfo() {
   `;
 }
 
+// ===== CONSUMPTION REPORT =====
+async function loadConsumptionReport() {
+  const token = getToken();
+  const reportContainer = document.getElementById('consumptionReport');
+
+  if (!reportContainer) return;
+
+  try {
+    const res = await fetch('/api/v1/user/dosing/consumption-report', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || !json.success) {
+      reportContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Erro ao carregar relatório</div>';
+      return;
+    }
+
+    const data = json.data || [];
+
+    if (data.length === 0) {
+      reportContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">Nenhuma bomba configurada</div>';
+      return;
+    }
+
+    reportContainer.innerHTML = data.map(pump => {
+      const alertColors = {
+        'OK':       { bg: '#22c55e', text: '#fff', label: 'OK' },
+        'WARNING':  { bg: '#f59e0b', text: '#fff', label: 'ATENÇÃO' },
+        'CRITICAL': { bg: '#ef4444', text: '#fff', label: 'CRÍTICO' }
+      };
+
+      const alertColor = alertColors[pump.alert_status] || alertColors.OK;
+      const volumePct = Math.round(pump.volume_pct || 0);
+      const barColor = alertColor.bg;
+      const isOn = pump.enabled == 1;
+
+      return `
+        <div style="background: #020617; border: 1px solid #1f2937; border-radius: 8px; padding: 16px;">
+          <!-- Header: toggle ON/OFF + nome + badge status -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button
+                class="btn-status ${isOn ? 'btn-on' : 'btn-off'}"
+                onclick="togglePumpFromReport(${pump.pump_index}, ${isOn})"
+              >${isOn ? 'ON' : 'OFF'}</button>
+              <h3 style="margin: 0; font-size: 16px; color: #e5e7eb;">${pump.pump_name}</h3>
+              <button
+                onclick="renamePumpFromReport(${pump.pump_index}, '${pump.pump_name}')"
+                title="Renomear bomba"
+                style="background: none; border: none; color: #6b7280; cursor: pointer; padding: 2px 4px; line-height: 1; display: flex; align-items: center;"
+              ><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            </div>
+            <span style="background: ${alertColor.bg}; color: ${alertColor.text}; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+              ${alertColor.label}
+            </span>
+          </div>
+
+          <!-- Barra de progresso + % -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <div style="flex: 1; background: #1f2937; border-radius: 4px; height: 8px; overflow: hidden;">
+              <div style="background: ${barColor}; height: 100%; width: ${Math.max(2, volumePct)}%; transition: width 0.3s;"></div>
+            </div>
+            <span style="color: ${barColor}; font-size: 12px; font-weight: 600; min-width: 36px; text-align: right;">${volumePct}%</span>
+          </div>
+
+          <!-- Informações -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+            <div>
+              <div style="color: #9ca3af; font-size: 11px;">Volume Restante</div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: #e5e7eb; font-weight: 600;">${pump.current_volume_ml} / ${pump.container_volume_ml} mL</span>
+                <button
+                  onclick="refillReservoirFromReport(${pump.pump_index}, ${pump.container_volume_ml})"
+                  title="Reabastecer reservatório"
+                  style="background: #16a34a; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 13px; line-height: 1; flex-shrink: 0;"
+                >↻</button>
+              </div>
+            </div>
+            <div>
+              <div style="color: #9ca3af; font-size: 11px;">Dias Restantes</div>
+              <div style="color: #e5e7eb; font-weight: 600;">${pump.days_remaining !== null ? pump.days_remaining + ' dias' : 'N/A'}</div>
+            </div>
+            <div>
+              <div style="color: #9ca3af; font-size: 11px;">Consumo Diário</div>
+              <div style="color: #e5e7eb; font-weight: 600;">${pump.avg_daily_consumption_ml} mL/dia</div>
+            </div>
+            <div> 
+              <div style="color: #9ca3af; font-size: 11px;">Previsão de Fim</div>
+              <div style="color: #e5e7eb; font-weight: 600;">${pump.estimated_end_date ? new Date(pump.estimated_end_date).toLocaleDateString('pt-BR') : 'N/A'}</div>  
+            </div>
+            <div>
+              <div style="color: #9ca3af; font-size: 11px;">Consumo Mensal</div>
+              <div style="color: #e5e7eb; font-weight: 600;">${pump.volume_consumed_month_ml} mL</div>
+            </div>
+            <div>
+              <div style="color: #9ca3af; font-size: 11px;">Custo Mensal</div>
+              <div style="color: #e5e7eb; font-weight: 600;">R$ ${pump.cost_month.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('Erro ao carregar relatório de consumo:', err);
+    reportContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #ef4444;">Erro ao carregar relatório</div>';
+  }
+}
+
+function showRenamePumpModal(currentName) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('renamePumpModal');
+    const cancelBtn = document.getElementById('renameCancelBtn');
+    const confirmBtn = document.getElementById('renameConfirmBtn');
+    const input = document.getElementById('renamePumpInput');
+
+    input.value = currentName;
+    modal.classList.add('show');
+    setTimeout(() => { input.focus(); input.select(); }, 100);
+
+    const close = (value) => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      input.removeEventListener('keydown', handleKey);
+      resolve(value);
+    };
+
+    const handleCancel = () => close(null);
+    const handleConfirm = () => {
+      const name = input.value.trim();
+      if (name) close(name);
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Enter') handleConfirm();
+      if (e.key === 'Escape') handleCancel();
+    };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    confirmBtn.addEventListener('click', handleConfirm);
+    input.addEventListener('keydown', handleKey);
+  });
+}
+
+async function renamePumpFromReport(pumpIndex, currentName) {
+  const newName = await showRenamePumpModal(currentName);
+  if (!newName || newName === currentName) return;
+
+  const pump = pumps[pumpIndex];
+  if (!pump) return;
+
+  const data = {
+    name: newName,
+    active: pump.enabled == 1,
+    container_size: pump.container_volume_ml,
+    current_volume: pump.current_volume_ml,
+    alarm_percent: pump.alarm_threshold_pct,
+    reagent_cost_per_liter: pump.reagent_cost_per_liter,
+    alert_before_days: pump.alert_before_days,
+  };
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}`,
+    'PUT',
+    data
+  );
+
+  if (result) {
+    pump.name = newName;
+    showSuccess('Bomba renomeada!');
+    renderConfigTable();
+    renderDashboard();
+    loadConsumptionReport();
+  }
+}
+
+async function togglePumpFromReport(pumpIndex, currentEnabled) {
+  const pump = pumps[pumpIndex];
+  if (!pump) return;
+
+  const newActive = !currentEnabled;
+  const data = {
+    name: pump.name,
+    active: newActive,
+    container_size: pump.container_volume_ml,
+    current_volume: pump.current_volume_ml,
+    alarm_percent: pump.alarm_threshold_pct,
+    reagent_cost_per_liter: pump.reagent_cost_per_liter,
+    alert_before_days: pump.alert_before_days,
+  };
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}`,
+    'PUT',
+    data
+  );
+
+  if (result) {
+    pump.enabled = newActive ? 1 : 0;
+    renderConfigTable();
+    renderDashboard();
+    loadConsumptionReport();
+  }
+}
+
+function showRefillConfirmModal(pumpName, containerVolume) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('refillConfirmModal');
+    const cancelBtn = document.getElementById('refillCancelBtn');
+    const confirmBtn = document.getElementById('refillConfirmBtn');
+    const message = document.getElementById('refillConfirmMessage');
+
+    message.textContent = `Marcar reservatório de ${pumpName} como cheio (${containerVolume} mL)?`;
+    modal.classList.add('show');
+
+    const handleCancel = () => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      resolve(false);
+    };
+
+    const handleConfirm = () => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      resolve(true);
+    };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    confirmBtn.addEventListener('click', handleConfirm);
+  });
+}
+
+async function refillReservoirFromReport(pumpIndex, containerVolume) {
+  const pump = pumps[pumpIndex];
+  if (!pump) return;
+
+  const confirmed = await showRefillConfirmModal(pump.name, containerVolume);
+  if (!confirmed) return;
+
+  const data = {
+    name: pump.name,
+    active: pump.enabled == 1,
+    container_size: pump.container_volume_ml,
+    current_volume: containerVolume,
+    alarm_percent: pump.alarm_threshold_pct,
+    reagent_cost_per_liter: pump.reagent_cost_per_liter,
+    alert_before_days: pump.alert_before_days,
+  };
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}`,
+    'PUT',
+    data
+  );
+
+  if (result) {
+    pump.current_volume_ml = containerVolume;
+    showSuccess('Reservatório reabastecido!');
+    loadConsumptionReport();
+    renderDashboard();
+  }
+}
+
 // ===== PUMPS =====
 async function loadPumps(deviceId) {
   if (!deviceId) {
@@ -230,9 +524,12 @@ async function loadPumps(deviceId) {
 
     renderPumpSelectors();
     renderConfigTable();
-    updateCalibrationRateLabel(); 
+    renderCalibrationCards();
+    updateCalibrationRateLabel();
     renderAllPumpsRateList();
     renderDashboard();
+    renderManualCards();
+    loadConsumptionReport();
 
   } catch (err) {
     console.error('❌ Erro ao carregar bombas:', err);
@@ -266,40 +563,53 @@ function renderPumpSelectors() {
 
 // ===== CONFIG TABLE =====
 function renderConfigTable() {
-    const tbody = document.getElementById('configTableBody');
-    if (!tbody) return;
+    const container = document.getElementById('configCards');
+    if (!container) return;
 
-    tbody.innerHTML = '';
-
-    if (pumps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma bomba encontrada</td></tr>';
+    if (!Array.isArray(pumps) || pumps.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;">Nenhuma bomba configurada</div>';
         return;
     }
 
-    pumps.forEach((pump, index) => {
-        const row = document.createElement('tr');
+    container.innerHTML = pumps.map((pump, index) => {
+        if (!pump) return '';
+
+        const pumpName = pump.name || `Bomba ${index + 1}`;
+        const pumpEnabled = pump.enabled;
         const containerSize = pump.container_volume_ml || pump.container_size || 0;
         const currentVolume = pump.current_volume_ml || pump.current_volume || 0;
         const alarmPercent = pump.alarm_threshold_pct || pump.alarm_percent || 0;
-        
-          row.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${pump.name || `P${index + 1}`}</td>
-            <td>
-              <button
-                class="btn-status ${pump.enabled ? 'btn-on' : 'btn-off'}"
-                onclick="togglePump(${index})"
-              >
-                ${pump.enabled ? 'ON' : 'OFF'}
-              </button>
-            </td>
-            <td>${containerSize}</td>
-            <td>${currentVolume}</td>
-            <td>${alarmPercent}%</td>
-            <td><button class="btn-edit" onclick="openEditModal(${index})">Editar</button></td>
-        `;
-        tbody.appendChild(row);
-    });
+        const volumePct = containerSize > 0 ? (currentVolume / containerSize) * 100 : 0;
+
+        return `
+          <div class="dosing-card config-pump-card">
+            <div class="schedule-card-header" style="padding:14px 16px;">
+              <button class="btn-status ${pumpEnabled ? 'btn-on' : 'btn-off'}" onclick="togglePump(${index})">${pumpEnabled ? 'ON' : 'OFF'}</button>
+              <span class="pump-card-name">${pumpName}</span>
+            </div>
+            <div style="padding:14px 16px; display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px;">
+              <div>
+                <div style="color:#94a3b8;margin-bottom:2px;">Vol. Recipiente</div>
+                <div style="color:#e2e8f0;font-weight:600;">${formatMl(containerSize)}</div>
+              </div>
+              <div>
+                <div style="color:#94a3b8;margin-bottom:2px;">Vol. Atual</div>
+                <div style="color:#e2e8f0;font-weight:600;">${formatMl(currentVolume)} <span style="color:#94a3b8;font-weight:400;">(${volumePct.toFixed(0)}%)</span></div>
+              </div>
+              <div>
+                <div style="color:#94a3b8;margin-bottom:2px;">Alarme</div>
+                <div style="color:#e2e8f0;font-weight:600;">${alarmPercent}%</div>
+              </div>
+              <div>
+                <div style="color:#94a3b8;margin-bottom:2px;">Taxa Calibrada</div>
+                <div style="color:#e2e8f0;font-weight:600;">${pump.calibration_rate_ml_s > 0 ? formatNumberBr(pump.calibration_rate_ml_s, 2) + ' mL/s' : '--'}</div>
+              </div>
+            </div>
+            <div style="padding:10px 16px; border-top:1px solid rgba(255,255,255,0.08);">
+              <button class="btn-edit" style="width:100%;" onclick="openEditModal(${index})">✏ Editar Configurações</button>
+            </div>
+          </div>`;
+    }).join('');
 }
 
 function updateCalibrationRateLabel() {
@@ -421,9 +731,10 @@ function openEditModal(index) {
     document.getElementById('editContainerSize').value = pump.container_volume_ml || pump.container_size || 0;
     document.getElementById('editCurrentVolume').value = pump.current_volume_ml || pump.current_volume || 0;
     document.getElementById('editAlarmPercent').value = pump.alarm_threshold_pct || pump.alarm_percent || 0;
+    document.getElementById('editReagentCost').value = pump.reagent_cost_per_liter || 0;
+    document.getElementById('editAlertBeforeDays').value = pump.alert_before_days || 7;
 
-
-    document.getElementById('editModal').style.display = 'flex';
+    document.getElementById('editModal').classList.add('show');
 }
 
 // [NOVO] Preencher volume atual = capacidade do reservatório
@@ -433,7 +744,7 @@ function fillToMaxVolume() {
 }
 
 function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
+    document.getElementById('editModal').classList.remove('show');
 }
 
 async function saveEditModal() {
@@ -445,6 +756,8 @@ async function saveEditModal() {
     container_size: parseInt(document.getElementById('editContainerSize').value) || 0,
     current_volume: parseInt(document.getElementById('editCurrentVolume').value) || 0,
     alarm_percent: parseInt(document.getElementById('editAlarmPercent').value) || 0,
+    reagent_cost_per_liter: parseFloat(document.getElementById('editReagentCost').value) || 0,
+    alert_before_days: parseInt(document.getElementById('editAlertBeforeDays').value) || 7,
   };
 
   console.log('💾 Salvando bomba:', index, data);
@@ -517,15 +830,16 @@ function openEditScheduleModal(scheduleId) {
   document.getElementById('editNotifyTelegram').checked = !!schedule.notify_telegram;
   document.getElementById('editNotifyEmail').checked = !!schedule.notify_email;
 
-  // abre modal
-  document.getElementById('editScheduleModal').style.display = 'flex';
+  const modal = document.getElementById('editScheduleModal');
+  modal.classList.add('show');
 }
 
 
 
 
 function closeEditScheduleModal() {
-  document.getElementById('editScheduleModal').style.display = 'none';
+  const modal = document.getElementById('editScheduleModal');
+  modal.classList.remove('show');
   editingScheduleId = null;
 }
 
@@ -644,70 +958,94 @@ async function togglePump(index) {
 
   if (result) {
     pump.enabled = newActive;
-    renderConfigTable();     
+    renderConfigTable();
     renderDashboard();
+    renderManualCards();
+    renderScheduleTableAll();
   }
 }
 
 function renderScheduleTableAll() {
-  const tbody = document.getElementById('scheduleTableBody');
-  if (!tbody) return;
+  const container = document.getElementById('scheduleCards');
+  if (!container) return;
 
-  if (schedules.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">Nenhuma agenda</td></tr>';
+  if (!Array.isArray(schedules) || schedules.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;">Nenhuma agenda cadastrada</div>';
     return;
   }
 
-  tbody.innerHTML = '';
-
   const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
 
-  schedules.forEach(schedule => {
-    const activeDaysArray = Array(7).fill(false);
-    (schedule.days_of_week || []).forEach(i => {
-      if (i >= 0 && i < 7) activeDaysArray[i] = true;
-    });
-
-    const daysText = activeDaysArray
-      .map((a,i) => a ? days[i] : '')
-      .filter(Boolean)
-      .join(', ');
-
-    const startTime = schedule.start_time || '--';
-    const endTime   = schedule.end_time   || '--';
-
-
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>
-        <button class="btn-status ${schedule.enabled ? 'btn-on' : 'btn-off'}"
-                onclick="toggleSchedule(${schedule.id})">
-          ${schedule.enabled ? 'ON' : 'OFF'}
-        </button>
-      </td>
-      <td>${schedule.pump_name || ('Bomba ' + (schedule.pump_index + 1))}</td>
-      <td>${daysText || '---'}</td>
-      <td>${schedule.doses_per_day || 0}</td>
-      <td>${startTime} - ${endTime}</td>
-      <td>${formatMl(schedule.volume_per_day_ml || schedule.volume_per_day || 0)}</td>
-      <td>
-        <button class="btn-edit" onclick="openEditScheduleModal(${schedule.id})">Editar</button>
-      </td>
-      <td>
-        <button class="btn-delete" onclick="deleteSchedule(${schedule.id})">Deletar</button>
-      </td>
-    `;
-    tbody.appendChild(row);
+  // Agrupa schedules por pump_index
+  const grouped = {};
+  schedules.forEach(s => {
+    const idx = s.pump_index != null ? s.pump_index : 0;
+    if (!grouped[idx]) grouped[idx] = [];
+    grouped[idx].push(s);
   });
+
+  const sortedIndexes = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+
+  container.innerHTML = sortedIndexes.map(pumpIdx => {
+    const pumpSchedules = grouped[pumpIdx];
+    const pumpName = (pumps[pumpIdx] && pumps[pumpIdx].name) || pumpSchedules[0].pump_name || `Bomba ${pumpIdx + 1}`;
+    const pumpEnabled = pumps[pumpIdx] ? pumps[pumpIdx].enabled : true;
+
+    const totalDaily = pumpSchedules
+      .filter(s => s.enabled)
+      .reduce((sum, s) => sum + (s.volume_per_day_ml || s.volume_per_day || 0), 0);
+
+    const rows = pumpSchedules.map(s => {
+      const activeDays = Array(7).fill(false);
+      (s.days_of_week || []).forEach(i => { if (i >= 0 && i < 7) activeDays[i] = true; });
+      const daysText = activeDays.map((a, i) => a ? `<span class="day-chip${a ? ' active' : ''}">${days[i]}</span>` : `<span class="day-chip">${days[i]}</span>`).join('');
+      const startTime = s.start_time || '--';
+      const endTime = s.end_time || '--';
+
+      return `
+        <div class="schedule-row ${s.enabled ? '' : 'schedule-row-disabled'}">
+          <div class="schedule-row-left">
+            <button class="btn-status ${s.enabled ? 'btn-on' : 'btn-off'}" onclick="toggleSchedule(${s.id})">${s.enabled ? 'ON' : 'OFF'}</button>
+            <div class="schedule-row-info">
+              <div class="schedule-days">${daysText}</div>
+              <div class="schedule-details">
+                <span>⏱ ${startTime} – ${endTime}</span>
+                <span>💧 ${s.doses_per_day || 0}×/dia</span>
+                <span>💉 ${((s.volume_per_day_ml || s.volume_per_day || 0) / (s.doses_per_day || 1)).toFixed(2).replace('.', ',')} mL/dose</span>
+                ${s.notify_email ? '<span title="Notificação por Email ativa">📧</span>' : ''}
+                ${s.notify_telegram ? '<span title="Notificação por Telegram ativa" style="display:inline-flex;align-items:center;margin-left:2px;"><svg width="16" height="16" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><circle cx="120" cy="120" r="120" fill="#0088cc"/><path fill="#fff" d="M81.229 128.772l14.237 39.406s1.78 3.687 3.686 3.687 30.255-29.492 30.255-29.492l31.525-60.89L81.737 118.6z"/><path fill="#d2e5f1" d="M100.106 138.878l-2.733 29.046s-1.144 8.9 7.754 0 17.415-15.763 17.415-15.763"/><path fill="#b5cfe4" d="M81.486 130.178l-17.8-5.467s-2.131-.835-1.424-2.73c.147-.388.403-.753.958-1.223 5.349-4.553 100.11-37.533 100.11-37.533s1.977-.415 3.13-.128c.385.098.754.288.987.642.132.2.211.44.232.686.032.383-.012.803-.046 1.257-.13 1.725-8.017 74.785-8.017 74.785s-.528 5.935-4.894 6.163c-1.157.06-2.556-.365-5.153-1.647-5.768-2.853-24.173-15.43-28.405-17.878-.655-.38-1.25-.817-1.565-1.538-.373-.855-.06-1.84.407-2.417 4.05-5.01 17.91-16.853 27.01-25.675.914-.888.818-1.126-.139-.847-6.298 1.838-29.952 18.72-34.02 21.263-.973.608-1.79.938-2.64 1.056-1.87.26-3.684-.167-5.59-.826-2.372-.82-11.728-3.868-11.728-3.868z"/></svg></span>' : ''}
+              </div>
+            </div>
+          </div>
+          <div class="schedule-row-actions">
+            <button class="btn-edit" onclick="openEditScheduleModal(${s.id})">✏ Editar</button>
+            <button class="btn-delete" onclick="deleteSchedule(${s.id})">🗑</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="dosing-card schedule-pump-card">
+        <div class="schedule-card-header">
+          <span class="pump-card-name">${pumpName}</span>
+          <span class="pump-daily-total">Total: ${totalDaily.toFixed(2).replace('.', ',')} mL/dia</span>
+        </div>
+        <div class="schedule-rows">${rows}</div>
+        <div class="schedule-card-footer">
+          <button class="btn-new-agenda" style="width:100%;" onclick="openAgendaModal(${pumpIdx})">+ Nova Agenda para ${pumpName}</button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
-function openAgendaModal() {
-    document.getElementById('pumpSelectAgenda').value = currentPumpIndex;
-    document.getElementById('agendaModal').style.display = 'flex';
+function openAgendaModal(pumpIdx) {
+    const idx = pumpIdx != null ? pumpIdx : currentPumpIndex;
+    document.getElementById('pumpSelectAgenda').value = idx;
+    document.getElementById('agendaModal').classList.add('show');
 }
 
 function closeAgendaModal() {
-    document.getElementById('agendaModal').style.display = 'none';
+    document.getElementById('agendaModal').classList.remove('show');
 }
 
 async function createSchedule() {
@@ -766,8 +1104,37 @@ async function createSchedule() {
 
 
 
+// Modal de confirmação customizado para deletar
+function showDeleteConfirmModal() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('deleteConfirmModal');
+    const cancelBtn = document.getElementById('deleteCancelBtn');
+    const confirmBtn = document.getElementById('deleteConfirmBtn');
+
+    modal.classList.add('show');
+
+    const handleCancel = () => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      resolve(false);
+    };
+
+    const handleConfirm = () => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      resolve(true);
+    };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    confirmBtn.addEventListener('click', handleConfirm);
+  });
+}
+
 async function deleteSchedule(scheduleId) {
-  if (!confirm('Tem certeza que deseja deletar esta agenda?')) return;
+  const confirmed = await showDeleteConfirmModal();
+  if (!confirmed) return;
 
   // normaliza id para número
   const idNum = Number(scheduleId);
@@ -801,9 +1168,74 @@ async function deleteSchedule(scheduleId) {
 
 
 // ===== MANUAL DOSE =====
+function renderManualCards() {
+  const container = document.getElementById('manualCards');
+  if (!container) return;
+
+  if (!Array.isArray(pumps) || pumps.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;">Nenhuma bomba configurada</div>';
+    return;
+  }
+
+  container.innerHTML = pumps.map((pump, idx) => {
+    if (!pump) return '';
+    const pumpName = pump.name || `Bomba ${idx + 1}`;
+    const pumpEnabled = pump.enabled;
+    return `
+      <div class="dosing-card manual-pump-card">
+        <div class="schedule-card-header">
+          <span class="pump-card-name">${pumpName}</span>
+        </div>
+        <div style="padding:14px 16px;">
+          <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">Volume (mL)</label>
+          <input type="number" id="manualVolume_${idx}" min="0" value="0"
+                 style="width:100%;box-sizing:border-box;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;">
+          <button class="btn-primary" style="width:100%;margin-top:10px;" onclick="applyManualDoseFor(${idx})">💧 Aplicar Dose</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function applyManualDoseFor(pumpIndex) {
+  const input = document.getElementById(`manualVolume_${pumpIndex}`);
+  const volume = input ? parseMl(input.value) : 0;
+
+  if (!volume || volume <= 0) {
+    showError('Digite um volume válido');
+    return;
+  }
+
+  const pump = pumps[pumpIndex];
+  const rate = pump && pump.calibration_rate_ml_s != null ? Number(pump.calibration_rate_ml_s) : 0;
+  if (!rate || Number.isNaN(rate) || rate <= 0) {
+    showError('Bomba sem taxa calibrada; calibre antes de usar dose manual.');
+    return;
+  }
+
+  const doseSeconds = volume / rate;
+  const pumpName = pump.name || `Bomba ${pumpIndex + 1}`;
+  startManualProgress(doseSeconds, pumpName);
+
+  try {
+    const result = await apiCall(
+      `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/manual`,
+      'POST',
+      { volume }
+    );
+    if (result) {
+      if (input) input.value = '0';
+    }
+  } catch (err) {
+    // Se falhou, fecha o overlay e cancela o timer
+    if (manualDoseTimer) { clearInterval(manualDoseTimer); manualDoseTimer = null; }
+    _closeOverlay();
+    showError('Erro ao aplicar dose: ' + (err.message || err));
+  }
+}
+
 async function applyManualDose() {
   const pumpIndex = parseInt(document.getElementById('pumpSelectManual').value, 10);
-  const volume = parseMl(document.getElementById('manualVolume').value);
+  const volume = parseMl(document.getElementById('manualVolume') ? document.getElementById('manualVolume').value : '0');
 
 
 
@@ -838,77 +1270,282 @@ async function applyManualDose() {
 }
 
 // ===== CALIBRATION =====
-async function startCalibration() {
-  const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
-  const btn = event.target;
+function renderCalibrationCards() {
+  const container = document.getElementById('calibrationCards');
+  if (!container) return;
 
-  console.log('⚙️ Iniciando calibração (60s):', pumpIndex);
+  if (!Array.isArray(pumps) || pumps.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;">Nenhuma bomba configurada</div>';
+    return;
+  }
 
-  // Nenhuma chamada de API aqui; só animação de 60s
-  btn.disabled = true;
+  container.innerHTML = pumps.map((pump, idx) => {
+    if (!pump) return '';
+    const pumpName = pump.name || `Bomba ${idx + 1}`;
+    const rate = pump.calibration_rate_ml_s > 0 ? formatNumberBr(pump.calibration_rate_ml_s, 3) : '--';
+    const rateMin = pump.calibration_rate_ml_s > 0 ? formatNumberBr(pump.calibration_rate_ml_s * 60, 1) : '--';
+
+    return `
+      <div class="dosing-card">
+        <div class="schedule-card-header" style="padding:14px 16px;">
+          <span class="pump-card-name">${pumpName}</span>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="margin-bottom:12px; font-size:13px; color:#cbd5e1;">
+            <div style="color:#94a3b8;margin-bottom:4px;">Taxa Atual:</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div>
+                <div style="font-size:18px;font-weight:600;color:#63b3ed;">${rate} mL/s</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px;">(${rateMin} mL/min)</div>
+              </div>
+              <svg onclick="editCalibrationRate(${idx})" style="width:18px;height:18px;cursor:pointer;fill:#94a3b8;transition:fill 0.2s;flex-shrink:0;" onmouseover="this.style.fill='#63b3ed'" onmouseout="this.style.fill='#94a3b8'" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </div>
+          </div>
+          <button class="btn-primary" style="width:100%;" onclick="showCalibrationConfirm(${idx})">⚙️ Calibrar Bomba</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+let currentCalibrationPumpIndex = null;
+
+function showCalibrationConfirm(pumpIndex) {
+  const pump = pumps[pumpIndex];
+  if (!pump) return;
+
+  currentCalibrationPumpIndex = pumpIndex;
+  const pumpName = pump.name || `Bomba ${pumpIndex + 1}`;
+
+  document.getElementById('calibrationPumpName').textContent = pumpName;
+
+  const modal = document.getElementById('calibrationConfirmModal');
+  const cancelBtn = document.getElementById('calibrationCancelBtn');
+  const confirmBtn = document.getElementById('calibrationConfirmBtn');
+
+  modal.classList.add('show');
+
+  const handleCancel = () => {
+    modal.classList.remove('show');
+    cancelBtn.removeEventListener('click', handleCancel);
+    confirmBtn.removeEventListener('click', handleConfirm);
+    currentCalibrationPumpIndex = null;
+  };
+
+  const handleConfirm = () => {
+    modal.classList.remove('show');
+    cancelBtn.removeEventListener('click', handleCancel);
+    confirmBtn.removeEventListener('click', handleConfirm);
+    startCalibrationCountdown(pumpIndex);
+  };
+
+  cancelBtn.addEventListener('click', handleCancel);
+  confirmBtn.addEventListener('click', handleConfirm);
+}
+
+async function startCalibrationCountdown(pumpIndex) {
+  currentCalibrationPumpIndex = pumpIndex;
 
   const overlay = document.getElementById('calibrationOverlay');
-  const textEl  = document.getElementById('calibrationCountdownText');
-  const barEl   = document.getElementById('calibrationProgressFill');
+  const textEl = document.getElementById('calibrationCountdownText');
+  const barEl = document.getElementById('calibrationProgressFill');
+
+  if (!overlay || !textEl || !barEl) return;
+
+  // Fase 1: Contagem regressiva de 5 segundos
+  _openOverlay('calibration');
+  barEl.style.width = '0%';
+
+  let countdown = 5;
+  textEl.textContent = `Iniciando em ${countdown} segundos...`;
+
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdown > 0) {
+      textEl.textContent = `Iniciando em ${countdown} segundos...`;
+    } else {
+      clearInterval(countdownInterval);
+      startCalibration60s(pumpIndex);
+    }
+  }, 1000);
+}
+
+async function startCalibration60s(pumpIndex) {
+  console.log('⚙️ Iniciando calibração (60s):', pumpIndex);
+
+  const overlay = document.getElementById('calibrationOverlay');
+  const textEl = document.getElementById('calibrationCountdownText');
+  const barEl = document.getElementById('calibrationProgressFill');
 
   calibrationSecondsTotal = 60;
-  calibrationSecondsLeft  = 60;
+  calibrationSecondsLeft = 60;
 
-
-  if (overlay) overlay.style.display = 'flex';
-  if (barEl) barEl.style.width = '0%';
-  if (textEl) textEl.textContent = `Restam ${calibrationSecondsLeft} segundos...`;
+  textEl.textContent = `Calibração em andamento... Restam ${calibrationSecondsLeft} segundos`;
+  barEl.style.width = '0%';
 
   if (calibrationTimer) clearInterval(calibrationTimer);
   calibrationTimer = setInterval(() => {
     calibrationSecondsLeft--;
 
     const pct = ((calibrationSecondsTotal - calibrationSecondsLeft) / calibrationSecondsTotal) * 100;
-    if (barEl) barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
 
     const s = calibrationSecondsLeft <= 0 ? 0 : calibrationSecondsLeft;
-    if (textEl) textEl.textContent = `Restam ${s} segundos...`;
+    textEl.textContent = `Calibração em andamento... Restam ${s} segundos`;
 
     if (calibrationSecondsLeft <= 0) {
       clearInterval(calibrationTimer);
       calibrationTimer = null;
-      if (overlay) overlay.style.display = 'none';
-      btn.disabled = false;
-      btn.textContent = '🔴 Iniciar Calibração';
+      textEl.textContent = '✓ Calibração concluída! Meça o volume...';
+      barEl.style.width = '100%';
+      setTimeout(() => {
+        _closeOverlay();
+        const targetPump = pumpIndex;
+        currentCalibrationPumpIndex = null;
+        showMeasuredVolumeInput(targetPump);
+      }, 800);
     }
   }, 1000);
 }
 
+function showMeasuredVolumeInput(pumpIndex) {
+  const pump = pumps[pumpIndex];
+  const pumpName = pump ? (pump.name || `Bomba ${pumpIndex + 1}`) : `Bomba ${pumpIndex + 1}`;
 
-async function abortCalibration() {
-  const overlay = document.getElementById('calibrationOverlay');
-  const btn = document.getElementById('goBtn');
+  const volume = prompt(`✅ Calibração concluída para ${pumpName}!\n\nDigite o volume medido (em mL):`);
 
-  if (calibrationTimer) {
-    clearInterval(calibrationTimer);
-    calibrationTimer = null;
+  if (volume !== null && volume.trim() !== '') {
+    const measuredVol = parseMl(volume.trim());
+    if (measuredVol > 0) {
+      saveCalibrationFor(pumpIndex, measuredVol);
+    } else {
+      showError('Volume inválido. Tente novamente.');
+    }
+  }
+}
+
+async function saveCalibrationFor(pumpIndex, measuredVolume) {
+  if (!currentDevice) {
+    showError('Device inválido');
+    return;
   }
 
-  if (overlay) overlay.style.display = 'none';
+  console.log('⚙️ Salvando calibração (60s):', pumpIndex, measuredVolume);
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
+    'POST',
+    { measured_volume: measuredVolume }
+  );
+
+  if (result && result.data && typeof result.data.ml_per_second === 'number') {
+    const rateNum = result.data.ml_per_second;
+    showSuccess(`Calibração salva! Taxa: ${formatNumberBr(rateNum, 3)} mL/s`);
+
+    if (pumps[pumpIndex]) {
+      pumps[pumpIndex].calibration_rate_ml_s = Number(rateNum);
+    }
+
+    renderCalibrationCards();
+  }
+}
+
+function editCalibrationRate(pumpIndex) {
+  const pump = pumps[pumpIndex];
+  if (!pump) return;
+
+  const pumpName = pump.name || `Bomba ${pumpIndex + 1}`;
+  const currentRate = pump.calibration_rate_ml_s > 0 ? pump.calibration_rate_ml_s : 0;
+  const currentVolume60s = currentRate > 0 ? (currentRate * 60).toFixed(1) : '';
+
+  document.getElementById('editCalibrationPumpName').textContent = pumpName;
+  document.getElementById('editCalibrationCurrentRate').textContent = `${formatNumberBr(currentRate, 3)} mL/s`;
+  document.getElementById('editCalibrationVolumeInput').value = currentVolume60s;
+
+  const modal = document.getElementById('editCalibrationModal');
+  const input = document.getElementById('editCalibrationVolumeInput');
+  const cancelBtn = document.getElementById('editCalibrationCancelBtn');
+  const confirmBtn = document.getElementById('editCalibrationConfirmBtn');
+
+  modal.classList.add('show');
+  setTimeout(() => input.focus(), 100);
+
+  const handleCancel = () => {
+    modal.classList.remove('show');
+    cancelBtn.removeEventListener('click', handleCancel);
+    confirmBtn.removeEventListener('click', handleConfirm);
+  };
+
+  const handleConfirm = () => {
+    const newVolumeStr = input.value.trim();
+    if (newVolumeStr !== '') {
+      const newVolume = parseFloat(newVolumeStr.replace(',', '.'));
+      if (newVolume > 0 && !isNaN(newVolume)) {
+        modal.classList.remove('show');
+        cancelBtn.removeEventListener('click', handleCancel);
+        confirmBtn.removeEventListener('click', handleConfirm);
+        saveManualCalibrationRate(pumpIndex, newVolume);
+      } else {
+        showError('Volume inválido. Digite um número positivo.');
+      }
+    }
+  };
+
+  cancelBtn.addEventListener('click', handleCancel);
+  confirmBtn.addEventListener('click', handleConfirm);
+}
+
+async function saveManualCalibrationRate(pumpIndex, measuredVolume) {
+  if (!currentDevice) {
+    showError('Device inválido');
+    return;
+  }
+
+  console.log('✏️ Salvando calibração manual:', pumpIndex, measuredVolume, 'mL em 60s');
+
+  const result = await apiCall(
+    `/api/v1/user/dosing/devices/${currentDevice.id}/pumps/${pumpIndex}/calibrate/save`,
+    'POST',
+    { measured_volume: measuredVolume }
+  );
+
+  if (result && result.data && typeof result.data.ml_per_second === 'number') {
+    const rateNum = result.data.ml_per_second;
+    showSuccess(`Calibração atualizada! Taxa: ${formatNumberBr(rateNum, 3)} mL/s`);
+
+    if (pumps[pumpIndex]) {
+      pumps[pumpIndex].calibration_rate_ml_s = Number(rateNum);
+    }
+
+    renderCalibrationCards();
+  }
+}
+
+
+async function abortCalibration() {
+  const operacao = _overlayMode === 'manual' ? 'dose manual' : 'calibração';
+  if (!confirm(`Abortar a ${operacao} em andamento?\n\nA bomba será parada imediatamente.`)) return;
+
+  // Para todos os timers ativos
+  if (calibrationTimer) { clearInterval(calibrationTimer); calibrationTimer = null; }
+  if (manualDoseTimer)  { clearInterval(manualDoseTimer);  manualDoseTimer  = null; }
+
+  _closeOverlay();
 
   try {
-    const pumpIndex = parseInt(document.getElementById('pumpSelectCalibration').value, 10);
+    const pumpIndex = currentCalibrationPumpIndex != null
+      ? currentCalibrationPumpIndex
+      : parseInt(document.getElementById('pumpSelectCalibration').value, 10);
     const pump = pumps[pumpIndex];
     if (pump && pump.id) {
-      // aborta calibração se estiver rolando
       await apiCall(`/api/v1/user/dosing/pumps/${pump.id}/calibrate/abort`, 'POST');
-      // e aborta dose manual se houver
       await apiCall(`/api/v1/user/dosing/pumps/${pump.id}/manual/abort`, 'POST');
+      console.log('✅ Bomba parada:', pumpIndex);
     }
   } catch (e) {
     console.warn('Falha ao chamar abort no device', e);
   }
 
-  if (btn) {
-    btn.disabled = false;
-    btn.textContent = '🔴 Iniciar Calibração';
-  }
-
+  currentCalibrationPumpIndex = null;
   showError('Operação abortada pelo usuário');
 }
 
@@ -951,29 +1588,33 @@ async function saveCalibration() {
 }
 
 
-function startManualProgress(totalSeconds) {
-  const overlay = document.getElementById('calibrationOverlay');
-  const textEl  = document.getElementById('calibrationCountdownText');
-  const barEl   = document.getElementById('calibrationProgressFill');
-  if (!overlay || !textEl || !barEl) return;
+function startManualProgress(totalSeconds, pumpName) {
+  const textEl = document.getElementById('calibrationCountdownText');
+  const barEl  = document.getElementById('calibrationProgressFill');
+  if (!textEl || !barEl) return;
 
-  let left = Math.max(1, Math.round(totalSeconds));
+  if (manualDoseTimer) { clearInterval(manualDoseTimer); manualDoseTimer = null; }
+
+  let left  = Math.max(1, Math.round(totalSeconds));
   let total = left;
 
-  overlay.style.display = 'flex';
+  _openOverlay('manual');
   barEl.style.width = '0%';
-  textEl.textContent = `Dose em andamento (${left}s restantes)...`;
+  const bombaLabel = pumpName ? ` — ${pumpName}` : '';
+  textEl.textContent = `Bomba ligada${bombaLabel}. Dosando... (${left}s restantes)`;
 
-  const timer = setInterval(() => {
+  manualDoseTimer = setInterval(() => {
     left--;
-    const used = total - left;
-    const pct = (used / total) * 100;
+    const pct = ((total - left) / total) * 100;
     barEl.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-    textEl.textContent = `Dose em andamento (${Math.max(0,left)}s restantes)...`;
+    textEl.textContent = `Bomba ligada${bombaLabel}. Dosando... (${Math.max(0, left)}s restantes)`;
 
     if (left <= 0) {
-      clearInterval(timer);
-      overlay.style.display = 'none';
+      clearInterval(manualDoseTimer);
+      manualDoseTimer = null;
+      textEl.textContent = `✓ Dose aplicada${bombaLabel}!`;
+      barEl.style.width = '100%';
+      setTimeout(() => _closeOverlay(), 1200);
     }
   }, 1000);
 }
@@ -1027,19 +1668,25 @@ function generateTimersForToday() {
 
   const today   = new Date();
   const weekday = today.getDay(); // 0=Dom..6=Sab
+  const tomorrow = (weekday + 1) % 7; // dia seguinte
 
   const timers = [];
 
   schedules.forEach(s => {
     if (!s.enabled) return;
-    if (!Array.isArray(s.days_of_week) || !s.days_of_week.includes(weekday)) return;
 
     const pump = pumps.find(p => p.index_on_device === s.pump_index);
     if (!pump) return;
 
     const dosesPerDay = s.doses_per_day || 1;
     const volDay = s.volume_per_day_ml || s.volume_per_day || 0;
-    const volDose     = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
+
+    // Verificar se agenda cruza meia-noite
+    const start = s.start_time || '00:00';
+    const end   = s.end_time   || '23:59';
+    const [sh] = start.split(':').map(Number);
+    const [eh] = end.split(':').map(Number);
+    const crossesMidnight = eh < sh || (eh === sh && end < start);
 
     // Usar adjusted_times se disponível (horários ajustados pelo backend)
     let adjustedTimes = [];
@@ -1053,18 +1700,45 @@ function generateTimersForToday() {
       adjustedTimes = s.adjusted_times;
     }
 
-    // Se temos horários ajustados, usar eles diretamente
     if (adjustedTimes && adjustedTimes.length > 0) {
+      // com horários ajustados - detectar se cruza meia-noite
+      const firstTime = adjustedTimes[0];
+      const [fh, fm] = firstTime.split(':').map(Number);
+      const firstSec = fh * 3600 + fm * 60;
+
       adjustedTimes.forEach((timeStr, idx) => {
         if (!timeStr) return;
-        // [FIX] Arredondar minutos para evitar dízimas
+
         const [h, m] = timeStr.split(':').map(v => Math.round(parseFloat(v)));
-        const sec = h * 3600 + m * 60;
-        const cleanTimeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        let sec = h * 3600 + m * 60;
+
+        // Detectar se é "amanhã" (cruzou meia-noite)
+        let isTomorrow = false;
+        let sortKey = sec;
+        let displayTime = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+        if (crossesMidnight && sec < firstSec && (firstSec - sec) > 12 * 3600) {
+          isTomorrow = true;
+          sortKey = sec + 24 * 3600;
+          displayTime += ' <span style="color:#9ca3af; font-size:11px;">(amanhã)</span>';
+        }
+
+        // Verificar se o dia (hoje ou amanhã) está nos days_of_week
+        const relevantDay = isTomorrow ? tomorrow : weekday;
+        if (!Array.isArray(s.days_of_week) || !s.days_of_week.includes(relevantDay)) {
+          return; // pular esta dose
+        }
+
+        let volDose;
+        if (Array.isArray(s.dose_volumes) && s.dose_volumes.length > 0) {
+          volDose = s.dose_volumes[idx] ?? s.dose_volumes[s.dose_volumes.length - 1];
+        } else {
+          volDose = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
+        }
 
         timers.push({
-          sortKey: sec,
-          time: cleanTimeStr,
+          sortKey: sortKey,
+          time: displayTime,
           pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
           volume: volDose,
           doseNumber: idx + 1,
@@ -1073,29 +1747,57 @@ function generateTimersForToday() {
         });
       });
     } else {
-      // Fallback: calcular horários uniformemente (comportamento antigo)
+      // fallback: calcular horários uniformemente
       const start = s.start_time || '00:00';
       const end   = s.end_time   || '23:59';
 
       const [sh, sm] = start.split(':').map(Number);
       const [eh, em] = end.split(':').map(Number);
 
-      const startSec = sh * 3600 + sm * 60;
-      const endSec   = eh * 3600 + em * 60;
-      if (endSec <= startSec || dosesPerDay <= 0) return;
+      let startSec = sh * 3600 + sm * 60;
+      let endSec   = eh * 3600 + em * 60;
+
+      if (dosesPerDay <= 0) return;
+
+      // Se horário cruza meia-noite (ex: 21:50 - 03:00), ajustar endSec
+      if (endSec <= startSec) {
+        endSec += 24 * 3600; // adiciona 24h ao horário final
+      }
 
       const rangeSec = endSec - startSec;
       const interval = rangeSec / dosesPerDay;
 
       for (let i = 0; i < dosesPerDay; i++) {
-        const sec = Math.round(startSec + i * interval);
-        const h   = Math.floor(sec / 3600);
-        const m   = Math.floor((sec % 3600) / 60);
-        const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        let sec = Math.round(startSec + i * interval);
+
+        // Se passou da meia-noite, normalizar APENAS para exibição
+        const normalizedSec = sec % (24 * 3600);
+        const h   = Math.floor(normalizedSec / 3600);
+        const m   = Math.floor((normalizedSec % 3600) / 60);
+
+        // Detectar se é "amanhã"
+        const isTomorrow = sec >= 24 * 3600;
+        let displayTime = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        if (isTomorrow) {
+          displayTime += ' <span style="color:#9ca3af; font-size:11px;">(amanhã)</span>';
+        }
+
+        // Verificar se o dia (hoje ou amanhã) está nos days_of_week
+        const relevantDay = isTomorrow ? tomorrow : weekday;
+        if (!Array.isArray(s.days_of_week) || !s.days_of_week.includes(relevantDay)) {
+          continue; // pular esta dose
+        }
+
+        let volDose;
+        if (Array.isArray(s.dose_volumes) && s.dose_volumes.length > 0) {
+          volDose = s.dose_volumes[i] ?? s.dose_volumes[s.dose_volumes.length - 1];
+        } else {
+          volDose = dosesPerDay > 0 ? volDay / dosesPerDay : 0;
+        }
 
         timers.push({
-          sortKey: sec,
-          time: timeStr,
+          sortKey: sec, // USA o valor SEM normalizar para manter ordem correta
+          time: displayTime,
           pumpName: pump.name || `Bomba ${s.pump_index + 1}`,
           volume: volDose,
           doseNumber: i + 1,
@@ -1182,14 +1884,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== MODAL CLOSE =====
 window.addEventListener('click', (e) => {
-    const editModal = document.getElementById('editModal');
-    const agendaModal = document.getElementById('agendaModal');
-    const editScheduleModal = document.getElementById('editScheduleModal');
-    
-    if (e.target === editScheduleModal) editScheduleModal.style.display = 'none';
+  const editModal         = document.getElementById('editModal');
+  const agendaModal       = document.getElementById('agendaModal');
+  const editScheduleModal = document.getElementById('editScheduleModal');
 
-    if (e.target === editModal) editModal.style.display = 'none';
-    if (e.target === agendaModal) agendaModal.style.display = 'none';
+  if (e.target === editModal)         editModal.classList.remove('show');
+  if (e.target === agendaModal)       agendaModal.classList.remove('show');
+  if (e.target === editScheduleModal) editScheduleModal.classList.remove('show');
 });
 
 function showSuccess(msg) {

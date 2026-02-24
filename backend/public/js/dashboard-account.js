@@ -188,6 +188,219 @@ async function changePassword() {
   }
 }
 
+// Modal de confirmação customizado para OTA
+function showOtaConfirmModal(currentVersion, newVersion) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('otaConfirmModal');
+    const currentVersionSpan = document.getElementById('otaCurrentVersion');
+    const newVersionSpan = document.getElementById('otaNewVersion');
+    const cancelBtn = document.getElementById('otaCancelBtn');
+    const confirmBtn = document.getElementById('otaConfirmBtn');
+
+    currentVersionSpan.textContent = currentVersion || 'desconhecida';
+    newVersionSpan.textContent = newVersion;
+
+    modal.classList.add('show');
+
+    const handleCancel = () => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      resolve(false);
+    };
+
+    const handleConfirm = () => {
+      modal.classList.remove('show');
+      cancelBtn.removeEventListener('click', handleCancel);
+      confirmBtn.removeEventListener('click', handleConfirm);
+      resolve(true);
+    };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    confirmBtn.addEventListener('click', handleConfirm);
+  });
+}
+
+// Função para atualização OTA com barra de progresso
+async function startOtaUpdate(deviceId, currentVersion, newVersion, statusSpan, btn) {
+  const modal = document.getElementById('otaProgressModal');
+  const progressBar = document.getElementById('otaProgressBar');
+  const progressPercent = document.getElementById('otaProgressPercent');
+  const statusText = document.getElementById('otaStatusText');
+  const successIcon = document.getElementById('otaSuccessIcon');
+  const closeBtn = document.getElementById('otaCloseBtn');
+
+  // Mostrar modal
+  modal.classList.add('show');
+  progressBar.style.width = '0%';
+  progressPercent.textContent = '0%';
+  statusText.textContent = 'Enviando comando de atualização...';
+  successIcon.style.display = 'none';
+  closeBtn.style.display = 'none';
+
+  try {
+    // Atualizar status no card
+    if (statusSpan) {
+      statusSpan.innerHTML = '<span class="spinner"></span> Atualizando...';
+      statusSpan.className = 'device-status-badge status-update';
+    }
+
+    // Enviar comando de atualização
+    const resUpdate = await apiFetch(`/api/v1/user/devices/${deviceId}/commands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'otaupdate',
+        payload: null,
+      }),
+    });
+
+    const dataUpdate = await resUpdate.json().catch(() => null);
+
+    if (!resUpdate.ok || !dataUpdate?.success) {
+      throw new Error(dataUpdate?.message || 'Erro ao iniciar atualização');
+    }
+
+    const commandId = dataUpdate?.data?.commandId;
+
+    // Polling real do progresso (usa commandId retornado pelo backend)
+    let result;
+    if (commandId) {
+      result = await pollOtaProgress(deviceId, commandId, progressBar, progressPercent, statusText);
+    } else {
+      // Fallback: sem commandId, progresso indeterminado
+      progressBar.style.width = '80%';
+      progressPercent.textContent = '...';
+      statusText.textContent = 'Aguardando dispositivo (sem commandId)...';
+      await new Promise(resolve => setTimeout(resolve, 40000));
+      result = { success: true, timedOut: true };
+    }
+
+    if (result && !result.success) {
+      throw new Error(result.message || 'Falha reportada pelo dispositivo');
+    }
+
+    // Sucesso!
+    progressBar.style.width = '100%';
+    progressPercent.textContent = '100%';
+    statusText.innerHTML = `
+      <div>&#10003; Atualização concluída!</div>
+      <div style="font-size:12px; margin-top:8px; color:#94a3b8;">
+        ${currentVersion || 'Versão anterior'} &rarr; ${newVersion}
+      </div>
+      <div style="font-size:12px; margin-top:4px; color:#94a3b8;">
+        O dispositivo está reiniciando. Aguarde ~30 segundos...
+      </div>
+    `;
+    successIcon.style.display = 'block';
+    progressBar.style.background = 'linear-gradient(90deg, #22c55e 0%, #4ade80 100%)';
+
+    // Aguardar reinicialização
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Mostrar botão fechar
+    closeBtn.style.display = 'block';
+    closeBtn.onclick = () => {
+      modal.classList.remove('show');
+      setTimeout(() => {
+        window.location.reload();
+      }, 200);
+    };
+
+    // Auto-fechar após 10s e recarregar página
+    setTimeout(() => {
+      if (modal.classList.contains('show')) {
+        modal.classList.remove('show');
+        setTimeout(() => {
+          window.location.reload();
+        }, 200);
+      }
+    }, 10000);
+
+  } catch (err) {
+    console.error('Erro ao atualizar:', err);
+    progressBar.style.background = 'linear-gradient(90deg, #ef4444 0%, #f87171 100%)';
+    statusText.innerHTML = `
+      <div style="color:#fca5a5;">✗ Erro na atualização</div>
+      <div style="font-size:12px; margin-top:8px; color:#94a3b8;">
+        ${err.message}
+      </div>
+    `;
+
+    if (statusSpan) {
+      statusSpan.textContent = 'Erro';
+      statusSpan.className = 'device-status-badge status-error';
+    }
+
+    closeBtn.style.display = 'block';
+    closeBtn.textContent = 'Fechar';
+    closeBtn.onclick = () => {
+      modal.classList.remove('show');
+    };
+  }
+}
+
+// Polling real do progresso OTA via backend
+// Retorna true se concluiu (done/failed), false se timeout
+async function pollOtaProgress(deviceId, commandId, progressBar, progressPercent, statusText) {
+  const POLL_INTERVAL_MS = 3000;
+  const TIMEOUT_MS       = 5 * 60 * 1000;  // 5 minutos máximo
+  const started = Date.now();
+
+  const statusLabels = {
+    pending:     'Aguardando dispositivo...',
+    inprogress:  'Conectando ao servidor de firmware...',
+    in_progress: 'Baixando e instalando firmware...',
+    done:        'Atualização concluída!',
+    error:       'Erro na atualização',
+    failed:      'Falha na atualização',
+  };
+
+  // Antes do device responder: mostra progresso inicial animado (0→5%)
+  progressBar.style.width = '5%';
+  progressPercent.textContent = '5%';
+  statusText.textContent = 'Aguardando dispositivo...';
+
+  while (Date.now() - started < TIMEOUT_MS) {
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+    try {
+      const res  = await apiFetch(`/api/v1/user/devices/${deviceId}/commands/${commandId}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) continue;
+
+      const { progress, otaStatus, status } = data.data || {};
+      const pct = Number(progress) || 0;
+
+      // Atualizar barra com valor real
+      progressBar.style.width = `${pct}%`;
+      progressPercent.textContent = `${pct}%`;
+      statusText.textContent = statusLabels[otaStatus] || statusLabels[status] || 'Atualizando...';
+
+      // Finalizado com sucesso — aguarda 10s para device reiniciar e gravar firmware
+      if (otaStatus === 'done' || status === 'done') {
+        progressBar.style.width = '100%';
+        progressPercent.textContent = '100%';
+        statusText.textContent = 'Gravando firmware... aguarde reinicialização';
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        return { success: true };
+      }
+
+      // Falha
+      if (otaStatus === 'failed' || status === 'error') {
+        return { success: false, message: 'Falha reportada pelo dispositivo' };
+      }
+
+    } catch (e) {
+      // ignora erros de rede no polling, tenta novamente
+    }
+  }
+
+  // Timeout — device pode ainda estar reiniciando
+  return { success: true, timedOut: true };
+}
+
 async function checkFirmwareStatusForDevice(deviceId, statusSpan, btn) {
   try {
     const res  = await apiFetch(`/api/v1/dev/device-firmware-status/${deviceId}`, {
@@ -558,57 +771,19 @@ async function loadDevices() {
 
           if (!upToDate) {
             if (statusSpan) {
-              statusSpan.textContent = `Atualização: ${curNoBin || 'desconhecida'} → ${latestNoBin}`;
+              statusSpan.textContent = `Novo: ${latestNoBin}`;
               statusSpan.className   = 'device-status-badge status-update';
             }
 
-            const wantUpdate = confirm(
-              `Nova versão disponível para este dispositivo.\n\n` +
-              `Versão atual: ${curNoBin || 'desconhecida'}\n` +
-              `Versão nova:  ${latestNoBin}\n\n` +
-              `Deseja iniciar a atualização agora?`
-            );
+            const wantUpdate = await showOtaConfirmModal(curNoBin, latestNoBin);
 
             if (wantUpdate) {
-              try {
-                if (statusSpan) {
-                  statusSpan.innerHTML = '<span class="spinner"></span> Atualizando...';
-                  statusSpan.className = 'device-status-badge status-update';
-                }
-
-                const resUpdate = await apiFetch(`/api/v1/user/devices/${deviceId}/commands`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    type: 'otaupdate',
-                    payload: null,
-                  }),
-                });
-
-                const dataUpdate = await resUpdate.json().catch(() => null);
-
-                if (!resUpdate.ok || !dataUpdate?.success) {
-                  alert(dataUpdate?.message || 'Erro ao iniciar atualização.');
-                  if (statusSpan) {
-                    statusSpan.textContent = 'Erro';
-                    statusSpan.className = 'device-status-badge status-error';
-                  }
-                  return;
-                }
-
-                alert('Atualização iniciada. O dispositivo pode reiniciar durante o processo.');
-
-                // opcional: reconsultar status depois de alguns segundos
-                setTimeout(() => {
-                  checkFirmwareStatusForDevice(deviceId, statusSpan, btn);
-                }, 8000);
-              } catch (err) {
-                console.error('Erro ao iniciar atualização', err);
-                alert('Erro ao iniciar atualização.');
-                if (statusSpan) {
-                  statusSpan.textContent = 'Erro';
-                  statusSpan.className = 'device-status-badge status-error';
-                }
+              await startOtaUpdate(deviceId, curNoBin, latestNoBin, statusSpan, btn);
+            } else {
+              // Restaurar estado anterior se cancelar
+              if (statusSpan) {
+                statusSpan.textContent = `Novo: ${latestNoBin}`;
+                statusSpan.className   = 'device-status-badge status-update';
               }
             }
           } else {

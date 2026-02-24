@@ -166,6 +166,106 @@ function updateTestNowProgress() {
   }
 }
 
+// Elementos de detalhe do progresso de teste manual
+const testNowProgressMsgEl = document.getElementById('testNowProgressMsg');
+const testNowProgressLog   = document.getElementById('testNowProgressLog');
+const tnLvlA   = document.getElementById('tnLvlA');
+const tnLvlB   = document.getElementById('tnLvlB');
+const tnLvlC   = document.getElementById('tnLvlC');
+const tnPh     = document.getElementById('tnPh');
+const tnTemp   = document.getElementById('tnTemp');
+const tnCompSpan = document.getElementById('tnCompSpan');
+const tnCompS    = document.getElementById('tnCompS');
+
+let _tnPollTimer    = null;
+let _tnLastMsg      = '';
+let _tnSeenActive   = false;
+let _tnStartedAt    = 0;
+const TN_GRACE_MS   = 20000;  // 20 s de carência antes de desistir
+
+const testNowProgressPctEl = document.getElementById('testNowProgressPct');
+
+function _tnLevelLabel(v) { return v === 1 ? 'Cheio' : 'Vazio'; }
+
+function _tnLogAppend(msg) {
+  if (!testNowProgressLog || !msg || msg === _tnLastMsg) return;
+  _tnLastMsg = msg;
+  const time = new Date().toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.textContent = `${time}  ${msg}`;
+  testNowProgressLog.appendChild(line);
+  testNowProgressLog.scrollTop = testNowProgressLog.scrollHeight;
+}
+
+async function _tnPollOnce(deviceId) {
+  try {
+    const res  = await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-status`);
+    const json = await res.json();
+    if (!json.success) return null;
+    return json.data;
+  } catch (_) { return null; }
+}
+
+function _tnUpdateUI(data) {
+  if (!data || !data.active) return false;
+
+  _tnSeenActive = true;
+
+  const pct = Math.max(0, Math.min(100, data.pct ?? 0));
+  if (testNowProgressFill)    testNowProgressFill.style.width = pct + '%';
+  if (testNowProgressLabel)   testNowProgressLabel.textContent = data.msg || `Medição de KH — ${pct}%`;
+  if (testNowProgressPctEl)   testNowProgressPctEl.textContent = pct + '%';
+  if (testNowProgressMsgEl)   testNowProgressMsgEl.textContent = '';
+
+  if (tnLvlA) tnLvlA.textContent = _tnLevelLabel(data.level_a);
+  if (tnLvlB) tnLvlB.textContent = _tnLevelLabel(data.level_b);
+  if (tnLvlC) tnLvlC.textContent = _tnLevelLabel(data.level_c);
+  if (tnPh)   tnPh.textContent   = data.ph   != null ? Number(data.ph).toFixed(2)   : '—';
+  if (tnTemp) tnTemp.textContent  = data.temperature != null ? Number(data.temperature).toFixed(1) : '—';
+
+  const compS = data.compressor_remaining_s ?? 0;
+  if (tnCompSpan) tnCompSpan.style.display = compS > 0 ? '' : 'none';
+  if (tnCompS)    tnCompS.textContent      = compS;
+
+  _tnLogAppend(data.msg);
+  return true;
+}
+
+function _startRealProgressPolling(deviceId) {
+  if (_tnPollTimer) clearInterval(_tnPollTimer);
+  _tnLastMsg    = '';
+  _tnSeenActive = false;
+  _tnStartedAt  = Date.now();
+  if (testNowProgressLog) testNowProgressLog.innerHTML = '';
+
+  _tnPollTimer = setInterval(async () => {
+    const data        = await _tnPollOnce(deviceId);
+    const stillActive = _tnUpdateUI(data);
+    const elapsed     = Date.now() - _tnStartedAt;
+
+    if (!stillActive) {
+      if (_tnSeenActive) {
+        // Ciclo terminou normalmente
+        clearInterval(_tnPollTimer); _tnPollTimer = null;
+        if (data && data.pct >= 100) {
+          if (testNowProgressFill)  testNowProgressFill.style.width = '100%';
+          if (testNowProgressPctEl) testNowProgressPctEl.textContent = '100%';
+          if (testNowProgressLabel) testNowProgressLabel.textContent = data.msg || 'Medição concluída!';
+          _tnLogAppend(data.msg || 'Medição concluída!');
+        }
+        setTimeout(() => stopTestNowProgress(false), 4000);
+      } else if (elapsed > TN_GRACE_MS) {
+        // Timeout sem resposta do dispositivo
+        clearInterval(_tnPollTimer); _tnPollTimer = null;
+        if (testNowProgressLabel) testNowProgressLabel.textContent = 'Sem resposta do dispositivo.';
+        _tnLogAppend('Timeout: dispositivo não respondeu.');
+        setTimeout(() => stopTestNowProgress(false), 3000);
+      }
+      // Dentro da carência: continua polling silenciosamente
+    }
+  }, 1000);
+}
+
 function startTestNowProgress() {
   if (!testNowProgressWrapper) return;
 
@@ -173,21 +273,34 @@ function startTestNowProgress() {
   testNowStartedAt = Date.now();
   testNowStep = 1;
 
-  testNowProgressFill.style.width = '20%';
-  testNowProgressLabel.textContent = 'Teste em andamento — etapa 1 de 5';
+  testNowProgressFill.style.width = '0%';
+  testNowProgressLabel.textContent = 'Aguardando dispositivo...';
+  if (testNowProgressPctEl) testNowProgressPctEl.textContent = '0%';
+  if (testNowProgressMsgEl) testNowProgressMsgEl.textContent = '';
+  if (testNowProgressLog)   testNowProgressLog.innerHTML = '';
 
   testNowProgressWrapper.style.display = 'block';
   abortArea.style.display = 'block';
   abortStatusText.innerHTML = '&nbsp;';
 
-  if (testNowTimerId) clearInterval(testNowTimerId);
-  testNowTimerId = setInterval(updateTestNowProgress, 1000);
+  // Inicia polling real do backend (substitui a estimativa por tempo)
+  const deviceId = DashboardCommon.getSelectedDeviceId();
+  if (deviceId) {
+    _startRealProgressPolling(deviceId);
+  } else {
+    // Fallback: estimativa por tempo se não houver deviceId
+    if (testNowTimerId) clearInterval(testNowTimerId);
+    testNowTimerId = setInterval(updateTestNowProgress, 1000);
+  }
 }
 
 function stopTestNowProgress(wasAborted) {
   isRunningTestNow = false;
   testNowStartedAt = null;
   testNowStep = 0;
+
+  // Para o polling real se estiver rodando
+  if (_tnPollTimer) { clearInterval(_tnPollTimer); _tnPollTimer = null; }
 
   if (testNowTimerId) {
     clearInterval(testNowTimerId);
@@ -200,6 +313,7 @@ function stopTestNowProgress(wasAborted) {
     testNowProgressLabel.textContent = wasAborted
       ? 'Teste cancelado'
       : 'Teste concluído';
+    if (testNowProgressMsgEl) testNowProgressMsgEl.textContent = '';
   }
 
   if (abortArea) {

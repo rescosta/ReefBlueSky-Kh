@@ -765,6 +765,21 @@ const khCalibRefInput     = document.getElementById('khCalibRefInput');
 const khCalibSaveBtn      = document.getElementById('khCalibSaveBtn');
 const khCalibCancelBtn    = document.getElementById('khCalibCancelBtn');
 const khCalibModalStatus  = document.getElementById('khCalibModalStatus');
+// Passo 3 (progresso embutido no modal)
+const khCalibStep3        = document.getElementById('khCalibStep3');
+const khCalibProgFill     = document.getElementById('khCalibProgFill');
+const khCalibProgMsg      = document.getElementById('khCalibProgMsg');
+const khCalibProgPct      = document.getElementById('khCalibProgPct');
+const khCalibLvlA         = document.getElementById('khCalibLvlA');
+const khCalibLvlB         = document.getElementById('khCalibLvlB');
+const khCalibLvlC         = document.getElementById('khCalibLvlC');
+const khCalibPhVal        = document.getElementById('khCalibPhVal');
+const khCalibTempVal      = document.getElementById('khCalibTempVal');
+const khCalibCompSpan     = document.getElementById('khCalibCompSpan');
+const khCalibCompS        = document.getElementById('khCalibCompS');
+const khCalibProgLog      = document.getElementById('khCalibProgLog');
+const khCalibCloseBtn     = document.getElementById('khCalibCloseBtn');
+const khCalibAbortBtn     = document.getElementById('khCalibAbortBtn');
 
 // flag que depois vamos mandar para o backend (assumeEmpty)
 let khCalibAssumeEmpty = true;
@@ -774,6 +789,8 @@ function showKhCalibModal() {
   khCalibAssumeEmpty = true;          // default = câmaras vazias
   khCalibStep1.classList.remove('hidden');
   khCalibStep2.classList.add('hidden');
+  if (khCalibStep3)    khCalibStep3.classList.add('hidden');
+  if (khCalibCloseBtn) khCalibCloseBtn.style.display = 'none';
   khCalibModalStatus.textContent = '';
   // sugere o valor atual se existir
   if (khRefInput && khRefInput.value) {
@@ -788,6 +805,123 @@ function closeKhCalibModal() {
   if (!khCalibModal) return;
   khCalibModal.classList.add('hidden');
 }
+
+// ── Polling de progresso embutido no modal (Passo 3) ────────────────────────
+let _khCalibModalPollTimer  = null;
+let _khCalibModalLastMsg    = '';
+let _khCalibModalSeenActive = false;   // true quando recebeu ao menos um active:true
+let _khCalibModalStartedAt  = 0;
+const KH_CALIB_GRACE_MS = 20000;       // 20 s de carência antes de desistir
+
+function _khCalibModalLogAppend(msg) {
+  if (!khCalibProgLog || !msg || msg === _khCalibModalLastMsg) return;
+  _khCalibModalLastMsg = msg;
+  const time = new Date().toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.textContent = `${time}  ${msg}`;
+  khCalibProgLog.appendChild(line);
+  khCalibProgLog.scrollTop = khCalibProgLog.scrollHeight;
+}
+
+function _khCalibModalSetComplete(msg) {
+  if (khCalibProgFill) khCalibProgFill.style.width = '100%';
+  if (khCalibProgPct)  khCalibProgPct.textContent  = '100%';
+  if (khCalibProgMsg)  khCalibProgMsg.textContent  = msg || 'Calibração concluída!';
+  _khCalibModalLogAppend(msg || 'Calibração concluída!');
+  if (khCalibCloseBtn) khCalibCloseBtn.style.display = 'block';
+  if (khCalibAbortBtn) khCalibAbortBtn.style.display = 'none';
+}
+
+function _khCalibModalUpdateUI(data) {
+  if (!data || !data.active) {
+    // Só mostra "concluído" se já viu dados ativos (evita fechamento prematuro)
+    if (_khCalibModalSeenActive) {
+      if (data && data.pct >= 100) {
+        _khCalibModalSetComplete(data.msg);
+      } else {
+        // Ciclo parou sem pct=100 (ex: erro ou abort externo)
+        if (khCalibProgMsg) khCalibProgMsg.textContent = data?.msg || 'Ciclo finalizado.';
+        _khCalibModalLogAppend(data?.msg || 'Ciclo finalizado.');
+        if (khCalibCloseBtn) khCalibCloseBtn.style.display = 'block';
+        if (khCalibAbortBtn) khCalibAbortBtn.style.display = 'none';
+      }
+    }
+    // Enquanto na carência: mantém "Aguardando..." sem exibir Close
+    return;
+  }
+
+  _khCalibModalSeenActive = true;
+
+  const pct = Math.max(0, Math.min(100, data.pct ?? 0));
+  if (khCalibProgFill) khCalibProgFill.style.width = pct + '%';
+  if (khCalibProgPct)  khCalibProgPct.textContent  = pct + '%';
+
+  const msg = data.msg || '';
+  if (khCalibProgMsg) khCalibProgMsg.textContent = msg;
+
+  if (khCalibLvlA) khCalibLvlA.textContent = data.level_a === 1 ? 'Cheio' : 'Vazio';
+  if (khCalibLvlB) khCalibLvlB.textContent = data.level_b === 1 ? 'Cheio' : 'Vazio';
+  if (khCalibLvlC) khCalibLvlC.textContent = data.level_c === 1 ? 'Cheio' : 'Vazio';
+  if (khCalibPhVal)   khCalibPhVal.textContent   = data.ph != null ? Number(data.ph).toFixed(2) : '—';
+  if (khCalibTempVal) khCalibTempVal.textContent = data.temperature != null ? Number(data.temperature).toFixed(1) : '—';
+
+  const compS = data.compressor_remaining_s ?? 0;
+  if (khCalibCompSpan) khCalibCompSpan.style.display = compS > 0 ? '' : 'none';
+  if (khCalibCompS)    khCalibCompS.textContent      = compS;
+
+  _khCalibModalLogAppend(msg);
+}
+
+function startKhCalibModalProgress(deviceId) {
+  stopKhCalibModalProgress();
+  _khCalibModalLastMsg    = '';
+  _khCalibModalSeenActive = false;
+  _khCalibModalStartedAt  = Date.now();
+
+  // Resetar UI
+  if (khCalibProgLog)  khCalibProgLog.innerHTML    = '';
+  if (khCalibProgFill) khCalibProgFill.style.width = '0%';
+  if (khCalibProgPct)  khCalibProgPct.textContent  = '0%';
+  if (khCalibProgMsg)  khCalibProgMsg.textContent  = 'Aguardando dispositivo...';
+  if (khCalibCloseBtn) khCalibCloseBtn.style.display = 'none';
+  if (khCalibAbortBtn) khCalibAbortBtn.style.display = 'block';
+
+  _khCalibModalPollTimer = setInterval(async () => {
+    const data = await _khPollOnce(deviceId);
+
+    if (data && data.active) {
+      _khCalibModalSeenActive = true;
+    }
+
+    _khCalibModalUpdateUI(data);
+
+    const inactive = !data || !data.active;
+    const elapsed  = Date.now() - _khCalibModalStartedAt;
+
+    if (inactive) {
+      if (_khCalibModalSeenActive) {
+        // Ciclo terminou normalmente
+        stopKhCalibModalProgress();
+      } else if (elapsed > KH_CALIB_GRACE_MS) {
+        // Não recebeu dados em 20 s → timeout
+        if (khCalibProgMsg) khCalibProgMsg.textContent = 'Sem resposta do dispositivo.';
+        _khCalibModalLogAppend('Timeout: dispositivo não respondeu.');
+        if (khCalibCloseBtn) khCalibCloseBtn.style.display = 'block';
+        if (khCalibAbortBtn) khCalibAbortBtn.style.display = 'none';
+        stopKhCalibModalProgress();
+      }
+      // Dentro da carência: continua polling silenciosamente
+    }
+  }, 1000);
+}
+
+function stopKhCalibModalProgress() {
+  if (_khCalibModalPollTimer) {
+    clearInterval(_khCalibModalPollTimer);
+    _khCalibModalPollTimer = null;
+  }
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 if (openKhCalibModalBtn && khCalibModal) {
   openKhCalibModalBtn.addEventListener('click', () => {
@@ -817,7 +951,69 @@ if (khCalibStep1No) {
 
 if (khCalibCancelBtn) {
   khCalibCancelBtn.addEventListener('click', () => {
+    stopKhCalibModalProgress();
     closeKhCalibModal();
+  });
+}
+
+// Botão Fechar do Passo 3 (aparece após conclusão)
+if (khCalibCloseBtn) {
+  khCalibCloseBtn.addEventListener('click', () => {
+    stopKhCalibModalProgress();
+    closeKhCalibModal();
+    // Dispara refresh da topbar apenas quando o usuário fecha manualmente
+    window.dispatchEvent(new CustomEvent('deviceChanged'));
+  });
+}
+
+// Botão Abortar do Passo 3
+if (khCalibAbortBtn) {
+  khCalibAbortBtn.addEventListener('click', async () => {
+    const confirmed = window.confirm(
+      'Abortar calibração agora?\n\n' +
+      'O processo será interrompido imediatamente e todas as bombas serão paradas.'
+    );
+    if (!confirmed) return;
+
+    const deviceId = DashboardCommon.getSelectedDeviceId();
+    if (!deviceId) return;
+
+    stopKhCalibModalProgress();
+    khCalibAbortBtn.disabled = true;
+    if (khCalibProgMsg) khCalibProgMsg.textContent = 'Abortando...';
+    _khCalibModalLogAppend('Comando de abort enviado.');
+
+    try {
+      await sendDeviceCommand(deviceId, 'abort');
+    } catch (e) {
+      console.error('abort error', e);
+    }
+
+    if (khCalibProgMsg) khCalibProgMsg.textContent = 'Calibração abortada.';
+    _khCalibModalLogAppend('Calibração abortada pelo usuário.');
+    if (khCalibCloseBtn) khCalibCloseBtn.style.display = 'block';
+    khCalibAbortBtn.disabled = false;
+    khCalibAbortBtn.style.display = 'none';
+    isRunningCycle = false;
+    updateAbortVisibility();
+
+    // Pergunta sobre dreno das câmaras
+    const wantDrain = window.confirm(
+      'Deseja esvaziar as câmaras agora?\n\n' +
+      'As bombas serão acionadas por 30 segundos para retornar o líquido ao aquário.'
+    );
+    if (!wantDrain) return;
+
+    _khCalibModalLogAppend('Iniciando esvaziamento das câmaras (30 s)...');
+    if (khCalibProgMsg) khCalibProgMsg.textContent = 'Esvaziando câmaras...';
+
+    try {
+      await sendDeviceCommand(deviceId, 'kh_drain');
+      _khCalibModalLogAppend('Esvaziamento iniciado. Aguarde ~30 s.');
+    } catch (e) {
+      console.error('kh_drain error', e);
+      _khCalibModalLogAppend('Erro ao iniciar esvaziamento.');
+    }
   });
 }
 
@@ -867,12 +1063,15 @@ if (khCalibSaveBtn) {
         khRefUser: val,
       });
 
-      khCalibModalStatus.textContent =
-        'Calibração iniciada. Acompanhe o ciclo no dispositivo.';
       isRunningCycle = true;
       updateAbortVisibility();
 
-      setTimeout(() => closeKhCalibModal(), 1000);
+      // Mostrar Passo 3 com progresso embutido no modal
+      khCalibStep2.classList.add('hidden');
+      if (khCalibStep3) {
+        khCalibStep3.classList.remove('hidden');
+        startKhCalibModalProgress(deviceId);
+      }
     } catch (err) {
       console.error('khcalibrate error', err);
       khCalibModalStatus.textContent =
@@ -1228,87 +1427,234 @@ if (refreshSensorsBtn) {
   startSensorAutoUpdate();
 }
 
-// Testes de enchimento de câmaras
-if (fillChamberABtn) {
-  fillChamberABtn.addEventListener('click', async () => {
+// ============================================================================
+// PAINÉIS DE PROGRESSO — Enchimento de câmaras e Limpeza do sistema
+// Usa polling do endpoint /sensors (independente do kh-status)
+// ============================================================================
+
+// Referências aos painéis
+const fillProgPanel  = document.getElementById('fillProgPanel');
+const fillProgTarget = document.getElementById('fillProgTarget');
+const fillProgDone   = document.getElementById('fillProgDone');
+const fillLvlA       = document.getElementById('fillLvlA');
+const fillLvlB       = document.getElementById('fillLvlB');
+const fillLvlC       = document.getElementById('fillLvlC');
+const fillPh         = document.getElementById('fillPh');
+const fillTemp       = document.getElementById('fillTemp');
+const fillProgLog    = document.getElementById('fillProgLog');
+
+const flushProgPanel = document.getElementById('flushProgPanel');
+const flushProgFill  = document.getElementById('flushProgFill');
+const flushProgMsg   = document.getElementById('flushProgMsg');
+const flushProgPct   = document.getElementById('flushProgPct');
+const flushLvlA      = document.getElementById('flushLvlA');
+const flushLvlB      = document.getElementById('flushLvlB');
+const flushLvlC      = document.getElementById('flushLvlC');
+const flushPh        = document.getElementById('flushPh');
+const flushTemp      = document.getElementById('flushTemp');
+const flushProgLog   = document.getElementById('flushProgLog');
+
+let _maintPollTimer = null;
+
+function _maintLogAppend(logEl, msg, lastRef) {
+  if (!logEl || !msg || msg === lastRef.v) return;
+  lastRef.v = msg;
+  const time = new Date().toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.textContent = `${time}  ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function _pollSensorsOnce(deviceId) {
+  try {
+    const res = await apiFetch(`/api/v1/devices/${encodeURIComponent(deviceId)}/sensors`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) { return null; }
+}
+
+function _levelLabel(v) { return v ? 'Cheio' : 'Vazio'; }
+
+// ── Enchimento de câmara ────────────────────────────────────────────────────
+function startFillChamberProgress(deviceId, chamber) {
+  if (_maintPollTimer) { clearInterval(_maintPollTimer); _maintPollTimer = null; }
+
+  const timeoutMs = chamber === 'C' ? 90000 : 30000;
+  const levelKey  = { A: 'levelA', B: 'levelB', C: 'levelC' }[chamber];
+  const startedAt = Date.now();
+  const lastMsg   = { v: '' };
+
+  // Reset UI
+  if (fillProgPanel)  fillProgPanel.style.display  = 'block';
+  if (fillProgTarget) fillProgTarget.textContent   = chamber;
+  if (fillProgDone)   fillProgDone.style.display   = 'none';
+  if (fillProgLog)    fillProgLog.innerHTML         = '';
+  _maintLogAppend(fillProgLog, `Enchendo câmara ${chamber}...`, lastMsg);
+
+  _maintPollTimer = setInterval(async () => {
+    const s = await _pollSensorsOnce(deviceId);
+    if (!s) return;
+
+    if (fillLvlA) fillLvlA.textContent = _levelLabel(s.levelA);
+    if (fillLvlB) fillLvlB.textContent = _levelLabel(s.levelB);
+    if (fillLvlC) fillLvlC.textContent = _levelLabel(s.levelC);
+    if (fillPh)   fillPh.textContent   = s.ph   != null ? Number(s.ph).toFixed(2)   : '—';
+    if (fillTemp) fillTemp.textContent = s.temperature != null ? Number(s.temperature).toFixed(1) : '—';
+
+    const isFull    = !!s[levelKey];
+    const elapsed   = Date.now() - startedAt;
+
+    if (isFull) {
+      clearInterval(_maintPollTimer); _maintPollTimer = null;
+      if (fillProgDone) fillProgDone.style.display = 'inline';
+      _maintLogAppend(fillProgLog, `Câmara ${chamber} cheia! Sensor ativo.`, lastMsg);
+      [fillChamberABtn, fillChamberBBtn, fillChamberCBtn].forEach(b => { if (b) b.disabled = false; });
+    } else if (elapsed >= timeoutMs) {
+      clearInterval(_maintPollTimer); _maintPollTimer = null;
+      _maintLogAppend(fillProgLog, `Timeout: câmara ${chamber} não atingiu o sensor em ${timeoutMs/1000}s.`, lastMsg);
+      [fillChamberABtn, fillChamberBBtn, fillChamberCBtn].forEach(b => { if (b) b.disabled = false; });
+    }
+  }, 1000);
+}
+
+// ── Limpeza completa ────────────────────────────────────────────────────────
+const FLUSH_DURATION_MS = 120000;
+
+function startFlushProgress(deviceId) {
+  if (_maintPollTimer) { clearInterval(_maintPollTimer); _maintPollTimer = null; }
+
+  const startedAt = Date.now();
+  const lastMsg   = { v: '' };
+
+  if (flushProgPanel) flushProgPanel.style.display = 'block';
+  if (flushProgFill)  flushProgFill.style.width    = '0%';
+  if (flushProgPct)   flushProgPct.textContent     = '0%';
+  if (flushProgMsg)   flushProgMsg.textContent     = 'Limpeza em andamento...';
+  if (flushProgLog)   flushProgLog.innerHTML       = '';
+  _maintLogAppend(flushProgLog, 'Ciclo de limpeza iniciado.', lastMsg);
+
+  _maintPollTimer = setInterval(async () => {
+    const elapsed = Date.now() - startedAt;
+    const pct     = Math.min(100, Math.round((elapsed / FLUSH_DURATION_MS) * 100));
+    const secs    = Math.max(0, Math.round((FLUSH_DURATION_MS - elapsed) / 1000));
+
+    if (flushProgFill) flushProgFill.style.width = pct + '%';
+    if (flushProgPct)  flushProgPct.textContent  = pct + '%';
+    if (flushProgMsg)  flushProgMsg.textContent  = pct < 100
+      ? `Limpeza em andamento... ${secs}s restantes`
+      : 'Limpeza concluída!';
+
+    const s = await _pollSensorsOnce(deviceId);
+    if (s) {
+      if (flushLvlA) flushLvlA.textContent = _levelLabel(s.levelA);
+      if (flushLvlB) flushLvlB.textContent = _levelLabel(s.levelB);
+      if (flushLvlC) flushLvlC.textContent = _levelLabel(s.levelC);
+      if (flushPh)   flushPh.textContent   = s.ph   != null ? Number(s.ph).toFixed(2)   : '—';
+      if (flushTemp) flushTemp.textContent = s.temperature != null ? Number(s.temperature).toFixed(1) : '—';
+    }
+
+    if (elapsed >= FLUSH_DURATION_MS) {
+      clearInterval(_maintPollTimer); _maintPollTimer = null;
+      _maintLogAppend(flushProgLog, 'Ciclo de limpeza concluído.', lastMsg);
+      if (systemFlushBtn) systemFlushBtn.disabled = false;
+    }
+  }, 1000);
+}
+
+// ── Verificação de calibração ──────────────────────────────────────────────
+async function checkIfDeviceIsCalibrated(deviceId) {
+  try {
+    const res = await apiFetch(`/api/v1/user/devices/${deviceId}/kh-status`, {
+      method: 'GET',
+    });
+
+    if (!res.ok) return false;
+
+    const data = await res.json();
+
+    // Verifica se tem calibração salva (kh_configured = true ou kh_reference > 0)
+    return data.kh_configured === true || (data.kh_reference && data.kh_reference > 0);
+  } catch (err) {
+    console.error('checkIfDeviceIsCalibrated error', err);
+    return false;
+  }
+}
+
+// ── Handlers dos botões ─────────────────────────────────────────────────────
+function _fillChamberHandler(chamber, btn) {
+  btn.addEventListener('click', async () => {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
     if (!deviceId) return;
 
-    fillChamberABtn.disabled = true;
-    chamberTestStatus.textContent = 'Enchendo câmara A...';
+    // [AVISO] Verificar se dispositivo foi calibrado
+    const isCalibrated = await checkIfDeviceIsCalibrated(deviceId);
+    if (isCalibrated) {
+      const confirmed = window.confirm(
+        `⚠️ ATENÇÃO: Recalibração Necessária\n\n` +
+        `Encher a câmara ${chamber} manualmente irá invalidar a calibração atual.\n\n` +
+        `Após este comando, será necessário executar uma nova calibração completa antes de realizar testes de KH.\n\n` +
+        `Deseja continuar mesmo assim?`
+      );
+      if (!confirmed) return;
+    }
 
-    const ok = await sendMaintenanceCommand(deviceId, 'fill_chamber', { chamber: 'A' });
-    chamberTestStatus.textContent = ok
-      ? 'Câmara A sendo enchida. Monitore o nível do sensor A.'
-      : 'Erro ao acionar enchimento da câmara A.';
+    [fillChamberABtn, fillChamberBBtn, fillChamberCBtn].forEach(b => { if (b) b.disabled = true; });
 
-    setTimeout(() => { fillChamberABtn.disabled = false; }, 2000);
+    const ok = await sendMaintenanceCommand(deviceId, 'fill_chamber', { chamber });
+    if (!ok) {
+      [fillChamberABtn, fillChamberBBtn, fillChamberCBtn].forEach(b => { if (b) b.disabled = false; });
+      if (fillProgPanel) {
+        fillProgPanel.style.display = 'block';
+        if (fillProgLog) fillProgLog.innerHTML = `<div style="color:#f87171;">Erro ao acionar enchimento da câmara ${chamber}.</div>`;
+      }
+      return;
+    }
+    startFillChamberProgress(deviceId, chamber);
   });
 }
 
-if (fillChamberBBtn) {
-  fillChamberBBtn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
+if (fillChamberABtn) _fillChamberHandler('A', fillChamberABtn);
+if (fillChamberBBtn) _fillChamberHandler('B', fillChamberBBtn);
+if (fillChamberCBtn) _fillChamberHandler('C', fillChamberCBtn);
 
-    fillChamberBBtn.disabled = true;
-    chamberTestStatus.textContent = 'Enchendo câmara B...';
-
-    const ok = await sendMaintenanceCommand(deviceId, 'fill_chamber', { chamber: 'B' });
-    chamberTestStatus.textContent = ok
-      ? 'Câmara B sendo enchida. Monitore o nível do sensor B.'
-      : 'Erro ao acionar enchimento da câmara B.';
-
-    setTimeout(() => { fillChamberBBtn.disabled = false; }, 2000);
-  });
-}
-
-if (fillChamberCBtn) {
-  fillChamberCBtn.addEventListener('click', async () => {
-    const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
-    if (!deviceId) return;
-
-    fillChamberCBtn.disabled = true;
-    chamberTestStatus.textContent = 'Enchendo câmara C...';
-
-    const ok = await sendMaintenanceCommand(deviceId, 'fill_chamber', { chamber: 'C' });
-    chamberTestStatus.textContent = ok
-      ? 'Câmara C sendo enchida. Monitore o nível do sensor C.'
-      : 'Erro ao acionar enchimento da câmara C.';
-
-    setTimeout(() => { fillChamberCBtn.disabled = false; }, 2000);
-  });
-}
-
-// Ciclo de limpeza completo do sistema
 if (systemFlushBtn) {
   systemFlushBtn.addEventListener('click', async () => {
     const deviceId = DashboardCommon.getSelectedDeviceIdOrAlert();
     if (!deviceId) return;
 
-    const confirm = window.confirm(
-      'Executar ciclo completo de limpeza?\n\n' +
-      'Isso vai acionar todas as bombas e válvulas para limpar o sistema.\n' +
-      'Duração aproximada: 2 minutos.'
-    );
-
-    if (!confirm) return;
+    // [AVISO] Verificar se dispositivo foi calibrado
+    const isCalibrated = await checkIfDeviceIsCalibrated(deviceId);
+    if (isCalibrated) {
+      const confirmed = window.confirm(
+        `⚠️ ATENÇÃO: Recalibração Necessária\n\n` +
+        `Executar o ciclo de limpeza completo irá invalidar a calibração atual.\n\n` +
+        `Isso vai acionar todas as bombas e válvulas para limpar o sistema.\n` +
+        `Duração aproximada: 2 minutos.\n\n` +
+        `Após este comando, será necessário executar uma nova calibração completa antes de realizar testes de KH.\n\n` +
+        `Deseja continuar mesmo assim?`
+      );
+      if (!confirmed) return;
+    } else {
+      // Dispositivo não calibrado - apenas confirma ação
+      if (!window.confirm(
+        'Executar ciclo completo de limpeza?\n\n' +
+        'Isso vai acionar todas as bombas e válvulas para limpar o sistema.\n' +
+        'Duração aproximada: 2 minutos.'
+      )) return;
+    }
 
     systemFlushBtn.disabled = true;
-    flushStatus.textContent = 'Executando ciclo de limpeza... Aguarde 2 minutos.';
-
     const ok = await sendMaintenanceCommand(deviceId, 'system_flush');
-    flushStatus.textContent = ok
-      ? 'Ciclo de limpeza iniciado. Aguarde a conclusão (~2 min).'
-      : 'Erro ao iniciar ciclo de limpeza.';
-
-    // Habilitar botão novamente após 2 minutos
-    setTimeout(() => {
+    if (!ok) {
       systemFlushBtn.disabled = false;
-      if (ok) {
-        flushStatus.textContent = 'Ciclo de limpeza concluído.';
+      if (flushProgPanel) {
+        flushProgPanel.style.display = 'block';
+        if (flushProgLog) flushProgLog.innerHTML = '<div style="color:#f87171;">Erro ao iniciar ciclo de limpeza.</div>';
       }
-    }, 120000);
+      return;
+    }
+    startFlushProgress(deviceId);
   });
 }
 
@@ -1324,6 +1670,146 @@ if (startCalibrationBtn) {
   startCalibrationBtn.addEventListener('click', () => {
     showKhCalibModal();
   });
+}
+
+// ============================================================================
+// BARRA DE PROGRESSO KH — polling do endpoint /kh-status
+// ============================================================================
+
+const khProgressPanel    = document.getElementById('khProgressPanel');
+const khProgressType     = document.getElementById('khProgressType');
+const khProgressFill     = document.getElementById('khProgressFill');
+const khProgressMsg      = document.getElementById('khProgressMsg');
+const khProgressPct      = document.getElementById('khProgressPct');
+const khLvlA             = document.getElementById('khLvlA');
+const khLvlB             = document.getElementById('khLvlB');
+const khLvlC             = document.getElementById('khLvlC');
+const khPhVal            = document.getElementById('khPhVal');
+const khTempVal          = document.getElementById('khTempVal');
+const khCompressorSpan   = document.getElementById('khCompressorSpan');
+const khCompressorS      = document.getElementById('khCompressorS');
+const khProgressLog      = document.getElementById('khProgressLog');
+
+let _khPollTimer    = null;
+let _khLastMsg      = '';   // evita duplicar entradas no log
+
+function _khLevelLabel(val) {
+  return val === 1 ? '🟢 Cheio' : '⚪ Vazio';
+}
+
+function _khTypeLabel(type) {
+  if (type === 'calibration') return 'Calibração KH';
+  if (type === 'measurement') return 'Medição de KH';
+  return type || '—';
+}
+
+function _khLogAppend(msg) {
+  if (!khProgressLog || !msg || msg === _khLastMsg) return;
+  _khLastMsg = msg;
+  const now  = new Date();
+  const time = now.toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.textContent = `${time}  ${msg}`;
+  khProgressLog.appendChild(line);
+  khProgressLog.scrollTop = khProgressLog.scrollHeight;
+}
+
+function _khUpdateUI(data) {
+  if (!khProgressPanel) return;
+
+  if (!data || !data.active) {
+    // Ciclo inativo: esconde painel após 3 s para o usuário ver o "100%"
+    setTimeout(() => {
+      if (khProgressPanel) khProgressPanel.style.display = 'none';
+    }, 3000);
+    return;
+  }
+
+  // Exibir painel
+  khProgressPanel.style.display = 'block';
+
+  // Tipo
+  if (khProgressType) khProgressType.textContent = _khTypeLabel(data.type);
+
+  // Barra
+  const pct = Math.max(0, Math.min(100, data.pct ?? 0));
+  if (khProgressFill) khProgressFill.style.width = pct + '%';
+  if (khProgressPct)  khProgressPct.textContent  = pct + '%';
+
+  // Mensagem
+  const msg = data.msg || '';
+  if (khProgressMsg) khProgressMsg.textContent = msg;
+
+  // Sensores
+  if (khLvlA) khLvlA.textContent = _khLevelLabel(data.level_a);
+  if (khLvlB) khLvlB.textContent = _khLevelLabel(data.level_b);
+  if (khLvlC) khLvlC.textContent = _khLevelLabel(data.level_c);
+  if (khPhVal)   khPhVal.textContent   = Number(data.ph).toFixed(2);
+  if (khTempVal) khTempVal.textContent = Number(data.temperature).toFixed(1);
+
+  // Compressor countdown
+  const compS = data.compressor_remaining_s ?? 0;
+  if (khCompressorSpan) khCompressorSpan.style.display = compS > 0 ? '' : 'none';
+  if (khCompressorS)    khCompressorS.textContent      = compS;
+
+  // Log
+  _khLogAppend(msg);
+}
+
+async function _khPollOnce(deviceId) {
+  try {
+    const res  = await apiFetch(`/api/v1/user/devices/${encodeURIComponent(deviceId)}/kh-status`);
+    const json = await res.json();
+    if (!json.success) return null;
+    return json.data;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Inicia o polling de progresso KH.
+ * @param {string} deviceId
+ * @param {string} type  'calibration' | 'measurement'
+ */
+function startKhProgressPolling(deviceId, type) {
+  stopKhProgressPolling();          // garante que não há poll anterior rodando
+
+  // Limpar log e mostrar painel imediatamente
+  if (khProgressLog)  khProgressLog.innerHTML = '';
+  if (khProgressPanel) khProgressPanel.style.display = 'block';
+  if (khProgressType)  khProgressType.textContent = _khTypeLabel(type);
+  if (khProgressFill)  khProgressFill.style.width = '0%';
+  if (khProgressMsg)   khProgressMsg.textContent  = 'Aguardando primeiro status...';
+  if (khProgressPct)   khProgressPct.textContent  = '0%';
+  _khLastMsg = '';
+
+  _khPollTimer = setInterval(async () => {
+    const data = await _khPollOnce(deviceId);
+    _khUpdateUI(data);
+
+    // Para quando o ciclo terminar
+    if (!data || !data.active) {
+      stopKhProgressPolling();
+      if (data && data.pct === 100) {
+        // Exibe mensagem final e esconde painel após 5 s
+        if (khProgressMsg) khProgressMsg.textContent = data.msg || 'Concluído!';
+        if (khProgressFill) khProgressFill.style.width = '100%';
+        if (khProgressPct)  khProgressPct.textContent  = '100%';
+        _khLogAppend(data.msg || 'Concluído!');
+        setTimeout(() => {
+          if (khProgressPanel) khProgressPanel.style.display = 'none';
+        }, 5000);
+      }
+    }
+  }, 1000);
+}
+
+function stopKhProgressPolling() {
+  if (_khPollTimer) {
+    clearInterval(_khPollTimer);
+    _khPollTimer = null;
+  }
 }
 
 
