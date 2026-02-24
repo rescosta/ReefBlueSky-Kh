@@ -12,11 +12,14 @@
 
 console.log('### BOOT server.js em', __dirname);
 
+// IMPORTANTE: Carregar .env ANTES de qualquer outro require
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
@@ -27,6 +30,7 @@ const displayRoutes    = require('./display-endpoints');
 const dosingUserRoutes = require('./dosing-user-routes');
 const dosingIotRoutes  = require('./dosing-iot-routes');
 const dosingDeviceRoutes = require('./dosing-device-routes');
+const { router: dosingLogsRoutes } = require('./dosing-logs-routes');
 const khTestScheduleRoutes = require('./kh-test-schedule-routes');
 
 const { getLatestFirmwareForType } = require('./iot-ota');
@@ -43,10 +47,6 @@ const {
   formatWithUserTimezone,
   formatDoserWithTimezone,
 } = require('./user-timezone');
-
-
-dotenv.config();
-
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
@@ -772,11 +772,159 @@ async function checkDevicesOnlineStatus() {
 
 checkDevicesOnlineStatus().catch(err => console.error('ERRO monitor inicial:', err));
 
+// ============================================================================
+// Check reagente baixo nas bombas de dosagem
+// ============================================================================
+async function checkLowReagentAlerts() {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Buscar todas as bombas ativas
+    const pumps = await conn.query(
+      `SELECT
+        p.id,
+        p.name,
+        p.device_id,
+        p.current_volume_ml,
+        p.container_volume_ml,
+        p.reagent_cost_per_liter,
+        p.alert_before_days,
+        p.last_alert_sent_at,
+        d.user_id,
+        d.name as device_name,
+        u.email,
+        u.telegram_chat_id,
+        u.telegram_bot_token,
+        u.telegram_enabled,
+        u.email_enabled
+      FROM dosing_pumps p
+      JOIN dosing_devices d ON p.device_id = d.id
+      JOIN users u ON d.user_id = u.id
+      WHERE p.enabled = 1
+        AND p.alert_before_days > 0`
+    );
+
+    for (const pump of pumps) {
+      // Consumo diário = soma do volume_per_day_ml das agendas ativas
+      const activeSchedules = await conn.query(
+        `SELECT COALESCE(SUM(volume_per_day_ml), 0) as daily_total
+        FROM dosing_schedules
+        WHERE pump_id = ? AND enabled = 1`,
+        [pump.id]
+      );
+
+      const dailyConsumption = Number(activeSchedules[0]?.daily_total || 0);
+
+      if (dailyConsumption <= 0) continue; // Sem agenda ativa
+
+      // Calcular dias restantes
+      const currentVolume = Number(pump.current_volume_ml || 0);
+      const daysRemaining = Math.floor(currentVolume / dailyConsumption);
+      const alertBeforeDays = Number(pump.alert_before_days || 7);
+
+      // Verificar se precisa alertar
+      if (daysRemaining <= alertBeforeDays && daysRemaining >= 0) {
+        // Verificar se já alertou recentemente (nas últimas 24h)
+        const lastAlertDate = pump.last_alert_sent_at ? new Date(pump.last_alert_sent_at) : null;
+        const now = new Date();
+        const hoursSinceLastAlert = lastAlertDate ? (now - lastAlertDate) / (1000 * 60 * 60) : 999;
+
+        if (hoursSinceLastAlert < 24) {
+          console.log(`[LOW REAGENT] Alerta já enviado há ${hoursSinceLastAlert.toFixed(1)}h para bomba ${pump.name}`);
+          continue; // Não enviar novamente
+        }
+
+        const pumpLabel = pump.name || `Bomba ${pump.id}`;
+        const deviceLabel = pump.device_name || 'Dosadora';
+
+        console.log(`[LOW REAGENT] ⚠️ ${pumpLabel}: ${daysRemaining} dias restantes (alerta em ${alertBeforeDays} dias)`);
+
+        // Email
+        if (pump.email_enabled && pump.email) {
+          try {
+            const emailBody = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #f59e0b;">⚠️ Reagente com Estoque Baixo</h2>
+                <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+                  <p style="margin: 10px 0;"><strong>Dispositivo:</strong> ${deviceLabel}</p>
+                  <p style="margin: 10px 0;"><strong>Bomba:</strong> ${pumpLabel}</p>
+                  <p style="margin: 10px 0;"><strong>Volume restante:</strong> ${currentVolume} mL</p>
+                  <p style="margin: 10px 0;"><strong>Dias restantes:</strong> ${daysRemaining} dias</p>
+                  <p style="margin: 10px 0;"><strong>Consumo médio:</strong> ${avgDailyConsumption.toFixed(1)} mL/dia</p>
+                </div>
+                <p style="color: #374151;">
+                  É recomendado fazer o reabastecimento em breve para evitar interrupção da dosagem.
+                </p>
+                <p style="color: #6b7280; font-size: 12px;">
+                  Esta é uma notificação automática do sistema ReefBlueSky.
+                </p>
+              </div>
+            `;
+
+            const { sendEmailForUser } = require('./alerts-helpers');
+            await sendEmailForUser(
+              pump.user_id,
+              `[ReefBlueSky Dosadora] ⚠️ ${pumpLabel} - Reagente Baixo`,
+              emailBody
+            );
+            console.log(`[LOW REAGENT] Email enviado para user ${pump.user_id}`);
+          } catch (err) {
+            console.error(`[LOW REAGENT] Erro ao enviar email:`, err.message);
+          }
+        }
+
+        // Telegram
+        if (pump.telegram_enabled && pump.telegram_chat_id && pump.telegram_bot_token) {
+          try {
+            const { sendTelegramForUser } = require('./alerts-helpers');
+            await sendTelegramForUser(
+              pump.user_id,
+              `⚠️ *Reagente com Estoque Baixo*\n\n` +
+              `*Bomba:* ${pumpLabel}\n` +
+              `*Volume restante:* ${currentVolume} mL\n` +
+              `*Dias restantes:* ${daysRemaining} dias\n` +
+              `*Consumo médio:* ${avgDailyConsumption.toFixed(1)} mL/dia\n\n` +
+              `_É recomendado fazer o reabastecimento em breve._`
+            );
+            console.log(`[LOW REAGENT] Telegram enviado para user ${pump.user_id}`);
+          } catch (err) {
+            console.error(`[LOW REAGENT] Erro ao enviar telegram:`, err.message);
+          }
+        }
+
+        // Atualizar timestamp do alerta
+        await conn.query(
+          `UPDATE dosing_pumps SET last_alert_sent_at = NOW() WHERE id = ?`,
+          [pump.id]
+        );
+
+        // Salvar log
+        const { saveDosingLog } = require('./dosing-logs-routes');
+        await saveDosingLog(conn, {
+          device_id: pump.device_id,
+          pump_id: pump.id,
+          log_type: 'ALERT',
+          log_level: 'WARNING',
+          message: `Reagente baixo: ${daysRemaining} dias restantes`,
+          details: { days_remaining: daysRemaining, current_volume_ml: currentVolume, avg_daily_ml: avgDailyConsumption }
+        });
+      }
+    }
+
+  } catch (err) {
+    console.error('[LOW REAGENT] Erro ao verificar reagente baixo:', err);
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
 setInterval(async () => {
   await checkDevicesOnlineStatus();
+  await checkLowReagentAlerts();
 }, MONITOR_INTERVAL_MS);
 
-console.log('[ALERT] Monitor de devices online/offline iniciado.');
+console.log('[ALERT] Monitor de devices online/offline e reagente baixo iniciado.');
 
 
 // Body parser
@@ -839,6 +987,11 @@ function requireDev(req, res, next) {
 // Web (JWT) – dosing
 app.use('/api/v1/user/dosing', authUserMiddleware, dosingUserRoutes);
 
+// Web (JWT) – dosing logs
+app.use('/api/dosing-logs', authUserMiddleware, (req, res, next) => {
+  req.db = pool;
+  next();
+}, dosingLogsRoutes);
 
 // 🔹 Rotas da dosadora (ESP), sem JWT de usuário
 app.use('/api/v1/iot/dosing', dosingDeviceRoutes);
@@ -1195,6 +1348,26 @@ app.get('/api/v1/user/devices/:deviceId/test-connection',
         );
         if (doserRows.length) {
           lastSeen = doserRows[0].last_seen;
+        }
+      }
+
+      // 1c) Se for LCD, usa lcd_last_seen do KH associado como fallback
+      if (deviceType === 'LCD' && !lastSeen) {
+        const khRows = await conn.query(
+          `SELECT lcd_last_seen
+             FROM devices
+            WHERE deviceId = ? AND type = 'KH'
+            LIMIT 1`,
+          [dev.mainDeviceId || null]
+        );
+        if (khRows.length && khRows[0].lcd_last_seen) {
+          const raw = String(khRows[0].lcd_last_seen);
+          if (raw.length === 14) {
+            // YYYYMMDDHHMMSS → Date
+            const y = raw.slice(0,4), mo = raw.slice(4,6), d2 = raw.slice(6,8);
+            const h = raw.slice(8,10), m = raw.slice(10,12), s = raw.slice(12,14);
+            lastSeen = new Date(`${y}-${mo}-${d2}T${h}:${m}:${s}Z`);
+          }
         }
       }
 
@@ -3117,6 +3290,62 @@ app.post('/api/v1/device/health', verifyToken, async (req, res) => {
 });
 
 
+// ============================================================================
+// KH Progress — armazenamento em memória (sem alteração de schema de banco)
+// ============================================================================
+const khStatusByDevice = new Map();  // deviceId → { active, type, msg, pct, ... }
+
+/**
+ * POST /api/v1/device/kh-status
+ * Recebe progresso do ciclo KH do ESP32 e armazena em memória.
+ * Payload: { active, type, msg, pct, compressor_remaining_s,
+ *            level_a, level_b, level_c, ph, temperature }
+ */
+app.post('/api/v1/device/kh-status', verifyToken, async (req, res) => {
+  try {
+    const deviceId = req.user.deviceId;
+    const body = req.body || {};
+    khStatusByDevice.set(deviceId, {
+      active:                body.active ?? false,
+      type:                  body.type   ?? '',
+      msg:                   body.msg    ?? '',
+      pct:                   Number(body.pct ?? -1),
+      compressor_remaining_s:Number(body.compressor_remaining_s ?? 0),
+      level_a:               Number(body.level_a  ?? 0),
+      level_b:               Number(body.level_b  ?? 0),
+      level_c:               Number(body.level_c  ?? 0),
+      ph:                    Number(body.ph        ?? 0),
+      temperature:           Number(body.temperature ?? 0),
+      updated_at:            Date.now(),
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[kh-status POST]', err);
+    return res.status(500).json({ success: false });
+  }
+});
+
+/**
+ * GET /api/v1/user/devices/:deviceId/kh-status
+ * Retorna o progresso atual do ciclo KH para o frontend.
+ * Considera inativo se o dado tiver mais de 10 s (device desapareceu).
+ */
+app.get('/api/v1/user/devices/:deviceId/kh-status', authUserMiddleware, async (req, res) => {
+  try {
+    const deviceId = req.params.deviceId;
+    const status = khStatusByDevice.get(deviceId);
+    // [FIX] Aumentado timeout de 10s para 30s para evitar "Ciclo finalizado" prematuro
+    // quando ESP32 tem pequenas falhas de comunicação (WiFi, HTTP timeout, etc)
+    if (!status || Date.now() - status.updated_at > 30000) {
+      return res.json({ success: true, data: { active: false, pct: -1, msg: '' } });
+    }
+    return res.json({ success: true, data: status });
+  } catch (err) {
+    console.error('[kh-status GET]', err);
+    return res.status(500).json({ success: false });
+  }
+});
+
 // [FIX] POST /api/v1/device/alert - Recebe alertas do ESP32 (calibração, erros, etc)
 app.post('/api/v1/device/alert', verifyToken, async (req, res) => {
   console.log('[API] POST /api/v1/device/alert');
@@ -3475,17 +3704,27 @@ app.post('/api/v1/user/devices/:deviceId/config/interval', authUserMiddleware, a
 
 // Enfileirar comando genérico usando device_commands (substitui o Map em memória)
 async function enqueueDbCommand(deviceId, type, payload = null) {
+  // Mantém compatibilidade - usa device_commands por padrão (KH/LCD)
+  return enqueueDbCommandToTable('device_commands', deviceId, type, payload);
+}
+
+// [FIX OTA] Nova função que aceita nome da tabela (device_commands ou devicecommands)
+async function enqueueDbCommandToTable(tableName, deviceId, type, payload = null) {
   let conn;
   try {
+    console.log(`[CMD DEBUG] enqueueDbCommandToTable: tabela=${tableName}, deviceId=${deviceId}, type=${type}`);
+
     conn = await pool.getConnection();
     const now = new Date();
     const jsonPayload = payload ? JSON.stringify(payload) : null;
 
     const result = await conn.query(
-      `INSERT INTO device_commands (deviceId, type, payload, status, createdAt, updatedAt)
+      `INSERT INTO ${tableName} (deviceId, type, payload, status, createdAt, updatedAt)
        VALUES (?, ?, ?, 'pending', ?, ?)`,
       [deviceId, type, jsonPayload, now, now]
     );
+
+    console.log(`[CMD DEBUG] Comando inserido com sucesso na tabela ${tableName}, id=${result.insertId}`);
 
     return { id: Number(result.insertId), type };
   } finally {
@@ -3647,6 +3886,7 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       'fake_measurement',
       'pump4abort',
       'khcalibrate',
+      'kh_drain',
       // Modo Manutenção
       'test_pump',
       'fill_chamber',
@@ -3732,11 +3972,20 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
       payload = {};
       break;
 
-      case 'khcalibrate':          
-      // firmware: cmd.action == "khcalibrate" → envia 'K' para FSM KH_Calibrator
-      dbType = 'khcalibrate';
-      payload = {};
-      break;
+      case 'khcalibrate': {
+        dbType = 'khcalibrate';
+        const v = (typeof req.body.value === 'object' && req.body.value) ? req.body.value : {};
+        const khRefUser   = typeof v.khRefUser   === 'number' ? v.khRefUser   : null;
+        const assumeEmpty = typeof v.assumeEmpty === 'boolean' ? v.assumeEmpty : false;
+        payload = { assume_empty: assumeEmpty };
+        if (khRefUser !== null) payload.kh_ref_user = khRefUser;
+        break;
+      }
+
+      case 'kh_drain':
+        dbType = 'kh_drain';
+        payload = {};
+        break;
 
       case 'setpump4mlpersec':
         dbType = 'setpump4mlpersec';
@@ -3862,7 +4111,7 @@ app.post('/api/v1/user/devices/:deviceId/command', authUserMiddleware, async (re
 
         // Modo Manutenção: ciclo de limpeza completo
         case 'system_flush':
-          dbType = 'systemflush';
+          dbType = 'system_flush';
           payload = {};
           break;
 
@@ -3953,12 +4202,43 @@ app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (r
   }
 
   try {
-    const chk = await pool.query(
-      'SELECT id FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+    // [FIX OTA] Verificar se é device KH/LCD ou dosadora
+    console.log(`[CMD DEBUG] Buscando device: deviceId=${deviceId}, userId=${userId}`);
+
+    let chk = await pool.query(
+      'SELECT id, type FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
       [deviceId, userId]
     );
-    if (!chk.length) {
-      return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+
+    let isDoser = false;
+    let targetTable = 'device_commands';  // device_commands para KH/LCD
+
+    // [FIX OTA] Verificar se o type é DOSER (pode estar cadastrado em devices também)
+    if (chk.length && chk[0].type === 'DOSER') {
+      console.log(`[CMD DEBUG] Encontrado em devices com type=DOSER. targetTable=devicecommands`);
+      isDoser = true;
+      targetTable = 'devicecommands';  // devicecommands para dosadora (sem underscore)
+    } else if (!chk.length) {
+      console.log(`[CMD DEBUG] Não encontrado em devices, tentando dosing_devices...`);
+
+      // Não encontrou em devices, tentar dosing_devices
+      chk = await pool.query(
+        'SELECT id FROM dosing_devices WHERE esp_uid = ? AND user_id = ? LIMIT 1',
+        [deviceId, userId]
+      );
+
+      console.log(`[CMD DEBUG] Resultado dosing_devices: ${chk.length} registros encontrados`);
+
+      if (!chk.length) {
+        console.log(`[CMD DEBUG] Device não encontrado em nenhuma tabela`);
+        return res.status(404).json({ success:false, message:'Device não encontrado para este usuário' });
+      }
+
+      isDoser = true;
+      targetTable = 'devicecommands';  // devicecommands para dosadora (sem underscore)
+      console.log(`[CMD DEBUG] É DOSADORA (dosing_devices)! targetTable=${targetTable}`);
+    } else {
+      console.log(`[CMD DEBUG] Encontrado em devices (type=${chk[0].type}). targetTable=${targetTable}`);
     }
 
     // normalizar para o formato que o ESP entende
@@ -3987,8 +4267,9 @@ app.post('/api/v1/user/devices/:deviceId/commands', authUserMiddleware, async (r
         break;
     }
 
-    const cmd = await enqueueDbCommand(deviceId, dbType, payload || null); // <‑‑ dbType
-    console.log('[CMD] genérico enfileirado', deviceId, cmd);
+    // [FIX OTA] Usar tabela correta dependendo do tipo de device
+    const cmd = await enqueueDbCommandToTable(targetTable, deviceId, dbType, payload || null);
+    console.log('[CMD] genérico enfileirado', deviceId, 'tabela:', targetTable, cmd);
 
     return res.json({ success: true, data: { commandId: cmd.id, type } });
   } catch (err) {
@@ -4219,6 +4500,136 @@ app.post('/api/v1/device/commands/poll', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('POST /device/commands/poll error', err);
     return res.status(500).json({ success: false, message: 'Erro ao buscar comandos' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
+
+// Frontend consulta progresso real de um comando (polling durante OTA)
+app.get('/api/v1/user/devices/:deviceId/commands/:commandId', authUserMiddleware, async (req, res) => {
+  const userId   = req.user.userId;
+  const deviceId = req.params.deviceId;
+  const commandId = parseInt(req.params.commandId, 10);
+
+  if (!commandId || isNaN(commandId)) {
+    return res.status(400).json({ success: false, message: 'commandId inválido' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Verifica que o device pertence ao usuário
+    const [device] = await conn.query(
+      'SELECT deviceId FROM devices WHERE deviceId = ? AND userId = ? LIMIT 1',
+      [deviceId, userId]
+    );
+    if (!device) {
+      return res.status(403).json({ success: false, message: 'Acesso negado' });
+    }
+
+    // Busca o comando — tenta device_commands primeiro
+    const rows = await conn.query(
+      `SELECT id, type, status, errorMessage,
+              COALESCE(progress, 0) AS progress,
+              COALESCE(ota_status, 'pending') AS ota_status,
+              createdAt, updatedAt
+         FROM device_commands
+        WHERE id = ? AND deviceId = ?
+        LIMIT 1`,
+      [commandId, deviceId]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Comando não encontrado' });
+    }
+
+    const row = rows[0];
+    return res.json({
+      success: true,
+      data: {
+        id:           typeof row.id === 'bigint' ? Number(row.id) : row.id,
+        type:         row.type,
+        status:       row.status,
+        errorMessage: row.errorMessage || null,
+        progress:     Number(row.progress),
+        otaStatus:    row.ota_status,
+        createdAt:    row.createdAt,
+        updatedAt:    row.updatedAt,
+      }
+    });
+  } catch (err) {
+    console.error('GET /user/devices/:deviceId/commands/:commandId error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao consultar comando' });
+  } finally {
+    if (conn) try { conn.release(); } catch (e) {}
+  }
+});
+
+// ESP reporta progresso do OTA (progress 0-100, otaStatus: in_progress/done/failed)
+app.post('/api/v1/device/commands/ota-progress', verifyToken, async (req, res) => {
+  const deviceId = req.user.deviceId;
+  const { commandId, progress, otaStatus } = req.body || {};
+
+  if (!commandId) {
+    return res.status(400).json({ success: false, message: 'commandId é obrigatório' });
+  }
+
+  const pct = (progress !== undefined && progress !== null) ? Number(progress) : null;
+  const safeStatus = (otaStatus && typeof otaStatus === 'string') ? otaStatus : null;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Garantir que as colunas existem (cria se necessário)
+    await conn.query(
+      `ALTER TABLE device_commands
+         ADD COLUMN IF NOT EXISTS progress tinyint(4) DEFAULT 0,
+         ADD COLUMN IF NOT EXISTS ota_status varchar(20) DEFAULT 'pending'`
+    ).catch(() => {}); // ignora erro se já existirem
+
+    const updateFields = [];
+    const updateValues = [];
+
+    if (pct !== null) {
+      updateFields.push('progress = ?');
+      updateValues.push(pct);
+    }
+    if (safeStatus !== null) {
+      updateFields.push('ota_status = ?');
+      updateValues.push(safeStatus);
+      // Mantém status do comando em sync
+      if (safeStatus === 'done') {
+        updateFields.push('status = ?');
+        updateValues.push('done');
+      } else if (safeStatus === 'failed') {
+        updateFields.push('status = ?');
+        updateValues.push('error');
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return res.json({ success: true, message: 'Nada a atualizar' });
+    }
+
+    updateFields.push('updatedAt = NOW()');
+    updateValues.push(commandId, deviceId);
+
+    const result = await conn.query(
+      `UPDATE device_commands SET ${updateFields.join(', ')} WHERE id = ? AND deviceId = ?`,
+      updateValues
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Comando não encontrado para este device' });
+    }
+
+    console.log(`OTA progress: device=${deviceId} cmd=${commandId} pct=${pct}% status=${safeStatus}`);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('POST /device/commands/ota-progress error', err);
+    return res.status(500).json({ success: false, message: 'Erro ao atualizar progresso OTA' });
   } finally {
     if (conn) try { conn.release(); } catch (e) {}
   }

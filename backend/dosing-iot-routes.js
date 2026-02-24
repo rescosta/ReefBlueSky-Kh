@@ -3,7 +3,8 @@
 
 const { mailTransporter, ALERT_FROM, sendTelegramForUser, sendEmailForUser } =
   require('./alerts-helpers');
-const { getUserTimezone, getUserUtcOffsetSec } = require('./user-timezone');
+const { getUserTimezone, getUserUtcOffsetSec, formatWithUserTimezone } = require('./user-timezone');
+const { saveDosingLog } = require('./dosing-logs-routes');
 
 
 // dosing-iot-routes.js
@@ -69,26 +70,69 @@ async function updateDosingDeviceStatus(deviceId, online, lastIp = null) {
 }
 
 // ===== HELPER: Enviar notificações de alerta =====
-async function notifyDosingAlert(userId, alertType, message) {
-  // Email - usar helper que verifica email_enabled
+async function notifyDosingAlert(userId, alertType, message, pumpId = null) {
+  let conn;
   try {
-    await sendEmailForUser(
-      userId,
-      `[ReefBlueSky Dosadora] Alerta: ${alertType}`,
-      `<p>${message}</p>`
-    );
-  } catch (err) {
-    console.error('Error sending dosing alert email:', err);
-  }
+    conn = await pool.getConnection();
 
-  // Telegram - usar helper que verifica telegram_enabled
-  try {
-    await sendTelegramForUser(
-      userId,
-      `🚨 *Dosadora* - ${alertType}\n${message}`
-    );
+    // Verificar se há alguma agenda desta bomba com notificações habilitadas
+    let notify_email = false;
+    let notify_telegram = false;
+
+    if (pumpId) {
+      const schedules = await conn.query(
+        `SELECT notify_email, notify_telegram
+         FROM dosing_schedules
+         WHERE pump_id = ? AND enabled = 1
+         LIMIT 10`,
+        [pumpId]
+      );
+
+      // Se pelo menos UMA agenda tem notificação habilitada, enviar
+      if (schedules && schedules.length > 0) {
+        notify_email = schedules.some(s => s.notify_email === 1);
+        notify_telegram = schedules.some(s => s.notify_telegram === 1);
+      }
+    } else {
+      // Se não passou pumpId, assume que deve enviar (comportamento antigo)
+      notify_email = true;
+      notify_telegram = true;
+    }
+
+    // Email - enviar apenas se configurado
+    if (notify_email) {
+      try {
+        await sendEmailForUser(
+          userId,
+          `[ReefBlueSky Dosadora] Alerta: ${alertType}`,
+          `<p>${message}</p>`
+        );
+        console.log(`[Dosing Alert] Email enviado - User ${userId}, Pump ${pumpId}`);
+      } catch (err) {
+        console.error('Error sending dosing alert email:', err);
+      }
+    } else {
+      console.log(`[Dosing Alert] Email NÃO enviado (desabilitado) - User ${userId}, Pump ${pumpId}`);
+    }
+
+    // Telegram - enviar apenas se configurado
+    if (notify_telegram) {
+      try {
+        await sendTelegramForUser(
+          userId,
+          `🚨 *Dosadora* - ${alertType}\n${message}`
+        );
+        console.log(`[Dosing Alert] Telegram enviado - User ${userId}, Pump ${pumpId}`);
+      } catch (err) {
+        console.error('Error sending Telegram dosing alert:', err);
+      }
+    } else {
+      console.log(`[Dosing Alert] Telegram NÃO enviado (desabilitado) - User ${userId}, Pump ${pumpId}`);
+    }
   } catch (err) {
-    console.error('Error sending Telegram dosing alert:', err);
+    console.error('Error in notifyDosingAlert:', err);
+  } finally {
+    if (conn) conn.release();
   }
 }
 
@@ -226,18 +270,19 @@ router.post('/handshake', async (req, res) => {
         const dosesPerDay = s.doses_per_day || 1;
 
         if (dosesPerDay > 0 && totalVolume > 0) {
-          const volumePerDose = Math.floor(totalVolume / dosesPerDay);
           const doses = [];
-          let accumulated = 0;
+          const base = totalVolume / dosesPerDay;      // 16.6666...
+          let sum = 0;
 
-          // Primeiras N-1 doses: volume padrão (divisão inteira)
+          // N-1 doses arredondadas
           for (let i = 0; i < dosesPerDay - 1; i++) {
-            doses.push(volumePerDose);
-            accumulated += volumePerDose;
+            const v = Math.round(base * 100) / 100;   // 2 casas (16.67)
+            doses.push(v);
+            sum += v;
           }
 
-          // Última dose: pega o resto para garantir total exato
-          const lastDose = totalVolume - accumulated;
+          // Última dose ajusta o resto para fechar totalVolume
+          const lastDose = Math.round((totalVolume - sum) * 100) / 100; // 16.65
           doses.push(lastDose);
 
           s.dose_volumes = doses;
@@ -245,6 +290,7 @@ router.post('/handshake', async (req, res) => {
           s.dose_volumes = [];
         }
       });
+
 
       return {
         id: p.id,
@@ -344,7 +390,8 @@ router.post('/status', async (req, res) => {
               await notifyDosingAlert(
                 pump[0].user_id,
                 'Container Low',
-                msg
+                msg,
+                p.id  // Passar pump_id
               );
             }
 
@@ -512,12 +559,14 @@ router.post('/execution', async (req, res) => {
     const {
       esp_uid,
       pump_id,
+      schedule_id,   
       scheduled_at,  // epoch em segundos
       executed_at,   // epoch em segundos (ou null)
       volume_ml,
       status,
       origin,
-      error_code
+      error_code,
+      doseindex
     } = req.body;
 
     if (!esp_uid || !pump_id) {
@@ -535,34 +584,157 @@ router.post('/execution', async (req, res) => {
     const executedEpoch = Number.isFinite(executed_at)  ? executed_at  : null;
 
     // Registrar execução (epoch direto → FROM_UNIXTIME)
+    const doseIndexNum = Number.isFinite(Number(doseindex))
+      ? Number(doseindex)
+      : null;
+
     await conn.query(
       `INSERT INTO dosing_executions 
-         (pump_id, scheduled_at, executed_at, volume_ml, status, origin, error_code)
+         (pump_id, schedule_id, scheduled_at, executed_at,
+          volume_ml, status, origin, error_code, doseindex)
        VALUES (
-         ?, 
+         ?, ?,
          ${schedEpoch    != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
          ${executedEpoch != null ? 'FROM_UNIXTIME(?)' : 'NULL'},
-         ?, ?, ?, ?
+         ?, ?, ?, ?, ?
        )`,
       [
         pump_id,
+        schedule_id,
         ...(schedEpoch    != null ? [schedEpoch]    : []),
         ...(executedEpoch != null ? [executedEpoch] : []),
         volume_ml,
         status,
         origin,
-        error_code || null
+        error_code || null,
+        doseIndexNum              
       ]
     );
 
+    // Salvar log da execução
+    await saveDosingLog(conn, {
+      device_id: device.id,
+      pump_id: pump_id,
+      schedule_id: schedule_id,
+      log_type: 'EXECUTION',
+      log_level: status === 'OK' ? 'INFO' : 'WARNING',
+      message: `Dosagem ${status === 'OK' ? 'concluída' : status}: ${volume_ml}ml`,
+      details: {
+        status,
+        volume_ml,
+        origin,
+        error_code,
+        doseindex: doseIndexNum,
+        scheduled_at: schedEpoch,
+        executed_at: executedEpoch
+      }
+    });
+
+    if (status === 'GUARD_VOLUME' || status === 'GUARD_DURATION') {
+      const pumpInfo = await conn.query(
+        `SELECT dp.name AS pump_name, dp.device_id, dd.user_id
+           FROM dosing_pumps dp
+           JOIN dosing_devices dd ON dp.device_id = dd.id
+          WHERE dp.id = ?
+          LIMIT 1`,
+        [pump_id]
+      );
+
+      if (pumpInfo && pumpInfo.length > 0) {
+        const info = pumpInfo[0];
+        const msg =
+          `Proteção de segurança acionada na bomba ${info.pump_name}. ` +
+          `status=${status}, volume=${volume_ml} mL, ` +
+          `schedule_id=${schedule_id || 'null'}, doseindex=${doseIndexNum || 'null'}, ` +
+          `error_code=${error_code || 'none'}.`;
+
+        await logDosingAlert(
+          info.user_id,
+          info.device_id,
+          pump_id,
+          status,           // tipo = 'GUARD_VOLUME' ou 'GUARD_DURATION'
+          msg
+        );
+
+        await notifyDosingAlert(
+          info.user_id,
+          `Dosing ${status}`,
+          msg,
+          pump_id  // Passar pump_id
+        );
+      }
+
+      // não tenta refazer dose aqui; apenas alerta e segue
+    }
+
+
     // Se executou com sucesso, descontar do reservatório
     if (status === 'OK') {
+      // 1) desconta volume
       await conn.query(
         `UPDATE dosing_pumps
             SET current_volume_ml = GREATEST(0, current_volume_ml - ?)
           WHERE id = ?`,
         [volume_ml, pump_id]
       );
+
+      // 2) lê volume restante + dados do pump para alarme
+      const pumpRow = await conn.query(
+        `SELECT dp.current_volume_ml,
+                dp.container_volume_ml,
+                dp.alarm_threshold_pct,
+                dp.name,
+                dd.user_id
+           FROM dosing_pumps dp
+           JOIN dosing_devices dd ON dp.device_id = dd.id
+          WHERE dp.id = ?
+          LIMIT 1`,
+        [pump_id]
+      );
+
+      let remainingVolume = null;
+      if (pumpRow && pumpRow.length > 0) {
+        const pInfo     = pumpRow[0];
+        remainingVolume = pInfo.current_volume_ml;
+
+        const threshold = pInfo.container_volume_ml * pInfo.alarm_threshold_pct / 100;
+        if (remainingVolume <= threshold && remainingVolume > 0) {
+          // Registrar alerta (mas evitar spam, igual /status)
+          const recent = await conn.query(
+            `SELECT id FROM dosing_alerts 
+               WHERE pump_id = ?
+                 AND type = 'CONTAINER_LOW'
+                 AND resolved_at IS NULL
+                 AND created_at > DATE_SUB(NOW(), INTERVAL 4 HOUR)
+               LIMIT 1`,
+            [pump_id]
+          );
+
+          if (!recent || recent.length === 0) {
+            const msg = `Bomba ${pInfo.name}: nível do recipiente abaixo de ${pInfo.alarm_threshold_pct}%`;
+
+            await logDosingAlert(
+              pInfo.user_id,
+              device.id,
+              pump_id,
+              'CONTAINER_LOW',
+              msg
+            );
+
+            await notifyDosingAlert(
+              pInfo.user_id,
+              'Container Low',
+              msg,
+              pump_id  // Passar pump_id
+            );
+          }
+        }
+      }
+
+      const remainingText = remainingVolume != null
+        ? `\nVolume Reservatório: ${Number(remainingVolume).toFixed(2).replace('.', ',')} mL`
+        : '';
+
 
       // [NOVO] Enviar notificações se habilitado na agenda
       if (origin === 'AUTO' && schedEpoch) {
@@ -574,11 +746,14 @@ router.post('/execution', async (req, res) => {
                     ds.notify_telegram, ds.notify_email
              FROM dosing_pumps dp
              JOIN dosing_devices dd ON dp.device_id = dd.id
-             LEFT JOIN dosing_schedules ds ON ds.pump_id = dp.id
+             LEFT JOIN dosing_schedules ds
+                    ON ds.pump_id = dp.id
+                   AND ds.id = ?
              WHERE dp.id = ?
              LIMIT 1`,
-            [pump_id]
+            [schedule_id, pump_id]
           );
+
 
           if (pumpInfo && pumpInfo.length > 0) {
             const info = pumpInfo[0];
@@ -587,26 +762,40 @@ router.post('/execution', async (req, res) => {
             const shouldNotifyEmail = !!info.notify_email;
 
             if (shouldNotifyTelegram || shouldNotifyEmail) {
-              // [NOVO] Calcular qual dose é (1/3, 2/3, 3/3)
+          
+
+
               const dosesPerDay = info.doses_per_day || 1;
-              let doseNumber = 1;
-              try {
-                const rows = await conn.query(
-                  `SELECT COUNT(*) AS count
-                     FROM dosing_executions
-                    WHERE pump_id = ?
-                      AND DATE(executed_at) = CURDATE()
-                      AND status = 'OK'
-                      AND origin = 'AUTO'`,
-                  [pump_id]
-                );
-                // se o SELECT rodar DEPOIS do INSERT, a dose atual já entra na contagem
-                doseNumber = rows[0]?.count || 1;
-              } catch (err) {
-                console.error('[NOTIFY] Erro ao contar doses:', err);
+
+              let doseNumber = doseIndexNum && doseIndexNum > 0
+                ? Math.min(doseIndexNum, dosesPerDay)
+                : 1;
+
+              let doseInfo = `Dose ${doseNumber}/${dosesPerDay}`;
+
+              if (!doseIndexNum || doseIndexNum <= 0) {
+                try {
+                  const rows = await conn.query(
+                    `SELECT COUNT(*) AS count
+                       FROM dosing_executions
+                      WHERE pump_id = ?
+                        AND schedule_id = ?
+                        AND executed_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)
+                        AND executed_at <= UTC_TIMESTAMP()
+                        AND status = 'OK'
+                        AND origin = 'AUTO'`,
+                    [pump_id, schedule_id]
+                  );
+                  const rawCount = Number(rows?.[0]?.count ?? 0) + 1;
+                  doseNumber = Math.min(rawCount, dosesPerDay);
+                  doseInfo   = `Dose ${doseNumber}/${dosesPerDay}`;
+                } catch (err) {
+                  console.error('[NOTIFY] Erro ao contar doses:', err);
+                }
               }
 
-              const doseInfo = `Dose ${doseNumber}/${dosesPerDay}`;
+
+
 
 
               // Buscar dados do usuário
@@ -618,11 +807,25 @@ router.post('/execution', async (req, res) => {
 
               if (userRows && userRows.length > 0) {
                 const user = userRows[0];
+                const volumeText = Number(volume_ml).toFixed(2).replace('.', ',');
+                const remainingText = remainingVolume != null
+                  ? `\nVolume Reservatório: ${Number(remainingVolume).toFixed(2).replace('.', ',')} mL`
+                  : '';
+
+                // [FIX TIMEZONE] executedEpoch agora vem em UTC do ESP
+                // Converter UTC → timezone do usuário para exibição
+                const executedDate = new Date(executedEpoch * 1000);
+                const executedTimeFormatted = await formatWithUserTimezone(userId, executedDate);
+
+                console.log(`[NOTIFY] Timezone conversion: epoch=${executedEpoch}, UTC=${executedDate.toISOString()}, Local=${executedTimeFormatted}`);
+
                 const message = `✅ Dosagem concluída!\n\n` +
-                  `${doseInfo}\n` +
                   `Bomba: ${info.pump_name}\n` +
-                  `Volume: ${volume_ml} mL\n` +
-                  `Horário: ${new Date(executedEpoch * 1000).toLocaleString('pt-BR')}`;
+                  `${doseInfo}\n` +
+                  `Volume: ${volumeText} mL` +
+                  `${remainingText}\n` +
+                  `Horário: ${executedTimeFormatted}`;
+
 
                 // Telegram
                 if (shouldNotifyTelegram && user.telegram_enabled && user.telegram_chat_id && user.telegram_bot_token) {
@@ -636,24 +839,80 @@ router.post('/execution', async (req, res) => {
                         text: message
                       })
                     });
-                    console.log(`[NOTIFY] Telegram enviado para user ${userId}`);
+                    console.log(`[NOTIFY] Telegram enviado para user ${userId} - ${executedTimeFormatted}`);
+
+                    // Log: notificação telegram enviada
+                    await saveDosingLog(conn, {
+                      device_id: device.id,
+                      pump_id: pump_id,
+                      schedule_id: schedule_id,
+                      log_type: 'NOTIFICATION',
+                      log_level: 'INFO',
+                      message: `Telegram enviado: ${doseInfo}`,
+                      details: { channel: 'telegram', user_id: userId }
+                    });
                   } catch (err) {
                     console.error('[NOTIFY] Erro ao enviar Telegram:', err);
+
+                    // Log: erro ao enviar telegram
+                    await saveDosingLog(conn, {
+                      device_id: device.id,
+                      pump_id: pump_id,
+                      schedule_id: schedule_id,
+                      log_type: 'ERROR',
+                      log_level: 'ERROR',
+                      message: `Erro ao enviar Telegram: ${err.message}`,
+                      details: { channel: 'telegram', error: err.message }
+                    });
                   }
+                } else if (!shouldNotifyTelegram) {
+                  // Log: telegram desabilitado na agenda
+                  await saveDosingLog(conn, {
+                    device_id: device.id,
+                    pump_id: pump_id,
+                    schedule_id: schedule_id,
+                    log_type: 'NOTIFICATION',
+                    log_level: 'DEBUG',
+                    message: `Telegram NÃO enviado (desabilitado na agenda)`,
+                    details: { channel: 'telegram', reason: 'disabled_in_schedule' }
+                  });
+                } else {
+                  // Log: telegram não enviado por falta de configuração do usuário
+                  const reasons = [];
+                  if (!user.telegram_enabled) reasons.push('telegram_enabled=false');
+                  if (!user.telegram_chat_id) reasons.push('chat_id ausente');
+                  if (!user.telegram_bot_token) reasons.push('bot_token ausente');
+
+                  await saveDosingLog(conn, {
+                    device_id: device.id,
+                    pump_id: pump_id,
+                    schedule_id: schedule_id,
+                    log_type: 'NOTIFICATION',
+                    log_level: 'DEBUG',
+                    message: `Telegram NÃO enviado (configuração incompleta do usuário)`,
+                    details: { channel: 'telegram', reason: 'user_config_incomplete', missing: reasons.join(', ') }
+                  });
                 }
 
                 // Email
                 if (shouldNotifyEmail && user.email_enabled) {
                   try {
-                    const emailSubject = `✅ Dosagem Concluída - ${doseInfo} - ReefBlueSky`;
+                    const emailSubject = `✅ Dosagem Concluída - ${info.pump_name} -> ${doseInfo} - ReefBlueSky`;
+
+                    const volumeTextEmail = Number(volume_ml).toFixed(2).replace('.', ',');
+                    const remainingHtml = remainingVolume != null
+                      ? `<p style="margin: 10px 0;"><strong>Volume reservatório:</strong> ${Number(remainingVolume).toFixed(2).replace('.', ',')} mL</p>`
+                      : '';
+
                     const emailBody = `
                       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                         <h2 style="color: #22c55e;">✅ Dosagem Concluída com Sucesso!</h2>
                         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                          <p style="margin: 10px 0;"><strong>${doseInfo}</strong></p>
                           <p style="margin: 10px 0;"><strong>Bomba:</strong> ${info.pump_name}</p>
-                          <p style="margin: 10px 0;"><strong>Volume:</strong> ${volume_ml} mL</p>
-                          <p style="margin: 10px 0;"><strong>Horário:</strong> ${new Date(executedEpoch * 1000).toLocaleString('pt-BR')}</p>
+                          <p style="margin: 10px 0;"><strong>${doseInfo}</strong></p>
+                          <p style="margin: 10px 0;"><strong>Volume:</strong> ${volumeTextEmail} mL</p>
+                          ${remainingHtml}
+                          <p style="margin: 10px 0;"><strong>Horário:</strong> ${executedTimeFormatted}</p>
                         </div>
                         <p style="color: #6b7280; font-size: 12px;">
                           Esta é uma notificação automática do sistema ReefBlueSky.
@@ -662,12 +921,56 @@ router.post('/execution', async (req, res) => {
                     `;
 
                     await sendEmailForUser(userId, emailSubject, emailBody);
-                    console.log(`[NOTIFY] Email enviado para user ${userId} - ${doseInfo}`);
+                    console.log(`[NOTIFY] Email enviado para user ${userId} - ${doseInfo} - ${executedTimeFormatted}`);
+
+                    // Log: notificação email enviada
+                    await saveDosingLog(conn, {
+                      device_id: device.id,
+                      pump_id: pump_id,
+                      schedule_id: schedule_id,
+                      log_type: 'NOTIFICATION',
+                      log_level: 'INFO',
+                      message: `Email enviado: ${doseInfo}`,
+                      details: { channel: 'email', user_id: userId, email: user.email }
+                    });
                   } catch (err) {
                     console.error('[NOTIFY] Erro ao enviar Email:', err);
+
+                    // Log: erro ao enviar email
+                    await saveDosingLog(conn, {
+                      device_id: device.id,
+                      pump_id: pump_id,
+                      schedule_id: schedule_id,
+                      log_type: 'ERROR',
+                      log_level: 'ERROR',
+                      message: `Erro ao enviar Email: ${err.message}`,
+                      details: { channel: 'email', error: err.message }
+                    });
                   }
                 } else if (shouldNotifyEmail && !user.email_enabled) {
                   console.log(`[NOTIFY] Email não enviado - email_enabled=0 para user ${userId}`);
+
+                  // Log: email desabilitado no usuário
+                  await saveDosingLog(conn, {
+                    device_id: device.id,
+                    pump_id: pump_id,
+                    schedule_id: schedule_id,
+                    log_type: 'NOTIFICATION',
+                    log_level: 'DEBUG',
+                    message: `Email NÃO enviado (desabilitado no usuário)`,
+                    details: { channel: 'email', reason: 'disabled_in_user_settings' }
+                  });
+                } else if (!shouldNotifyEmail) {
+                  // Log: email desabilitado na agenda
+                  await saveDosingLog(conn, {
+                    device_id: device.id,
+                    pump_id: pump_id,
+                    schedule_id: schedule_id,
+                    log_type: 'NOTIFICATION',
+                    log_level: 'DEBUG',
+                    message: `Email NÃO enviado (desabilitado na agenda)`,
+                    details: { channel: 'email', reason: 'disabled_in_schedule' }
+                  });
                 }
               }
             }

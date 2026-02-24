@@ -214,6 +214,16 @@ router.post('/ping', authDisplayMiddleware, async (req, res) => {
       });
     }
 
+    // Atualiza last_seen do device LCD para aparecer como online no dashboard
+    const displayId = req.display && req.display.displayId;
+    if (displayId) {
+      await conn.query(
+        `UPDATE devices SET last_seen = NOW() WHERE deviceId = ? AND type = 'LCD'`,
+        [displayId]
+      );
+      console.log('[DISPLAY] ping: last_seen atualizado para LCD', displayId);
+    }
+
     return res.json({ success: true });
   } catch (err) {
     console.error('[DISPLAY] ERRO /ping:', err.message);

@@ -324,7 +324,8 @@ router.get('/devices/:deviceId/pumps', async (req, res) => {
                 id, device_id, name, index_on_device, enabled,
                 container_volume_ml, current_volume_ml,
                 alarm_threshold_pct, calibration_rate_ml_s,
-                created_at
+                reagent_cost_per_liter, alert_before_days,
+                last_refill_date, created_at
             FROM dosing_pumps
             WHERE device_id = ?
             ORDER BY index_on_device ASC`,
@@ -389,7 +390,7 @@ router.put('/devices/:deviceId/pumps/:pumpIndex', async (req, res) => {
     const { deviceId, pumpIndex } = req.params;
     const {
       name, active, container_size, current_volume,
-      alarm_percent
+      alarm_percent, reagent_cost_per_liter, alert_before_days
     } = req.body;
 
     conn = await pool.getConnection();
@@ -415,13 +416,23 @@ router.put('/devices/:deviceId/pumps/:pumpIndex', async (req, res) => {
 
     const pumpId = pump[0].id;
 
-    // Atualizar (sem daily_max)
+    // Atualizar incluindo novos campos de consumo
     await conn.query(
       `UPDATE dosing_pumps
          SET name = ?, enabled = ?, container_volume_ml = ?,
-             current_volume_ml = ?, alarm_threshold_pct = ?
+             current_volume_ml = ?, alarm_threshold_pct = ?,
+             reagent_cost_per_liter = ?, alert_before_days = ?
        WHERE id = ?`,
-      [name, active ? 1 : 0, container_size, current_volume, alarm_percent, pumpId]
+      [
+        name,
+        active ? 1 : 0,
+        container_size,
+        current_volume,
+        alarm_percent,
+        reagent_cost_per_liter || 0,
+        alert_before_days || 7,
+        pumpId
+      ]
     );
 
     res.json({ data: { id: pumpId, name, active } });
@@ -575,6 +586,8 @@ router.post('/devices/:deviceId/pumps/:pumpIndex/schedules', async (req, res) =>
       ]
     );
 
+    console.log('[DEBUG] Salvando adjusted_times:', validatedSchedule.adjusted_times);
+
     // Resolver conflitos globais após criar schedule
     await resolveAllScheduleConflicts(conn, deviceId);
 
@@ -616,6 +629,9 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
             [scheduleId, pumpIndex, deviceId, userId]
         );
         if (!schedCheck?.length) return res.status(404).json({ error: 'Schedule not found' });
+
+
+        
 
         // ✅ REVALIDAR se alterou horários/doses
         if (doses_per_day || start_time || end_time || min_gap_minutes !== undefined) {
@@ -672,43 +688,54 @@ router.put('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (r
 // DELETE /api/v1/user/dosing/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId
 // Deletar agenda
 router.delete('/devices/:deviceId/pumps/:pumpIndex/schedules/:scheduleId', async (req, res) => {
-    let conn;
-    try {
-        if (!req.user || !req.user.userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.user.userId;
-        const { deviceId, pumpIndex, scheduleId } = req.params;
-
-        conn = await pool.getConnection();
-
-        // Verificar propriedade
-        const sched = await conn.query(
-            `SELECT s.id FROM dosing_schedules s
-            JOIN dosing_pumps p ON s.pump_id = p.id
-            JOIN dosing_devices d ON p.device_id = d.id
-            WHERE s.id = ? AND p.index_on_device = ? AND d.id = ? AND d.user_id = ? LIMIT 1`,
-            [scheduleId, pumpIndex, deviceId, userId]
-        );
-
-        if (!sched || sched.length === 0) {
-            return res.status(404).json({ error: 'Schedule not found' });
-        }
-
-        await conn.query(`DELETE FROM dosing_schedules WHERE id = ?`, [scheduleId]);
-
-        // Resolver conflitos globais após deletar schedule
-        await resolveAllScheduleConflicts(conn, deviceId);
-
-        res.json({ data: { id: scheduleId } });
-    } catch (err) {
-        console.error('Error deleting schedule:', err);
-        res.status(500).json({ error: 'Database error' });
-    } finally {
-        if (conn) conn.release();
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = req.user.userId;
+    const { deviceId, pumpIndex, scheduleId } = req.params;
+
+    conn = await pool.getConnection();
+
+    // Verificar propriedade
+    const sched = await conn.query(
+      `SELECT s.id
+         FROM dosing_schedules s
+         JOIN dosing_pumps p ON s.pump_id = p.id
+         JOIN dosing_devices d ON p.device_id = d.id
+        WHERE s.id = ?
+          AND p.index_on_device = ?
+          AND d.id = ?
+          AND d.user_id = ?
+        LIMIT 1`,
+      [scheduleId, pumpIndex, deviceId, userId]
+    );
+    if (!sched || sched.length === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    // NOVO: apaga execuções ligadas a essa agenda
+    await conn.query(
+      `DELETE FROM dosing_executions WHERE schedule_id = ?`,
+      [scheduleId]
+    );
+
+    // Apaga a agenda
+    await conn.query(`DELETE FROM dosing_schedules WHERE id = ?`, [scheduleId]);
+
+    // Resolver conflitos globais após deletar schedule
+    await resolveAllScheduleConflicts(conn, deviceId);
+
+    res.json({ data: { id: scheduleId } });
+  } catch (err) {
+    console.error('Error deleting schedule:', err);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
 
 // GET /api/v1/user/dosing/devices/:deviceId/schedules
 // Lista todas as agendas de todas as bombas de um device
@@ -762,6 +789,31 @@ router.get('/devices/:deviceId/schedules', async (req, res) => {
       ...s,
       days_of_week: convertDaysMaskToArray(s.days_mask)
     }));
+
+    data.forEach(s => {
+      const total = s.volume_per_day_ml || 0;
+      const doses = s.doses_per_day || 1;
+
+      if (doses > 0 && total > 0) {
+        const arr = [];
+        const base = total / doses; // 16.666...
+
+        let sum = 0;
+        for (let i = 0; i < doses - 1; i++) {
+          const v = Math.round(base * 100) / 100; // 2 casas
+          arr.push(v);
+          sum += v;
+        }
+
+        const last = Math.round((total - sum) * 100) / 100;
+        arr.push(last);
+
+        s.dose_volumes = arr;
+      } else {
+        s.dose_volumes = [];
+      }
+    });
+    
 
     res.json({ data });
   } catch (err) {
@@ -1137,24 +1189,26 @@ async function validateAndAdjustSchedule(conn, deviceId, scheduleData) {
 
 function calculateDoseTimes(schedule) {
     const startMin = parseTime(schedule.start_time);
-    const endMin = parseTime(schedule.end_time);
-    const durationMin = Math.min((endMin - startMin + 1440) % 1440, 1440);
+    let endMin = parseTime(schedule.end_time);
     const doses = parseInt(schedule.doses_per_day) || 1;
-    
-    const times = [startMin];
-    if (doses >= 2) times.push(endMin);
-    
-    if (doses > 2) {
-        const intermediateSlots = doses - 1;
-        const gap = durationMin / intermediateSlots;
-        for (let i = 1; i < doses - 1; i++) {
-            // [FIX] Arredondar para minuto inteiro para evitar dízimas
-            times.splice(i, 0, Math.round(startMin + gap * i));
-        }
+
+    // Se horário cruza meia-noite (ex: 21:50 - 03:00), ajustar endMin
+    if (endMin <= startMin) {
+        endMin += 1440; // adiciona 24h ao horário final
     }
 
-    // [FIX] Garantir que todos os valores sejam inteiros
-    return times.map(t => formatTime(Math.round(t) % 1440));
+    const durationMin = endMin - startMin;
+    const gap = durationMin / doses;
+
+    const times = [];
+    for (let i = 0; i < doses; i++) {
+        const timeMin = Math.round(startMin + gap * i);
+        // NÃO normalizar aqui - manter ordem cronológica
+        times.push(timeMin);
+    }
+
+    // Normalizar APENAS na formatação para exibição
+    return times.map(t => formatTime(t % 1440));
 }
 
 function tryAdjustIntermediateTimes(existingEvents, newTimes, minGap) {
@@ -1225,13 +1279,40 @@ async function resolveAllScheduleConflicts(conn, deviceId) {
     const allEvents = [];
 
     schedules.forEach(sched => {
-        const times = calculateDoseTimes(sched);
+        // Usar adjusted_times salvos se existirem, senão calcular
+        let times;
+        if (sched.adjusted_times && sched.adjusted_times.length > 0) {
+            try {
+                times = JSON.parse(sched.adjusted_times);
+                console.log(`[Dosing] Usando adjusted_times salvos - Schedule ${sched.id}:`, times);
+            } catch (e) {
+                console.error('[Dosing] Erro ao parsear adjusted_times:', e);
+                times = calculateDoseTimes(sched);
+                console.log(`[Dosing] Recalculando horários - Schedule ${sched.id}:`, times);
+            }
+        } else {
+            times = calculateDoseTimes(sched);
+            console.log(`[Dosing] Calculando horários (primeira vez) - Schedule ${sched.id}:`, times);
+        }
+
         const minGapMinutes = sched.min_gap_minutes || 30;
+
+        // Detectar se schedule cruza meia-noite
+        const firstTime = parseTime(times[0]);
+        const lastTime = parseTime(times[times.length - 1]);
+        const crossesMidnight = lastTime < firstTime;
 
         times.forEach(timeStr => {
             const minutes = parseTime(timeStr);
+
+            // Se cruza meia-noite e este horário é "pequeno", adicionar 1440 para manter ordem cronológica
+            let sortMinutes = minutes;
+            if (crossesMidnight && minutes < firstTime && (firstTime - minutes) > 12 * 60) {
+                sortMinutes = minutes + 1440;
+            }
+
             allEvents.push({
-                minutes: minutes,
+                minutes: sortMinutes,  // valor para ordenação mantendo cronologia
                 timeStr: timeStr,
                 scheduleId: sched.id,
                 pumpId: sched.pump_id,  // Agora vem de s.pump_id
@@ -1306,6 +1387,159 @@ function convertDaysArrayToMask(days) {
     });
     return mask;
 }
+
+// ============================================================================
+// GET /api/v1/user/dosing/consumption-report
+// Relatório de consumo de reagentes
+// ============================================================================
+router.get('/consumption-report', async (req, res) => {
+  let conn;
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = req.user.userId;
+    conn = await pool.getConnection();
+
+    // Buscar todos os dispositivos e bombas do usuário
+    const pumps = await conn.query(
+      `SELECT
+        p.id,
+        p.name,
+        p.device_id,
+        p.index_on_device,
+        p.container_volume_ml,
+        p.current_volume_ml,
+        p.alarm_threshold_pct,
+        p.reagent_cost_per_liter,
+        p.alert_before_days,
+        p.last_refill_date,
+        p.enabled,
+        d.name as device_name
+      FROM dosing_pumps p
+      JOIN dosing_devices d ON p.device_id = d.id
+      WHERE d.user_id = ?
+      ORDER BY p.device_id, p.index_on_device`,
+      [userId]
+    );
+
+    if (!pumps || pumps.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const report = [];
+
+    for (const pump of pumps) {
+      // Calcular volume consumido no mês atual
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const executions = await conn.query(
+        `SELECT
+          COALESCE(SUM(volume_ml), 0) as total_volume_ml,
+          COUNT(*) as total_doses
+        FROM dosing_executions
+        WHERE pump_id = ?
+          AND status = 'OK'
+          AND executed_at >= ?
+          AND executed_at < ?`,
+        [pump.id, startOfMonth, now]
+      );
+
+      const volumeConsumedMonth = Number(executions[0]?.total_volume_ml || 0);
+      const totalDosesMonth = Number(executions[0]?.total_doses || 0);
+
+      // Consumo diário = soma do volume_per_day_ml das agendas ativas
+      const activeSchedules = await conn.query(
+        `SELECT COALESCE(SUM(volume_per_day_ml), 0) as daily_total
+        FROM dosing_schedules
+        WHERE pump_id = ? AND enabled = 1`,
+        [pump.id]
+      );
+
+      const dailyConsumption = Number(activeSchedules[0]?.daily_total || 0);
+
+      // Dias do mês atual
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+      // Consumo mensal = consumo diário × dias do mês
+      const monthlyConsumption = dailyConsumption * daysInMonth;
+
+      // Custo mensal = consumo diário × dias do mês × preço/litro
+      const costPerLiter = Number(pump.reagent_cost_per_liter || 0);
+      const costMonth = (dailyConsumption / 1000) * daysInMonth * costPerLiter;
+
+      // Calcular dias restantes baseado no consumo diário programado
+      const currentVolume = Number(pump.current_volume_ml || 0);
+      let daysRemaining = null;
+      let estimatedEndDate = null;
+
+      if (dailyConsumption > 0 && currentVolume > 0) {
+        daysRemaining = Math.floor(currentVolume / dailyConsumption);
+        estimatedEndDate = new Date();
+        estimatedEndDate.setDate(estimatedEndDate.getDate() + daysRemaining);
+      }
+
+      // Determinar status de alerta
+      let alertStatus = 'OK'; // OK, WARNING, CRITICAL
+      const alertBeforeDays = Number(pump.alert_before_days || 7);
+
+      if (daysRemaining !== null) {
+        if (daysRemaining <= 0) {
+          alertStatus = 'CRITICAL';
+        } else if (daysRemaining <= alertBeforeDays) {
+          alertStatus = 'WARNING';
+        }
+      }
+
+      // Calcular porcentagem restante
+      const volumePct = pump.container_volume_ml > 0
+        ? (currentVolume / pump.container_volume_ml) * 100
+        : 0;
+
+      report.push({
+        pump_id: pump.id,
+        pump_index: pump.index_on_device,
+        pump_name: pump.name,
+        device_name: pump.device_name,
+        device_id: pump.device_id,
+        enabled: pump.enabled,
+
+        // Volume
+        current_volume_ml: currentVolume,
+        container_volume_ml: pump.container_volume_ml,
+        volume_pct: Math.round(volumePct * 100) / 100,
+
+        // Consumo
+        volume_consumed_month_ml: monthlyConsumption,
+        total_doses_month: totalDosesMonth,
+        avg_daily_consumption_ml: dailyConsumption,
+
+        // Custo
+        reagent_cost_per_liter: costPerLiter,
+        cost_month: Math.round(costMonth * 100) / 100,
+
+        // Previsão
+        days_remaining: daysRemaining,
+        estimated_end_date: estimatedEndDate ? estimatedEndDate.toISOString().split('T')[0] : null,
+
+        // Alerta
+        alert_status: alertStatus,
+        alert_before_days: alertBeforeDays,
+        last_refill_date: pump.last_refill_date
+      });
+    }
+
+    res.json({ success: true, data: report });
+
+  } catch (err) {
+    console.error('[Consumption Report] Erro:', err);
+    res.status(500).json({ error: 'Server error', message: err.message });
+  } finally {
+    if (conn) conn.release();
+  }
+});
 
 
 module.exports = router;
