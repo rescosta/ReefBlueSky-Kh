@@ -159,6 +159,95 @@
       </div>
       <pre id="serverConsole" class="console-box">Carregando...</pre>
     </div>
+
+    <!-- NOVA SEÇÃO: Logs da Dosadora -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Logs da Dosadora</div>
+          <div class="card-subtitle">
+            Histórico de execuções, notificações e alertas
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="reloadDosingLogs" class="btn-primary">
+            Recarregar logs
+          </button>
+          <button id="clearDosingLogs" class="btn-primary" style="background:#111827;">
+            Limpar antigos
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+        <select id="filterLogType" style="padding:6px 8px; font-size:12px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb;">
+          <option value="">Todos os tipos</option>
+          <option value="EXECUTION">Execuções</option>
+          <option value="NOTIFICATION">Notificações</option>
+          <option value="ALERT">Alertas</option>
+          <option value="ERROR">Erros</option>
+          <option value="INFO">Informações</option>
+        </select>
+
+        <select id="filterLogLevel" style="padding:6px 8px; font-size:12px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb;">
+          <option value="">Todos os níveis</option>
+          <option value="DEBUG">Debug</option>
+          <option value="INFO">Info</option>
+          <option value="WARNING">Warning</option>
+          <option value="ERROR">Error</option>
+          <option value="CRITICAL">Critical</option>
+        </select>
+
+        <select id="filterPump" style="padding:6px 8px; font-size:12px; border-radius:6px; border:1px solid #374151; background:#020617; color:#e5e7eb;">
+          <option value="">Todas as bombas</option>
+          <!-- Preenchido dinamicamente -->
+        </select>
+      </div>
+
+      <!-- Tabela de logs -->
+      <div style="overflow-x: auto;">
+        <table id="dosingLogsTable" style="width:100%; font-size:12px; border-collapse: collapse;">
+          <thead>
+            <tr style="text-align: left; border-bottom: 1px solid #374151; color:#9ca3af;">
+              <th style="padding:8px;">Data/Hora</th>
+              <th style="padding:8px;">Tipo</th>
+              <th style="padding:8px;">Nível</th>
+              <th style="padding:8px;">Bomba</th>
+              <th style="padding:8px;">Mensagem</th>
+              <th style="padding:8px;">Detalhes</th>
+            </tr>
+          </thead>
+          <tbody id="dosingLogsBody">
+            <tr>
+              <td colspan="6" style="padding:20px; text-align:center; color:#6b7280;">
+                Carregando logs...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Estatísticas -->
+      <div id="dosingStats" style="margin-top:16px; padding-top:16px; border-top:1px solid #1f2937; display:flex; gap:16px; flex-wrap:wrap; font-size:12px;">
+        <div>
+          <span style="color:#9ca3af;">Total de logs:</span>
+          <span id="totalLogs" style="color:#e5e7eb; font-weight:600; margin-left:4px;">0</span>
+        </div>
+        <div>
+          <span style="color:#9ca3af;">Execuções:</span>
+          <span id="totalExecutions" style="color:#22c55e; font-weight:600; margin-left:4px;">0</span>
+        </div>
+        <div>
+          <span style="color:#9ca3af;">Notificações:</span>
+          <span id="totalNotifications" style="color:#3b82f6; font-weight:600; margin-left:4px;">0</span>
+        </div>
+        <div>
+          <span style="color:#9ca3af;">Erros:</span>
+          <span id="totalErrors" style="color:#ef4444; font-weight:600; margin-left:4px;">0</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="footer-root"></div>

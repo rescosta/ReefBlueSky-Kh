@@ -507,10 +507,34 @@
         </div>
 
         <!-- Progresso do teste manual -->
-        <div id="testNowProgressWrapper" class="progress-wrapper" style="display:none; margin-top:8px;">
-          <div class="progress-label" id="testNowProgressLabel">Teste manual em andamento...</div>
-          <div class="progress-bar">
+        <div id="testNowProgressWrapper" style="display:none; margin-top:10px;
+             background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px;">
+          <div class="progress-bar" style="margin-bottom:4px;">
             <div class="progress-fill" id="testNowProgressFill"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px;
+                      color:#9ca3af; margin-bottom:8px;">
+            <span id="testNowProgressLabel">Aguardando dispositivo...</span>
+            <span id="testNowProgressPct">0%</span>
+          </div>
+          <div id="testNowProgressMsg"
+               style="font-size:12px; color:#9ca3af; margin-bottom:8px; font-style:italic;"></div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px;
+                      color:#d1d5db; margin-bottom:8px;">
+            <span>Res.A: <b id="tnLvlA">—</b></span>
+            <span>Res.B: <b id="tnLvlB">—</b></span>
+            <span>Res.C: <b id="tnLvlC">—</b></span>
+            <span>pH: <b id="tnPh">—</b></span>
+            <span>Temp: <b id="tnTemp">—</b>°C</span>
+            <span id="tnCompSpan" style="color:#f97316; display:none;">
+              Compressor: <b id="tnCompS">—</b>s
+            </span>
+          </div>
+          <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">Log de etapas:</div>
+          <div id="testNowProgressLog"
+               style="background:#0a0f1e; border:1px solid #1f2937; border-radius:6px;
+                      padding:6px 8px; max-height:140px; overflow-y:auto;
+                      font-size:11px; font-family:monospace; color:#9ca3af;">
           </div>
         </div>
 
@@ -523,6 +547,7 @@
       </div>
 
       <!-- Modo Teste de Hardware -->
+<!--
       <div class="card">
         <div class="card-header">
           <div class="card-title">🔧 Modo Teste de Hardware</div>
@@ -549,6 +574,7 @@
           Bombas em sentido normal = nível detectado após 5s. Reverso = sem nível após 5s.
         </div>
       </div>
+-->
 
     <div class="card">
       <div class="card-header">

@@ -312,6 +312,49 @@
           </div>
           <div id="khRefStatus" class="hint">Referência atual --</div>
 
+        <!-- ============================================================
+             PAINEL DE PROGRESSO KH (calibração e teste)
+             Oculto por padrão; exibido quando um ciclo está ativo
+        ============================================================ -->
+        <div id="khProgressPanel" style="display:none; margin-top:16px;">
+          <div style="font-weight:600; margin-bottom:6px;">
+            Progresso: <span id="khProgressType">—</span>
+          </div>
+
+          <!-- Barra de progresso -->
+          <div style="background:#e0e0e0; border-radius:6px; height:18px; overflow:hidden; margin-bottom:6px;">
+            <div id="khProgressFill"
+                 style="height:100%; width:0%; background:#2196F3;
+                        border-radius:6px; transition:width 0.5s ease;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:#666; margin-bottom:8px;">
+            <span id="khProgressMsg">Aguardando...</span>
+            <span id="khProgressPct">0%</span>
+          </div>
+
+          <!-- Sensores em tempo real -->
+          <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:13px; margin-bottom:8px;">
+            <span>Res. A: <b id="khLvlA">—</b></span>
+            <span>Res. B: <b id="khLvlB">—</b></span>
+            <span>Res. C: <b id="khLvlC">—</b></span>
+            <span>pH: <b id="khPhVal">—</b></span>
+            <span>Temp: <b id="khTempVal">—</b>°C</span>
+            <span id="khCompressorSpan" style="color:#e53935;display:none;">
+              Compressor: <b id="khCompressorS">—</b>s
+            </span>
+          </div>
+
+          <!-- Log de eventos -->
+          <div style="font-size:12px; font-weight:600; margin-bottom:4px; color:#555;">
+            Log de eventos:
+          </div>
+          <div id="khProgressLog"
+               style="background:#f5f5f5; border:1px solid #ddd; border-radius:4px;
+                      padding:6px 8px; max-height:160px; overflow-y:auto;
+                      font-size:12px; font-family:monospace; color:#333;">
+          </div>
+        </div>
+
      <!--     <label for="khRefInput">KH de referência</label> -->
           <div class="inline">
      <!--       <input id="khRefInput" type="number" step="0.01" placeholder="Ex: 7.50" /> -->
@@ -593,19 +636,30 @@
               Preenche uma câmara específica para teste. Use para verificar válvulas e níveis.
             </div>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
-              <button id="fillChamberABtn" class="btn-primary">
-                Encher Câmara A
-              </button>
-              <button id="fillChamberBBtn" class="btn-primary">
-                Encher Câmara B
-              </button>
-              <button id="fillChamberCBtn" class="btn-primary">
-                Encher Câmara C
-              </button>
+              <button id="fillChamberABtn" class="btn-primary">Encher A</button>
+              <button id="fillChamberBBtn" class="btn-primary">Encher B</button>
+              <button id="fillChamberCBtn" class="btn-primary">Encher C</button>
             </div>
-            <span id="chamberTestStatus" class="hint" style="margin-top:6px; display:block;">
-              Selecione uma câmara para testar o enchimento.
-            </span>
+            <!-- Painel de progresso do enchimento -->
+            <div id="fillProgPanel" style="display:none; margin-top:10px;
+                 background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px;">
+              <div style="font-size:12px; color:#9ca3af; margin-bottom:8px;">
+                Enchendo câmara <b id="fillProgTarget">?</b>
+                <span id="fillProgDone" style="display:none; color:#4ade80;"> — Cheio!</span>
+              </div>
+              <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px;
+                          color:#d1d5db; margin-bottom:8px;">
+                <span>Res.A: <b id="fillLvlA">—</b></span>
+                <span>Res.B: <b id="fillLvlB">—</b></span>
+                <span>Res.C: <b id="fillLvlC">—</b></span>
+                <span>pH: <b id="fillPh">—</b></span>
+                <span>Temp: <b id="fillTemp">—</b>°C</span>
+              </div>
+              <div id="fillProgLog"
+                   style="background:#0a0f1e; border:1px solid #1f2937; border-radius:6px;
+                          padding:6px 8px; max-height:100px; overflow-y:auto;
+                          font-size:11px; font-family:monospace; color:#9ca3af;"></div>
+            </div>
           </div>
 
           <!-- Limpeza do sistema -->
@@ -617,9 +671,30 @@
             <button id="systemFlushBtn" class="btn-primary" style="width:100%;">
               🚿 Executar ciclo de limpeza completo
             </button>
-            <span id="flushStatus" class="hint" style="margin-top:6px; display:block;">
-              Ciclo de limpeza demora aproximadamente 2 minutos.
-            </span>
+            <!-- Painel de progresso da limpeza -->
+            <div id="flushProgPanel" style="display:none; margin-top:10px;
+                 background:#020617; border:1px solid #1f2937; border-radius:8px; padding:12px;">
+              <div class="progress-bar" style="margin-bottom:4px;">
+                <div id="flushProgFill" class="progress-inner" style="width:0%;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:12px;
+                          color:#9ca3af; margin-bottom:8px;">
+                <span id="flushProgMsg">Iniciando limpeza...</span>
+                <span id="flushProgPct">0%</span>
+              </div>
+              <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px;
+                          color:#d1d5db; margin-bottom:8px;">
+                <span>Res.A: <b id="flushLvlA">—</b></span>
+                <span>Res.B: <b id="flushLvlB">—</b></span>
+                <span>Res.C: <b id="flushLvlC">—</b></span>
+                <span>pH: <b id="flushPh">—</b></span>
+                <span>Temp: <b id="flushTemp">—</b>°C</span>
+              </div>
+              <div id="flushProgLog"
+                   style="background:#0a0f1e; border:1px solid #1f2937; border-radius:6px;
+                          padding:6px 8px; max-height:100px; overflow-y:auto;
+                          font-size:11px; font-family:monospace; color:#9ca3af;"></div>
+            </div>
           </div>
         </div>
 
@@ -721,6 +796,54 @@
               <div class="inline" style="margin-top:8px;">
                 <button id="khCalibSaveBtn"   class="btn-primary">✓ Iniciar Calibração</button>
                 <button id="khCalibCancelBtn" class="btn-primary">✗ Cancelar</button>
+              </div>
+            </div>
+
+            <!-- Passo 3: Progresso da calibração (aparece no lugar do passo 2) -->
+            <div id="khCalibStep3" class="hidden">
+              <h3 style="margin-bottom:10px;">🔬 Calibração em andamento</h3>
+
+              <!-- Barra de progresso -->
+              <div class="progress-bar" style="margin-bottom:4px;">
+                <div id="khCalibProgFill" class="progress-inner" style="width:0%;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:12px;
+                          color:#9ca3af; margin-bottom:12px;">
+                <span id="khCalibProgMsg">Aguardando...</span>
+                <span id="khCalibProgPct">0%</span>
+              </div>
+
+              <!-- Sensores em tempo real -->
+              <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px;
+                          color:#d1d5db; margin-bottom:10px;">
+                <span>Res.A: <b id="khCalibLvlA">—</b></span>
+                <span>Res.B: <b id="khCalibLvlB">—</b></span>
+                <span>Res.C: <b id="khCalibLvlC">—</b></span>
+                <span>pH: <b id="khCalibPhVal">—</b></span>
+                <span>Temp: <b id="khCalibTempVal">—</b>°C</span>
+                <span id="khCalibCompSpan" style="color:#f97316; display:none;">
+                  Compressor: <b id="khCalibCompS">—</b>s
+                </span>
+              </div>
+
+              <!-- Log de eventos -->
+              <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">Log de eventos:</div>
+              <div id="khCalibProgLog"
+                   style="background:#0a0f1e; border:1px solid #1f2937; border-radius:6px;
+                          padding:6px 8px; max-height:150px; overflow-y:auto;
+                          font-size:11px; font-family:monospace; color:#9ca3af;
+                          margin-bottom:12px;">
+              </div>
+
+              <!-- Botões de ação -->
+              <div style="display:flex; gap:8px; margin-top:4px;">
+                <button id="khCalibAbortBtn" class="btn-danger" style="flex:1;">
+                  ✗ Abortar
+                </button>
+                <button id="khCalibCloseBtn" class="btn-primary"
+                        style="display:none; flex:1;">
+                  ✓ Fechar
+                </button>
               </div>
             </div>
           </div>

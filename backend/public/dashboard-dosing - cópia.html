@@ -373,25 +373,16 @@
       gap: 15px;
     }
 
-    /* MODAIS — centralizados via flexbox, como filhos diretos de <body>
-       para que position:fixed funcione independente de overflow:auto nos ancestrais */
+    /* MODAIS */
     .modal {
       display: none;
       position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 9999;
-      align-items: center;
-      justify-content: center;
-      overflow-y: auto;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-
-    .modal.show {
-      display: flex;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
     }
 
     .modal-content {
@@ -401,12 +392,43 @@
       padding: 20px 24px;
       border-radius: 10px;
       max-width: 600px;
-      width: 100%;
+      width: 90%;
       max-height: 90vh;
       overflow-y: auto;
-      position: relative;
-      flex-shrink: 0;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Força centralização COMPLETA do modal de edição */
+    #editScheduleModal {
+      display: none !important;
+      position: fixed !important;
+      inset: 0 !important; /* top, right, bottom, left = 0 */
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 9999 !important;
+      background: rgba(0, 0, 0, 0.7) !important;
+      overflow: auto !important;
+      padding: 20px !important;
+      box-sizing: border-box !important;
+    }
+
+    #editScheduleModal[style*="display: flex"],
+    #editScheduleModal[style*="display:flex"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    #editScheduleModal .modal-content {
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+      transform: none !important;
+      margin: auto !important;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
     }
 
     .modal-header {
@@ -433,9 +455,7 @@
     /* Modal de confirmação de deletar agenda */
     #deleteConfirmModal,
     #refillConfirmModal,
-    #renamePumpModal,
-    #calibrationConfirmModal,
-    #editCalibrationModal {
+    #renamePumpModal {
       position: fixed;
       top: 0;
       left: 0;
@@ -450,9 +470,7 @@
 
     #deleteConfirmModal.show,
     #refillConfirmModal.show,
-    #renamePumpModal.show,
-    #calibrationConfirmModal.show,
-    #editCalibrationModal.show {
+    #renamePumpModal.show {
       display: flex;
     }
 
@@ -903,108 +921,6 @@
     }
 
 
-    /* Cards da Agenda por bomba */
-    .schedule-pump-card {
-      padding: 0 !important;
-      overflow: hidden;
-    }
-
-    .schedule-card-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 16px;
-      background: rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-
-    .pump-card-name {
-      font-size: 15px;
-      font-weight: 600;
-      color: #e2e8f0;
-      flex: 1;
-    }
-
-    .pump-daily-total {
-      font-size: 12px;
-      color: #94a3b8;
-    }
-
-    .schedule-rows {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .schedule-row {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 10px 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-
-    .schedule-row-disabled {
-      opacity: 0.55;
-    }
-
-    .schedule-row-left {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      flex: 1;
-    }
-
-    .schedule-row-info {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .schedule-days {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 3px;
-    }
-
-    .day-chip {
-      font-size: 10px;
-      padding: 2px 5px;
-      border-radius: 4px;
-      background: rgba(255,255,255,0.06);
-      color: #6b7280;
-    }
-
-    .day-chip.active {
-      background: rgba(99,179,237,0.2);
-      color: #63b3ed;
-    }
-
-    .schedule-details {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      font-size: 12px;
-      color: #94a3b8;
-    }
-
-    .schedule-row-actions {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      flex-shrink: 0;
-    }
-
-    .schedule-row-actions .btn-delete {
-      padding: 4px 8px;
-      font-size: 14px;
-    }
-
-    .schedule-card-footer {
-      padding: 10px 16px;
-    }
-
     /* Título e descrição da seção Agendas alinhados com a tabela */
     #agendaTab .dosing-card {
       text-align: left;
@@ -1292,56 +1208,294 @@
               📅 Define os horários e frequência de dosagem
             </div>
           </div>
+
           <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
             <button id="timersBtn" class="btn-timers">⏰ Timers</button>
             <button class="btn-new-agenda" onclick="openAgendaModal()">+ Nova Agenda</button>
           </div>
         </div>
 
-        <!-- Cards por bomba -->
-        <div id="scheduleCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 16px;">
-          <div style="text-align: center; padding: 40px; color: #6b7280;">Carregando...</div>
-        </div>
-
-        <!-- Manter tbody oculto para compatibilidade -->
-        <tbody id="scheduleTableBody" style="display:none;"></tbody>
+        <div class="dosing-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>STATUS</th>
+                <th>BOMBA</th>
+                <th>DIAS DA SEMANA</th>
+                <th>DOSES/DIA</th>
+                <th>JANELA HORÁRIA</th>
+                <th>VOL. DIÁRIO (ML)</th>
+                <th>AÇÕES</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody">
+              <tr><td colspan="7" style="text-align: center;">Carregando...</td></tr>
+            </tbody>
+          </table>
+         </div> 
       </div>
     </div>
 
 
     <!-- Manual Tab -->
     <div id="manualTab" class="tab-content">
-      <div class="dosing-card" style="margin-bottom:12px;">
-        <h2 class="section-title" style="margin-bottom:4px;">Dose Manual</h2>
-        <div class="info-box">💧 Aplicar uma dose manual imediatamente em cada bomba.</div>
+      <div class="dosing-card">
+        <h2 class="section-title">Dose Manual</h2>
+        <div class="info-box">
+          💧 Aplicar uma dose manual imediatamente.
+        </div>
+        <div class="form-group">
+          <label for="pumpSelectManual">Selecionar Bomba:</label>
+          <select id="pumpSelectManual"></select>
+        </div>
+        <div class="form-group">
+          <label for="manualVolume">Volume (ml):</label>
+          <input type="number" id="manualVolume" min="0" value="0">
+        </div>
+        <button class="btn-primary" onclick="applyManualDose()">💧 Aplicar Dose</button>
       </div>
-      <div id="manualCards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;"></div>
-      <!-- selects ocultos para compatibilidade -->
-      <select id="pumpSelectManual" style="display:none;"></select>
     </div>
 
     <!-- Config Tab -->
     <div id="configTab" class="tab-content">
-      <div class="dosing-card" style="margin-bottom:12px;">
+      <div class="dosing-card">
         <h2 class="section-title">Configurar Bombas</h2>
+
+          <div class="dosing-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>BOMBA</th>
+                  <th>NOME</th>
+                  <th>STATUS</th>
+                  <th>VOL. RECIPIENTE (ML)</th>
+                  <th>VOL. ATUAL (ML)</th>
+                  <th>ALARME %</th>
+                </tr>
+              </thead>
+              <tbody id="configTableBody">
+                <tr><td colspan="8" style="text-align: center;">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
       </div>
-      <div id="configCards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px;"></div>
-      <!-- Manter tbody oculto para compatibilidade -->
-      <tbody id="configTableBody" style="display:none;"></tbody>
     </div>
 
     <!-- Calibration Tab -->
     <div id="calibrationTab" class="tab-content">
-      <div class="dosing-card" style="margin-bottom:12px;">
-        <h2 class="section-title" style="margin-bottom:6px;">Calibração</h2>
-        <div class="info-box" style="font-size:13px;">
+      <div class="dosing-card">
+        <h2 class="section-title">Calibração</h2>
+        <div class="info-box">
           ⚙️ Calibre a taxa de dosagem medindo o volume dispensado em 60 segundos.
         </div>
+        <div class="form-group">
+          <label for="pumpSelectCalibration">Selecionar Bomba:</label>
+          <select id="pumpSelectCalibration"></select>
+        </div>
+        <h3 style="margin-top: 20px;">Procedimento:</h3>
+        <ol class="help-text" style="margin-left: 20px; line-height: 1.6;">
+          <li>Coloque um recipiente graduado sob a bomba</li>
+          <li>Clique em "Iniciar Calibração" para iniciar a dosagem de teste (60s)</li>
+          <li>Após 60 segundos, meça o volume dispensado</li>
+          <li>Digite o volume medido e clique "Salvar Taxa"</li>
+        </ol>
+        <button class="btn-primary" id="goBtn" onclick="startCalibration()" style="margin-top: 20px;">🔴 Iniciar Calibração</button>
+        <div class="form-group" style="margin-top: 20px;">
+          <label for="measuredVolume">Volume Medido (ml):</label>
+          <input type="number" id="measuredVolume" step="0.1" placeholder="ex: 10,5">
+        </div>
+        <button class="btn-primary" onclick="saveCalibration()">✅ Salvar Taxa</button>
+
+        <div class="form-group" style="margin-top: 8px;">
+          <label style="display:block;" class="help-text">
+            Taxa de dosagem da bomba:
+          </label>
+          <div id="calibrationRateLabel" style="margin-top:4px;">
+            Taxa atual desta bomba: -- ml/s
+          </div>
+          <div style="margin-top:24px;">
+            <h3 style="font-size:14px; margin-bottom:8px;">Taxas de todas as bombas</h3>
+            <div id="allPumpsRateList">
+              Carregando taxas...
+            </div>
+          </div>
+          <small class="small-text">
+            Usada nas doses manuais e nas agendas automáticas.
+          </small>
+        </div>
+      </div>  
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Editar Configuração</h2>
+        <span class="close" onclick="closeEditModal()">×</span>
       </div>
-      <div id="calibrationCards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px;"></div>
-      <!-- Select oculto para compatibilidade -->
-      <select id="pumpSelectCalibration" style="display:none;"></select>
-      <input type="hidden" id="measuredVolume">
+      <input type="hidden" id="editPumpIndex">
+      <div class="form-group">
+        <label for="editName">Nome da Bomba:</label>
+        <input type="text" id="editName">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editContainerSize">Recipiente (ml):</label>
+          <input type="number" id="editContainerSize" min="0">
+        </div>
+        <div class="form-group">
+          <label for="editCurrentVolume">Volume Atual (ml):</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="number" id="editCurrentVolume" min="0" style="flex: 1;">
+            <button
+              type="button"
+              onclick="fillToMaxVolume()"
+              style="background: #16a34a; color: white; border: none; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 14px; transition: all 0.2s; flex-shrink: 0; height: 38px; display: flex; align-items: center; justify-content: center;"
+              title="Marcar como cheio"
+              onmouseover="this.style.background='#15803d'"
+              onmouseout="this.style.background='#16a34a'">
+              ↻
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="editAlarmPercent">Alarme (%):</label>
+          <input type="number" id="editAlarmPercent" min="0" max="100">
+        </div>
+      </div>
+
+      <!-- Campos de Consumo e Custo -->
+      <div class="form-row" style="border-top: 1px solid #374151; padding-top: 12px; margin-top: 12px;">
+        <div class="form-group">
+          <label for="editReagentCost">Preço por litro (R$):</label>
+          <input type="number" id="editReagentCost" min="0" step="0.01" placeholder="0.00">
+          <small class="small-text">Para cálculo de custo mensal</small>
+        </div>
+        <div class="form-group">
+          <label for="editAlertBeforeDays">Alertar X dias antes:</label>
+          <input type="number" id="editAlertBeforeDays" min="1" max="90" value="7">
+          <small class="small-text">Alerta quando restar X dias</small>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
+        <button class="btn-primary" onclick="saveEditModal()">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agenda Modal -->
+  <div id="agendaModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Nova Agenda</h2>
+        <span class="close" onclick="closeAgendaModal()">×</span>
+      </div>
+      <div class="form-group">
+        <label>Intervalo mín. entre bombas:</label>
+        <input type="number" id="minGapMinutes" min="5" max="120" value="30" style="width:80px;">
+        <small class="small-text">minutos (padrão 30)</small>
+      </div>
+      <div class="form-group">
+        <label for="pumpSelectAgenda">Selecionar Bomba:</label>
+        <select id="pumpSelectAgenda"></select>
+      </div>
+      <div class="form-group">
+        <label>Dias da Semana:</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Dom</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Seg</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Ter</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Qua</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Qui</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Sex</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" class="day-checkbox" checked> <label>Sab</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dosesPerDay">Doses por Dia:</label>
+          <input type="number" id="dosesPerDay" min="1" value="2">
+        </div>
+        <div class="form-group">
+          <label for="volumePerDay">Volume Diário (ml):</label>
+          <input type="number" id="volumePerDay" min="0" value="36">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="startTime">Horário Inicial:</label>
+          <input type="time" id="startTime" value="08:00">
+        </div>
+        <div class="form-group">
+          <label for="endTime">Horário Final:</label>
+          <input type="time" id="endTime" value="20:00">
+        </div>
+      </div>
+
+      <!-- Notificações -->
+      <div class="form-group" style="border-top: 1px solid #374151; padding-top: 12px; margin-top: 12px;">
+        <label style="font-weight: 600; margin-bottom: 8px; display: block;">🔔 Notificações de Dosagem Concluída</label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="notifyTelegram" style="cursor: pointer;">
+            <span>📱 Enviar notificação no Telegram</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" id="notifyEmail" style="cursor: pointer;">
+            <span>📧 Enviar notificação por Email</span>
+          </label>
+        </div>
+        <small class="small-text" style="display: block; margin-top: 6px; color: #9ca3af;">
+          Você receberá uma mensagem quando a dosagem automática for concluída com sucesso.
+        </small>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-secondary" onclick="closeAgendaModal()">Cancelar</button>
+        <button class="btn-primary" onclick="createSchedule()">+ Criar Agenda</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="calibrationOverlay" class="modal">
+      <div class="modal-content" style="max-width:420px; padding:20px;">
+        <h2>Calibração em andamento</h2>
+        <p id="calibrationCountdownText" class="help-text" style="margin-top:10px;">
+          Restam 60 segundos...
+        </p>
+
+        <div style="margin-top:12px; margin-bottom:16px;">
+          <div class="small-text" style="margin-bottom:4px;">
+            Progresso
+          </div>
+          <div class="progress-bar">
+            <div id="calibrationProgressFill" class="progress-fill"></div>
+          </div>
+        </div>
+
+      <button class="btn-secondary" id="abortCalibrationBtn" onclick="abortCalibration()">
+        ✖ Abortar teste
+      </button>
     </div>
   </div>
 
@@ -1476,46 +1630,6 @@
     </div>
   </div>
 
-  <div id="calibrationConfirmModal">
-    <div class="delete-confirm-content" style="max-width: 450px;">
-      <div class="delete-confirm-title">⚙️ Iniciar Calibração</div>
-      <div style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 16px 0;">
-        <p style="margin-bottom: 12px;"><strong id="calibrationPumpName"></strong></p>
-        <p style="margin-bottom: 8px;">Procedimento:</p>
-        <ol style="margin-left: 20px; margin-bottom: 12px;">
-          <li>Coloque um recipiente graduado sob a bomba</li>
-          <li>A dosagem será iniciada automaticamente após 5 segundos</li>
-          <li>Aguarde 60 segundos até completar</li>
-          <li>Meça o volume dispensado e informe no próximo passo</li>
-        </ol>
-        <p style="color: #fbbf24; font-size: 13px;">⚠️ Certifique-se de que o recipiente está posicionado corretamente antes de continuar.</p>
-      </div>
-      <div class="delete-confirm-buttons">
-        <button id="calibrationCancelBtn" class="delete-btn-cancel">Cancelar</button>
-        <button id="calibrationConfirmBtn" class="delete-btn-confirm" style="background: linear-gradient(135deg, #16a085, #138073);">OK, Iniciar</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="editCalibrationModal">
-    <div class="delete-confirm-content" style="max-width: 400px;">
-      <div class="delete-confirm-title">✏️ Editar Calibração</div>
-      <div style="margin: 16px 0;">
-        <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 12px;"><strong id="editCalibrationPumpName"></strong></p>
-        <p style="color: #94a3b8; font-size: 13px; margin-bottom: 4px;">Taxa atual: <span id="editCalibrationCurrentRate"></span></p>
-        <label style="display:block; color:#cbd5e1; font-size:13px; margin-bottom:8px; margin-top:16px;">Digite o volume medido em 60 segundos (mL):</label>
-        <input type="number" id="editCalibrationVolumeInput" step="0.1" placeholder="Ex: 95.5"
-          style="width: 100%; padding: 10px 12px; font-size: 15px;
-                 background: #0f172a; border: 1px solid #334155; border-radius: 8px;
-                 color: #e5e7eb; outline: none; box-sizing: border-box;">
-      </div>
-      <div class="delete-confirm-buttons">
-        <button id="editCalibrationCancelBtn" class="delete-btn-cancel">Cancelar</button>
-        <button id="editCalibrationConfirmBtn" class="delete-btn-confirm" style="background: linear-gradient(135deg, #667eea, #764ba2);">Salvar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal Timers -->
   <div id="timersModal">
     <div id="timersContent">
@@ -1532,169 +1646,6 @@
     </div>
   </div>
 
-
-  <!-- Edit Modal (filho direto de <body>) -->
-  <div id="editModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Editar Configuração</h2>
-        <span class="close" onclick="closeEditModal()">×</span>
-      </div>
-      <input type="hidden" id="editPumpIndex">
-      <div class="form-group">
-        <label for="editName">Nome da Bomba:</label>
-        <input type="text" id="editName">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="editContainerSize">Recipiente (ml):</label>
-          <input type="number" id="editContainerSize" min="0">
-        </div>
-        <div class="form-group">
-          <label for="editCurrentVolume">Volume Atual (ml):</label>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="number" id="editCurrentVolume" min="0" style="flex: 1;">
-            <button
-              type="button"
-              onclick="fillToMaxVolume()"
-              style="background: #16a34a; color: white; border: none; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 14px; transition: all 0.2s; flex-shrink: 0; height: 38px; display: flex; align-items: center; justify-content: center;"
-              title="Marcar como cheio"
-              onmouseover="this.style.background='#15803d'"
-              onmouseout="this.style.background='#16a34a'">
-              ↻
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="editAlarmPercent">Alarme (%):</label>
-          <input type="number" id="editAlarmPercent" min="0" max="100">
-        </div>
-      </div>
-      <div class="form-row" style="border-top: 1px solid #374151; padding-top: 12px; margin-top: 12px;">
-        <div class="form-group">
-          <label for="editReagentCost">Preço por litro (R$):</label>
-          <input type="number" id="editReagentCost" min="0" step="0.01" placeholder="0.00">
-          <small class="small-text">Para cálculo de custo mensal</small>
-        </div>
-        <div class="form-group">
-          <label for="editAlertBeforeDays">Alertar X dias antes:</label>
-          <input type="number" id="editAlertBeforeDays" min="1" max="90" value="7">
-          <small class="small-text">Alerta quando restar X dias</small>
-        </div>
-      </div>
-      <div class="button-group">
-        <button class="btn-secondary" onclick="closeEditModal()">Cancelar</button>
-        <button class="btn-primary" onclick="saveEditModal()">💾 Salvar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Agenda Modal (filho direto de <body>) -->
-  <div id="agendaModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Nova Agenda</h2>
-        <span class="close" onclick="closeAgendaModal()">×</span>
-      </div>
-      <div class="form-group">
-        <label>Intervalo mín. entre bombas:</label>
-        <input type="number" id="minGapMinutes" min="5" max="120" value="30" style="width:80px;">
-        <small class="small-text">minutos (padrão 30)</small>
-      </div>
-      <div class="form-group">
-        <label for="pumpSelectAgenda">Selecionar Bomba:</label>
-        <select id="pumpSelectAgenda"></select>
-      </div>
-      <div class="form-group">
-        <label>Dias da Semana:</label>
-        <div class="checkbox-group">
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Dom</label></div>
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Seg</label></div>
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Ter</label></div>
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Qua</label></div>
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Qui</label></div>
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Sex</label></div>
-          <div class="checkbox-item"><input type="checkbox" class="day-checkbox" checked> <label>Sab</label></div>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="dosesPerDay">Doses por Dia:</label>
-          <input type="number" id="dosesPerDay" min="1" value="2">
-        </div>
-        <div class="form-group">
-          <label for="volumePerDay">Volume Diário (ml):</label>
-          <input type="number" id="volumePerDay" min="0" value="36">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="startTime">Horário Inicial:</label>
-          <input type="time" id="startTime" value="08:00">
-        </div>
-        <div class="form-group">
-          <label for="endTime">Horário Final:</label>
-          <input type="time" id="endTime" value="20:00">
-        </div>
-      </div>
-      <div class="form-group" style="border-top: 1px solid #374151; padding-top: 12px; margin-top: 12px;">
-        <label style="font-weight: 600; margin-bottom: 8px; display: block;">🔔 Notificações de Dosagem Concluída</label>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="notifyTelegram" style="cursor: pointer;">
-            <span>📱 Enviar notificação no Telegram</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="notifyEmail" style="cursor: pointer;">
-            <span>📧 Enviar notificação por Email</span>
-          </label>
-        </div>
-        <small class="small-text" style="display: block; margin-top: 6px; color: #9ca3af;">
-          Você receberá uma mensagem quando a dosagem automática for concluída com sucesso.
-        </small>
-      </div>
-      <div class="button-group">
-        <button class="btn-secondary" onclick="closeAgendaModal()">Cancelar</button>
-        <button class="btn-primary" onclick="createSchedule()">+ Criar Agenda</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Overlay de operação em andamento: filho direto de <body> para que
-       position:fixed funcione corretamente, sem ser afetado por overflow:auto -->
-  <div id="calibrationOverlay"
-       style="position:fixed; inset:0; background:rgba(0,0,0,0.75);
-              z-index:10000; display:none;
-              align-items:center; justify-content:center;">
-    <div style="max-width:440px; width:90%; padding:28px 24px;
-                background:#0f172a; border:1px solid #334155;
-                border-radius:14px; box-shadow:0 25px 50px rgba(0,0,0,0.6);">
-      <h2 id="calibrationOverlayTitle"
-          style="font-size:20px; color:#e2e8f0; margin-bottom:16px;">
-        ⚙️ Calibração em andamento
-      </h2>
-      <p id="calibrationCountdownText"
-         style="font-size:15px; color:#cbd5e1; margin-bottom:20px; text-align:center;">
-        Restam 60 segundos...
-      </p>
-      <div style="margin-bottom:20px;">
-        <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">Progresso</div>
-        <div class="progress-bar"
-             style="height:12px; background:#1e293b; border-radius:8px; overflow:hidden;">
-          <div id="calibrationProgressFill" class="progress-fill"
-               style="height:100%; background:linear-gradient(90deg, #16a085, #63b3ed);
-                      transition:width 0.3s ease;"></div>
-        </div>
-      </div>
-      <button class="btn-secondary" id="abortCalibrationBtn"
-              onclick="abortCalibration()"
-              style="width:100%; padding:10px; font-size:14px;">
-        ✖ Abortar Operação
-      </button>
-    </div>
-  </div>
 
   <!-- Scripts -->
   <script src="js/dashboard-common.js"></script>
