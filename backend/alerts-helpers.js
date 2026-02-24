@@ -6,6 +6,13 @@ const pool = require('./db-pool');
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 
 // === EMAIL ===
+console.log('[SMTP Config]', {
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  user: process.env.EMAIL_USER,
+  from: process.env.EMAIL_FROM
+});
+
 const mailTransporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: Number(process.env.EMAIL_PORT),
@@ -79,17 +86,21 @@ async function sendEmailForUser(userId, subject, htmlBody) {
     );
 
     if (!rows || rows.length === 0) {
+      const error = new Error('Usuário não encontrado');
+      error.code = 'USER_NOT_FOUND';
       console.warn('sendEmailForUser: user não encontrado', userId);
-      return;
+      throw error;
     }
 
     const u = rows[0];
     if (!u.email_enabled || !u.email) {
+      const error = new Error('Email desabilitado ou não configurado');
+      error.code = 'EMAIL_DISABLED';
       console.log(
         'sendEmailForUser: Email desabilitado ou não configurado para user',
         userId
       );
-      return;
+      throw error;
     }
 
     await mailTransporter.sendMail({
@@ -102,6 +113,7 @@ async function sendEmailForUser(userId, subject, htmlBody) {
     console.log('sendEmailForUser: email enviado para user', userId, u.email);
   } catch (err) {
     console.error('sendEmailForUser error:', err.message);
+    throw err; // Re-lançar a exceção para o código chamador tratar
   } finally {
     if (conn) try { conn.release(); } catch {}
   }
